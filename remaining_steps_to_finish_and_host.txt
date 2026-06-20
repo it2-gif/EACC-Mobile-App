@@ -1,0 +1,412 @@
+EACC Chat - Remaining Steps to Finish and Host
+
+Updated: 2026-06-20
+
+Current Position
+================
+
+The project is already strong in these areas:
+
+- Flutter chat UI is working and professionally branded
+- Student LMS login is connected
+- Teacher LMS login is connected
+- PostgreSQL and Prisma are working
+- Firebase custom-token authentication is working for student and teacher
+- Firestore real-time chat is working
+- Image, video, and voice messages are implemented
+- Chat permissions for student and teacher are secured
+
+The main unfinished work is no longer the basic app.
+The remaining work is the production-completion work.
+
+
+Remaining Steps Until The App Is Finished
+=========================================
+
+Step 1: Finish admin role end to end
+------------------------------------
+
+What remains:
+
+- Connect admin LMS login to the backend
+- Parse the real admin LMS response correctly
+- Create or sync admin users in PostgreSQL
+- Generate Firebase custom tokens for admins
+- Add admin claims and secure admin permissions in Firestore and Storage rules
+- Replace any remaining fake admin data in Flutter
+
+Result:
+
+The admin becomes a real production role, not a temporary local role.
+
+
+Step 2: Remove all remaining fake data and fake flows
+-----------------------------------------------------
+
+What remains:
+
+- Confirm no screen still depends on fake_data.dart
+- Confirm student data comes only from backend and Firebase
+- Confirm teacher data comes only from backend and Firebase
+- Confirm admin data comes only from backend and Firebase
+- Remove old development-only fallback logic that could confuse production behavior
+
+Result:
+
+When the app runs, everything shown is real LMS-backed and database-backed data.
+
+
+Step 3: Add unread counts, read receipts, and latest thread ordering polish
+---------------------------------------------------------------------------
+
+What remains:
+
+- Add unread message counters per thread
+- Mark messages as seen when a user opens the chat
+- Show thread ordering by newest activity
+- Keep teacher student-thread list sorted by latest activity
+- Keep admin monitoring list sorted by latest activity
+
+Result:
+
+The app will feel much more complete and professional in daily use.
+
+
+Step 4: Add push notifications
+------------------------------
+
+What remains:
+
+- Save FCM device tokens in PostgreSQL
+- Refresh tokens when changed
+- Send push notifications when a new message is created
+- Handle foreground and background notifications
+- Open the correct chat when a user taps the notification
+
+Result:
+
+Users do not need to keep the app open to know that a new message arrived.
+
+
+Step 5: Improve attachment experience
+-------------------------------------
+
+What remains:
+
+- Add upload progress UI for large video and voice files
+- Add retry UI when upload fails
+- Add better preview states for media before and after sending
+- Optionally add document attachments later if EACC needs PDF or file exchange
+
+Result:
+
+Media feels reliable and polished instead of only technically working.
+
+
+Step 6: Professional UI/UX finishing pass
+-----------------------------------------
+
+What remains:
+
+- Tighten spacing, typography, and hierarchy on all screens
+- Standardize empty, loading, and error states
+- Improve mobile ergonomics for chat actions
+- Make teacher student-list and admin monitoring views more scan-friendly
+- Improve visual feedback for sending, uploading, recording, and playing media
+- Check responsiveness carefully on Android phone widths
+- Check color contrast and accessibility
+
+Result:
+
+The app looks and feels like a real production product, not just a working prototype.
+
+
+Step 7: Security and production hardening
+-----------------------------------------
+
+What remains:
+
+- Review Firestore and Storage rules one more time after admin is added
+- Add backend rate limiting
+- Add audit logging for sensitive admin actions
+- Add server-side validation for message metadata where needed
+- Keep Firebase Admin credentials only on the backend
+- Prepare production environment variables safely
+
+Result:
+
+The app becomes safer to expose to real users.
+
+
+Step 8: Real-device testing
+---------------------------
+
+What remains:
+
+- Test on at least one real Android phone
+- Test login, chat, image upload, video upload, voice recording, and playback
+- Test microphone and camera permissions on a real device
+- Test logout and session restore
+- Test weak internet behavior
+- Test teacher and student communication on two devices
+
+Result:
+
+You will catch the issues that do not appear in Chrome testing.
+
+
+Step 9: Production deployment
+-----------------------------
+
+What remains:
+
+- Host the NestJS backend publicly
+- Host the Flutter web build publicly if you want a browser version
+- Point Flutter production config to the hosted backend
+- Deploy Firestore and Storage rules
+- Verify Firebase Authentication and Storage are enabled in production
+- Add domain, HTTPS, and environment configuration
+
+Result:
+
+Real users can access the system outside your laptop.
+
+
+Recommended Order From Here
+===========================
+
+This is the best next order for finishing the project:
+
+1. Finish admin role
+2. Remove all remaining fake data
+3. Add unread counts and read receipts
+4. Add push notifications
+5. Do the UI/UX polishing pass
+6. Do security hardening
+7. Test on real Android devices
+8. Deploy backend and web app
+9. Do final production smoke testing
+
+
+How To Host It
+==============
+
+You asked about Hostinger VPS versus normal shared hosting.
+
+Short answer:
+
+- Use Hostinger VPS if you want this app to run properly and professionally
+- Do not rely on normal shared hosting for the backend
+
+
+Why VPS Is The Correct Choice
+=============================
+
+Your project needs:
+
+- A long-running NestJS backend
+- Environment variables
+- PostgreSQL access
+- Firebase Admin credentials on the server
+- API endpoints always available
+- Process manager support such as PM2
+- Reverse proxy such as Nginx
+- SSL and domain control
+
+That is what a VPS is for.
+
+
+Why Normal Shared Hosting Is Not Recommended
+============================================
+
+Normal shared hosting is usually fine for:
+
+- Simple PHP websites
+- Static HTML pages
+- Basic WordPress sites
+
+It is usually not good for:
+
+- NestJS backend hosting
+- Long-running Node.js API processes
+- Production-grade API control
+- Real-time style app backends
+- Easier debugging and deployment workflows
+
+You might host only the Flutter web build on shared hosting if it is purely static,
+but the backend should still be on a VPS or another backend host.
+
+
+Best Practical Hosting Options
+==============================
+
+Option A: Hostinger VPS
+
+Best if:
+
+- You want one main server you control
+- You want backend deployment freedom
+- You want professional production hosting
+
+Recommended use:
+
+- NestJS backend on Hostinger VPS
+- PostgreSQL either on VPS or a managed database
+- Flutter web build on the VPS through Nginx
+- Firebase continues for Auth, Firestore, Storage, and notifications
+
+
+Option B: Split hosting
+
+Best if:
+
+- You want simpler frontend deployment
+
+Recommended use:
+
+- Backend on VPS or Railway or Render
+- Flutter web on Firebase Hosting or Hostinger static hosting
+- PostgreSQL on Neon, Supabase, or VPS
+
+
+My recommendation:
+
+Use Hostinger VPS for backend and optionally for the Flutter web build too.
+It gives you fewer platform limitations and a cleaner production setup.
+
+
+How To Host On Hostinger VPS
+============================
+
+Step 1: Prepare the server
+
+- Buy a Linux VPS
+- Point your domain or subdomain to the VPS
+- Install Node.js LTS
+- Install Nginx
+- Install PM2
+- Install Git
+- Install SSL with Let's Encrypt
+
+
+Step 2: Upload the backend
+
+- Clone the repository to the VPS
+- Go to the backend folder
+- Add production `.env` values
+- Add the Firebase Admin credentials on the server only
+- Run Prisma migration deploy
+- Build the NestJS app
+- Start it with PM2
+
+Example backend flow:
+
+- `npm install`
+- `npx prisma migrate deploy`
+- `npm run build`
+- `pm2 start dist/src/main.js --name eacc-backend`
+
+
+Step 3: Configure Nginx
+
+- Proxy HTTPS requests from your domain to the NestJS backend port
+- Example:
+  - `https://api.yourdomain.com` -> `http://localhost:3000`
+
+
+Step 4: Deploy the Flutter web app
+
+- Run `flutter build web`
+- Copy the `build/web` files to the web root on the VPS
+- Serve them with Nginx
+- Example:
+  - `https://chat.yourdomain.com`
+
+
+Step 5: Update production configuration
+
+- Change Flutter backend base URL to the hosted API domain
+- Confirm Firebase project settings allow the production web domain
+- Deploy final Firestore and Storage rules
+
+
+Step 6: Run production smoke tests
+
+- Student login
+- Teacher login
+- Admin login after admin is finished
+- Text chat
+- Image upload
+- Video upload
+- Voice record and playback
+- Notification delivery
+- Logout and session restore
+
+
+How To Host With Normal Shared Hosting
+======================================
+
+This is only acceptable for the Flutter web files, not the backend.
+
+Possible setup:
+
+- Upload `build/web` to shared hosting public folder
+- Keep the backend somewhere else:
+  - Hostinger VPS
+  - Railway
+  - Render
+  - another Node.js-capable host
+
+This means shared hosting alone is not enough for the full app.
+
+
+Minimum Production Architecture I Recommend
+===========================================
+
+- Flutter app:
+  - Android APK or AAB
+  - Optional web version
+- Backend:
+  - NestJS on Hostinger VPS
+- Database:
+  - PostgreSQL
+- Firebase:
+  - Authentication
+  - Firestore
+  - Storage
+  - FCM
+- Reverse proxy:
+  - Nginx with HTTPS
+
+
+What "Finished and Ready" Means
+===============================
+
+I would consider the app production-ready when all of this is true:
+
+- Student login is real
+- Teacher login is real
+- Admin login is real
+- No fake data remains
+- Chat permissions are secure
+- Media sending works on real phones
+- Notifications work
+- Real-device testing is completed
+- Backend is hosted publicly
+- Web or mobile release build is prepared
+- Production smoke test passes
+
+
+Simple Recommendation
+=====================
+
+If the goal is a serious and stable release, use Hostinger VPS, not normal shared hosting.
+
+The best next engineering step is:
+
+1. Finish admin role
+2. Remove fake data completely
+3. Add notifications and unread logic
+4. Do the final UI/UX pass
+5. Deploy to VPS
+

@@ -1,0 +1,188 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  STUDENT @map("student")
+  TEACHER @map("teacher")
+  ADMIN   @map("admin")
+
+  @@map("user_role")
+}
+
+enum UserStatus {
+  ACTIVE    @map("active")
+  SUSPENDED @map("suspended")
+  DISABLED  @map("disabled")
+
+  @@map("user_status")
+}
+
+enum CourseStatus {
+  ACTIVE   @map("active")
+  ARCHIVED @map("archived")
+
+  @@map("course_status")
+}
+
+enum MembershipStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+
+  @@map("membership_status")
+}
+
+enum DevicePlatform {
+  ANDROID @map("android")
+  IOS     @map("ios")
+  WEB     @map("web")
+
+  @@map("device_platform")
+}
+
+enum AuditResult {
+  SUCCESS @map("success")
+  FAILURE @map("failure")
+
+  @@map("audit_result")
+}
+
+model User {
+  id          String     @id @default(uuid()) @db.Uuid
+  lmsSource   String     @default("eacc_lms") @map("lms_source") @db.VarChar(50)
+  lmsUserId   String     @map("lms_user_id") @db.VarChar(100)
+  role        UserRole
+  name        String     @db.VarChar(200)
+  email       String?    @db.VarChar(320)
+  status      UserStatus @default(ACTIVE)
+  lastLoginAt DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  memberships  CourseMembership[]
+  deviceTokens DeviceToken[]
+  auditLogs    AuditLog[]
+
+  @@unique([lmsSource, lmsUserId, role])
+  @@index([email])
+  @@index([role, status])
+  @@map("users")
+}
+
+model Course {
+  id          String       @id @default(uuid()) @db.Uuid
+  lmsSource   String       @default("eacc_lms") @map("lms_source") @db.VarChar(50)
+  lmsCourseId String       @map("lms_course_id") @db.VarChar(100)
+  name        String       @db.VarChar(250)
+  category    String?      @db.VarChar(200)
+  status      CourseStatus @default(ACTIVE)
+  startsAt    DateTime?    @map("starts_at") @db.Timestamptz(6)
+  endsAt      DateTime?    @map("ends_at") @db.Timestamptz(6)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  memberships CourseMembership[]
+
+  @@unique([lmsSource, lmsCourseId])
+  @@index([status])
+  @@index([name])
+  @@map("courses")
+}
+
+model CourseMembership {
+  id        String           @id @default(uuid()) @db.Uuid
+  courseId  String           @map("course_id") @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  role      UserRole
+  status    MembershipStatus @default(ACTIVE)
+  syncedAt  DateTime         @default(now()) @map("synced_at") @db.Timestamptz(6)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([courseId, userId, role])
+  @@index([userId, status])
+  @@index([courseId, role, status])
+  @@map("course_memberships")
+}
+
+model DeviceToken {
+  id         String         @id @default(uuid()) @db.Uuid
+  userId     String         @map("user_id") @db.Uuid
+  token      String         @unique @db.Text
+  platform   DevicePlatform
+  deviceName String?        @map("device_name") @db.VarChar(200)
+  active     Boolean        @default(true)
+  lastSeenAt DateTime       @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, active])
+  @@map("device_tokens")
+}
+
+model AuditLog {
+  id           String      @id @default(uuid()) @db.Uuid
+  actorUserId  String?     @map("actor_user_id") @db.Uuid
+  action       String      @db.VarChar(100)
+  resourceType String      @map("resource_type") @db.VarChar(100)
+  resourceId   String?     @map("resource_id") @db.VarChar(200)
+  result       AuditResult
+  ipAddress    String?     @map("ip_address") @db.Inet
+  userAgent    String?     @map("user_agent") @db.Text
+  metadata     Json        @default("{}") @db.JsonB
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@index([resourceType, resourceId])
+  @@map("audit_logs")
+}
+
+model LmsSyncRun {
+  id             String    @id @default(uuid()) @db.Uuid
+  syncType       String    @map("sync_type") @db.VarChar(50)
+  status         String    @db.VarChar(30)
+  recordsRead    Int       @default(0) @map("records_read")
+  recordsChanged Int       @default(0) @map("records_changed")
+  errorCode      String?   @map("error_code") @db.VarChar(100)
+  startedAt      DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt     DateTime? @map("finished_at") @db.Timestamptz(6)
+
+  @@index([status, startedAt])
+  @@map("lms_sync_runs")
+}
+
+model IntegrationOutbox {
+  id            String    @id @default(uuid()) @db.Uuid
+  eventType     String    @map("event_type") @db.VarChar(100)
+  aggregateType String    @map("aggregate_type") @db.VarChar(100)
+  aggregateId   String    @map("aggregate_id") @db.Uuid
+  payload       Json      @db.JsonB
+  attempts      Int       @default(0)
+  availableAt   DateTime  @default(now()) @map("available_at") @db.Timestamptz(6)
+  processedAt   DateTime? @map("processed_at") @db.Timestamptz(6)
+  lastErrorCode String?   @map("last_error_code") @db.VarChar(100)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([processedAt, availableAt])
+  @@index([aggregateType, aggregateId])
+  @@map("integration_outbox")
+}

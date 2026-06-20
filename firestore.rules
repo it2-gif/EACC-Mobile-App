@@ -1,0 +1,104 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSupportedRole() {
+      return isSignedIn()
+        && request.auth.token.role in ['student', 'teacher'];
+    }
+
+    function hasCourse(courseId) {
+      return isSupportedRole()
+        && request.auth.token.courseIds is list
+        && courseId in request.auth.token.courseIds;
+    }
+
+    function isStudentThread(threadId) {
+      return request.auth.token.role == 'student'
+        && request.auth.token.lmsUserId == threadId;
+    }
+
+    function isTeacher() {
+      return request.auth.token.role == 'teacher';
+    }
+
+    function canAccessThread(courseId, threadId) {
+      return hasCourse(courseId)
+        && (isTeacher() || isStudentThread(threadId));
+    }
+
+    function hasValidSender() {
+      return request.resource.data.sender_role == request.auth.token.role
+        && request.resource.data.sender_name == request.auth.token.displayName;
+    }
+
+    function sameField(name) {
+      return request.resource.data[name] == resource.data[name];
+    }
+
+    function isReadReceiptUpdate(threadId) {
+      return request.resource.data.thread_id == threadId
+        && sameField('last_message')
+        && sameField('last_sender_name')
+        && sameField('last_sender_role')
+        && sameField('last_message_at')
+        && (
+          (
+            request.auth.token.role == 'student'
+            && request.resource.data.student_unread_count == 0
+            && request.resource.data.student_last_read_at == request.time
+            && sameField('teacher_unread_count')
+            && sameField('teacher_last_read_at')
+          )
+          ||
+          (
+            request.auth.token.role == 'teacher'
+            && request.resource.data.teacher_unread_count == 0
+            && request.resource.data.teacher_last_read_at == request.time
+            && sameField('student_unread_count')
+            && sameField('student_last_read_at')
+          )
+        );
+    }
+
+    function isOutgoingThreadUpdate(threadId) {
+      return request.resource.data.thread_id == threadId
+        && request.resource.data.last_sender_role == request.auth.token.role
+        && request.resource.data.last_sender_name == request.auth.token.displayName
+        && (
+          isTeacher()
+          || request.resource.data.student_name == request.auth.token.displayName
+        );
+    }
+
+    match /courses/{courseId} {
+      allow read: if hasCourse(courseId);
+      allow write: if false;
+
+      match /threads/{threadId} {
+        allow read: if canAccessThread(courseId, threadId);
+        allow create: if canAccessThread(courseId, threadId)
+          && isOutgoingThreadUpdate(threadId);
+        allow update: if canAccessThread(courseId, threadId)
+          && (
+            isOutgoingThreadUpdate(threadId)
+            || isReadReceiptUpdate(threadId)
+          );
+        allow delete: if false;
+
+        match /messages/{messageId} {
+          allow read: if canAccessThread(courseId, threadId);
+          allow create: if canAccessThread(courseId, threadId)
+            && hasValidSender()
+            && request.resource.data.type in ['text', 'image', 'video', 'voice']
+            && request.resource.data.created_at == request.time;
+          allow update, delete: if false;
+        }
+      }
+    }
+  }
+}

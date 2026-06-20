@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "492936842220",
+    "project_id": "eacc-mobile-app",
+    "storage_bucket": "eacc-mobile-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:492936842220:android:d4a225330630e03ac34ec9",
+        "android_client_info": {
+          "package_name": "com.example.chatt_eacc"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD270_y2v0bEboQfuN94bOjolN-UoGvkjo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

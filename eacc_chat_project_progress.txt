@@ -1,0 +1,473 @@
+EACC Chat Mobile App - Project Progress
+
+Last Updated: 2026-06-18
+
+Project Goal
+============
+
+Build a professional Flutter chat application for EACC with three roles:
+
+1. Student
+2. Teacher
+3. Admin
+
+Privacy requirements:
+
+- A student sees only their courses and their own chat thread.
+- A student never sees another student's conversation.
+- A teacher sees only their courses and the student threads in those courses.
+- An admin can monitor all authorized courses, users, and chats.
+- Production permissions must be enforced by Firebase and the backend, not only
+  by the Flutter interface.
+
+Technology
+==========
+
+Current:
+
+- Flutter frontend
+- Firebase Firestore for real-time messages
+- Firebase Storage for chat images
+- Web and Android Firebase configuration
+
+Planned production stack:
+
+- Node.js with NestJS (backend skeleton created)
+- PostgreSQL with Prisma (schema and initial migration created)
+- Firebase Admin SDK
+- Firebase Authentication custom tokens
+- Firebase Cloud Messaging
+- EACC LMS integration
+
+Current Development Mode
+========================
+
+- Login and user/course data are still fake.
+- Firestore stores real chat messages.
+- Firebase Storage stores real uploaded images.
+- Firestore and Storage rules are open for development.
+- Open rules must not be used in production.
+
+Completed Features
+==================
+
+Application and branding
+------------------------
+
+- Student, teacher, and admin login paths
+- Student course list
+- Teacher course list and student thread list
+- Admin dashboard, courses, users, and chats
+- Logout navigation
+- Professional responsive layout
+- Official EACC blue logo on the login screen
+- Blue EACC visual theme across the application
+- Desktop and mobile layout verification
+
+Role behavior
+-------------
+
+- Student messages are identified as Student.
+- Teacher messages are identified as Teacher.
+- Admin is separate from Teacher.
+- Admin messages use the name "EACC Admin".
+- Admin sees all messages on the left in white bubbles for monitoring.
+- Teacher and student see their own messages on the right.
+
+Real-time chat
+--------------
+
+- Firestore real-time text messages
+- Messages persist after refresh
+- Thread summaries show the latest message and sender
+- Message ordering
+- Loading, empty, and error states
+- Automatic scroll to the newest message
+- Sending a new text or image keeps the sender at the bottom
+- Message times use 12-hour format with AM/PM
+- Thread times use 12-hour format with AM/PM for today's messages
+- Message pagination:
+  - Load the newest 30 messages first
+  - Load 30 older messages at a time
+  - Preserve reading position while loading older messages
+
+Image messages
+--------------
+
+- Pick an image from the gallery
+- Upload images to Firebase Storage
+- Save image metadata in Firestore
+- Display images inside the chat
+- Open images in a full-screen viewer
+- CORS configured for Firebase Storage
+- Image uploads manually verified for student, teacher, and admin
+- Allowed image types:
+  - JPG
+  - JPEG
+  - PNG
+  - WEBP
+  - GIF
+- Maximum image size: 5 MB
+- Clear validation and upload error messages
+
+Reliability
+-----------
+
+- Text message and thread summary writes use one Firestore batch.
+- Image message and thread summary writes use one Firestore batch after upload.
+- Message and thread metadata cannot be partially saved by the database commit.
+- Duplicate sends are blocked while a send or upload is active.
+
+Current Firestore Structure
+===========================
+
+courses/{courseId}/threads/{threadId}/messages/{messageId}
+
+Thread fields:
+
+- thread_id
+- student_name
+- last_message
+- last_sender_name
+- last_sender_role
+- last_message_at
+- updated_at
+
+Text message fields:
+
+- type
+- text
+- sender_name
+- sender_role
+- created_at
+
+Image message fields:
+
+- type
+- text
+- media_url
+- file_name
+- storage_path
+- sender_name
+- sender_role
+- created_at
+
+Current Storage Structure
+=========================
+
+chat_uploads/courses/{courseId}/threads/{threadId}/{timestamp}_{fileName}
+
+Automated Verification
+======================
+
+Current tests cover:
+
+- Supported and rejected image uploads
+- Empty image rejection
+- 5 MB image limit
+- EACC logo on login
+- Student login navigation
+- Teacher login navigation
+- Admin login navigation
+- Student and teacher message ownership
+- Admin left-side monitoring behavior
+- Official EACC Admin sender label
+- Midnight, morning, noon, and afternoon AM/PM formatting
+
+Verification completed on 2026-06-18:
+
+- 16 automated tests passed
+- Dart analysis reported no issues
+- Flutter production web build succeeded
+- Desktop login layout visually checked
+- Mobile login, course list, and chat layout visually checked
+
+Still Fake or Incomplete
+========================
+
+1. Login accepts any username and password.
+2. The user manually selects Student, Teacher, or Admin.
+3. Student, teacher, and admin identities are static.
+4. Courses and memberships come from fake_data.dart.
+5. The admin user list is static.
+6. There is no LMS connection.
+7. The backend skeleton and local PostgreSQL database are connected, but LMS
+   authentication is not implemented yet.
+8. Firestore and Storage rules are open for development.
+9. Video attachments are not implemented.
+10. General file attachments are not implemented.
+11. Voice recording and playback are not implemented.
+12. Read receipts and unread counters are not implemented.
+13. Push notifications are not implemented.
+14. Real Android device testing is not completed.
+15. Production deployment is not completed.
+
+Next Phase: Production Data Model
+=================================
+
+The next task is to define the permanent data model before authentication and
+LMS integration.
+
+The model must define:
+
+1. Users
+   - id
+   - lms_user_id
+   - role
+   - name
+   - email
+   - status
+
+2. Courses
+   - id
+   - lms_course_id
+   - name
+   - category
+   - status
+
+3. Course memberships
+   - user_id
+   - course_id
+   - role
+   - active
+
+4. Chat threads
+   - id
+   - course_id
+   - student_id
+   - last message metadata
+   - timestamps
+
+5. Messages
+   - id
+   - thread_id
+   - sender_id
+   - sender_role
+   - type
+   - text
+   - attachment metadata
+   - timestamps
+
+6. Device tokens
+   - user_id
+   - FCM token
+   - platform
+   - last active time
+
+7. Audit records
+   - admin actions
+   - security events
+   - relevant timestamps
+
+Important design rules:
+
+- Use stable LMS IDs and database IDs, never names as identity.
+- A thread belongs to exactly one student and one course.
+- Membership data determines access to a course.
+- The backend is the trusted source for roles and permissions.
+- Flutter must not choose or grant a role in production.
+
+Recommended Work Order
+======================
+
+1. Write the production data model and API contract.
+2. Create the NestJS backend project.
+3. Add PostgreSQL and Prisma migrations.
+4. Implement LMS login and user/course synchronization.
+5. Generate Firebase custom authentication tokens.
+6. Replace fake Flutter login and data with backend responses.
+7. Secure Firestore and Storage rules using authenticated identity and
+   memberships.
+8. Add file, video, and voice messages.
+9. Add unread counts, read receipts, and push notifications.
+10. Test on a real Android device.
+11. Add production logging, App Check, backups, and rate limiting.
+12. Deploy the backend and release builds.
+
+Immediate Next Task
+===================
+
+The production data model and API contract are now documented in:
+
+docs/production_architecture.md
+
+Next:
+
+1. Review the open LMS questions in the architecture document.
+2. Collect real student, teacher, and admin LMS success/failure response
+   examples.
+3. Implement the LMS adapter and login endpoint from the real response samples.
+4. Add Firebase Admin custom-token generation after LMS login succeeds.
+
+Backend Foundation Completed
+============================
+
+Location:
+
+backend/
+
+Implemented:
+
+- NestJS 11 strict TypeScript project
+- Fastify HTTP adapter
+- Validated environment configuration
+- Prisma 7 PostgreSQL client
+- Users, courses, memberships, device tokens, audit logs, LMS sync runs, and
+  integration outbox models
+- Generated initial SQL migration
+- Global Prisma service
+- GET /v1/health endpoint
+- Normalized LMS client contracts
+- POST /v1/auth/lms-login endpoint
+- Student, teacher, and admin LMS endpoint routing
+- application/x-www-form-urlencoded LMS requests using username and
+  inputPassword
+- Safe invalid-credentials, unavailable, and unsupported-response errors
+- Known student and teacher JSON field normalization
+- Backend unit tests
+- Backend lint and production build verification
+
+Backend verification completed on 2026-06-18:
+
+- Prisma schema valid
+- Prisma Client generated
+- Initial SQL migration generated
+- Initial migration applied to the local eacc_chat PostgreSQL database
+- TypeScript production build passed
+- ESLint passed
+- Backend tests passed
+- Backend started successfully
+- GET http://localhost:3000/v1/health returned status ok
+- POST /v1/auth/lms-login request validation verified
+
+Current LMS blocker:
+
+- Student authentication is confirmed as a PHP session flow:
+  - GET /login.php to establish PHPSESSID
+  - POST /members/login_1.php with ty, username, and inputPassword
+  - GET /members/ using the same session
+- The student dashboard HTML identity parser extracts the student name and LMS
+  ID from the Welcome heading.
+- The Request a Report course dropdown contains historical courses and is
+  intentionally excluded from chat authorization.
+- The student /members/lms page is now parsed.
+- Only cards in the Open Courses tab create active memberships.
+- Closed Courses are excluded from active chat authorization.
+- The current test student has zero open courses in the saved response.
+- Course 2191 ended on 2026-06-14 and course 2190 ended on 2026-06-13, so both
+  correctly appear under Closed Courses on 2026-06-18.
+- Teacher and admin dashboard HTML samples are still required.
+- Do not connect Flutter login or create memberships until active course data
+  and all role response structures are confirmed.
+
+Known dependency audit note:
+
+- The current NestJS and Prisma dependency trees contain upstream advisories.
+- The application uses Fastify instead of Express.
+- Do not run npm audit fix --force because it proposes incompatible major
+  downgrades.
+- Recheck advisories when patched NestJS and Prisma releases become available.
+
+Security Notes
+==============
+
+- Never deploy open Firestore or Storage rules to production.
+- Never store LMS passwords in Firestore.
+- Never expose Firebase Admin credentials in Flutter.
+- Do not trust a role or user ID supplied by Flutter without backend validation.
+- Use Firebase custom claims and server-controlled memberships.
+- Validate attachment type and size on both client and server.
+
+Development Commands
+====================
+
+Run the app:
+
+flutter run -d chrome
+
+Analyze:
+
+flutter analyze
+
+Run tests:
+
+flutter test
+
+Build web:
+
+flutter build web
+
+Firebase deployment helper:
+
+scripts/setup-firebase.ps1
+
+Firebase setup instructions:
+
+scripts/SETUP.md
+
+Current Status
+==============
+
+The real-time Flutter chat prototype is stable and visually professional.
+
+Text chat, image chat, role presentation, pagination, timestamps, and core
+automated tests work. The project is ready to move from prototype data toward
+the production identity, membership, backend, and LMS architecture.
+
+Secure Student and Teacher Authentication
+=========================================
+
+- Student and teacher LMS login is connected to the NestJS backend.
+- Authenticated LMS users and active courses are synchronized to PostgreSQL.
+- The backend creates Firebase custom tokens using stable UIDs:
+  - student:<lms_user_id>
+  - teacher:<lms_user_id>
+- Signed claims contain the role, LMS user ID, display name, app user ID, and
+  compact active-course ID list.
+- Flutter signs into Firebase only after LMS authentication succeeds.
+- LMS passwords are never stored by Flutter.
+- Non-secret session/course data is restored only while the matching Firebase
+  identity remains signed in.
+- Persisted app sessions are rejected after 12 hours when the app starts, and
+  logout clears both Firebase and saved session data.
+- Firestore rules restrict students to their own course thread.
+- Teachers can access threads only for courses present in their signed claims.
+- Message sender role and name must match the signed Firebase identity.
+- Storage rules enforce the same course/thread access and a 5 MB image limit.
+- Admin Firebase access remains intentionally disabled until admin LMS
+  integration is implemented.
+
+Verification completed on 2026-06-18:
+
+- Backend: 9 test suites and 19 tests passed.
+- Backend production build passed.
+- Backend ESLint passed.
+- Flutter analyzer reported no code issues.
+- Flutter focused suite: 16 tests passed.
+- Firestore and Storage rules compiled successfully in Firebase CLI dry run.
+
+Activation still required:
+
+1. Add Firebase service-account credentials to backend/.env.
+2. Restart the backend and verify login returns firebase.customToken.
+3. Deploy firestore.rules and storage.rules.
+4. Run the student/teacher end-to-end access tests in scripts/SETUP.md.
+
+Rich Media Chat
+===============
+
+- Students and teachers can choose photos from the gallery.
+- Camera photos are captured and sent immediately.
+- Existing videos can be selected and sent.
+- Camera videos can be recorded for up to two minutes and sent immediately.
+- Voice messages use tap-to-record and tap-to-stop-and-send.
+- Voice recordings can be cancelled and auto-stop after five minutes.
+- Voice messages include inline playback and duration progress.
+- Videos include inline playback controls.
+- Upload limits are enforced in Flutter and Firebase Storage:
+  - Images: 5 MB
+  - Voice: 10 MB
+  - Videos: 50 MB
+- Android and iOS camera, microphone, and photo-library permissions are
+  configured.
+- Firestore and Storage rules support image, voice, and video messages.

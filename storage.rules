@@ -1,0 +1,48 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSupportedRole() {
+      return request.auth != null
+        && request.auth.token.role in ['student', 'teacher'];
+    }
+
+    function hasCourse(courseId) {
+      return isSupportedRole()
+        && request.auth.token.courseIds is list
+        && courseId in request.auth.token.courseIds;
+    }
+
+    function canAccessThread(courseId, threadId) {
+      return hasCourse(courseId)
+        && (
+          request.auth.token.role == 'teacher'
+          || (
+            request.auth.token.role == 'student'
+            && request.auth.token.lmsUserId == threadId
+          )
+        );
+    }
+
+    match /chat_uploads/courses/{courseId}/threads/{threadId}/{fileName} {
+      allow read: if canAccessThread(courseId, threadId);
+      allow create: if canAccessThread(courseId, threadId)
+        && request.resource.size > 0
+        && (
+          (
+            request.resource.contentType.matches('image/.*')
+            && request.resource.size <= 5 * 1024 * 1024
+          )
+          || (
+            request.resource.contentType.matches('audio/.*')
+            && request.resource.size <= 10 * 1024 * 1024
+          )
+          || (
+            request.resource.contentType.matches('video/.*')
+            && request.resource.size <= 50 * 1024 * 1024
+          )
+        );
+      allow update, delete: if false;
+    }
+  }
+}

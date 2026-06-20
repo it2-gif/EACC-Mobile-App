@@ -1,0 +1,31 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "eacc-mobile-app",
+          "appId": "1:492936842220:android:d4a225330630e03ac34ec9",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "eacc-mobile-app",
+          "configurations": {
+            "android": "1:492936842220:android:d4a225330630e03ac34ec9",
+            "ios": "1:492936842220:ios:e4ca566f6d08733ac34ec9",
+            "macos": "1:492936842220:ios:e4ca566f6d08733ac34ec9",
+            "web": "1:492936842220:web:de1c69381e413074c34ec9",
+            "windows": "1:492936842220:web:f4b52333cfbe5a34c34ec9"
+          }
+        }
+      }
+    }
+  }
+}
