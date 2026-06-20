@@ -31,19 +31,20 @@ self.addEventListener('notificationclick', (event) => {
   const data = event.notification.data || {};
   const courseId = data.courseId || '';
   const threadId = data.threadId || '';
+  const studentName = data.studentName || '';
+  const senderName = data.senderName || '';
   const targetUrl = threadId
-    ? `/?courseId=${encodeURIComponent(courseId)}&threadId=${encodeURIComponent(threadId)}`
+    ? `/?courseId=${encodeURIComponent(courseId)}&threadId=${encodeURIComponent(threadId)}&studentName=${encodeURIComponent(studentName)}&senderName=${encodeURIComponent(senderName)}`
     : '/';
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
         if ('focus' in client) {
-          client.postMessage({
-            type: 'chat_notification_click',
-            courseId,
-            threadId,
-          });
+          if ('navigate' in client) {
+            return client.navigate(targetUrl).then((navigatedClient) => navigatedClient.focus());
+          }
+
           return client.focus();
         }
       }

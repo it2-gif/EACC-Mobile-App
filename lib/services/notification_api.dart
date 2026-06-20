@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class NotificationApi {
@@ -9,11 +10,9 @@ class NotificationApi {
 
   NotificationApi({
     http.Client? client,
-    this.baseUrl = const String.fromEnvironment(
-      'EACC_API_BASE_URL',
-      defaultValue: 'http://localhost:3000',
-    ),
-  }) : _client = client ?? http.Client();
+    String? baseUrl,
+  }) : baseUrl = baseUrl ?? _resolveBaseUrl(),
+       _client = client ?? http.Client();
 
   Future<void> registerDeviceToken({
     required String token,
@@ -70,6 +69,22 @@ class NotificationApi {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw NotificationApiException(response.body);
     }
+  }
+
+  static String _resolveBaseUrl() {
+    const envBaseUrl = String.fromEnvironment('EACC_API_BASE_URL');
+    final trimmed = envBaseUrl.trim();
+    if (trimmed.isNotEmpty) {
+      return trimmed;
+    }
+
+    if (kReleaseMode) {
+      throw StateError(
+        'EACC_API_BASE_URL is required for production builds.',
+      );
+    }
+
+    return 'http://localhost:3000';
   }
 }
 

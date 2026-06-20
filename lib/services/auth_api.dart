@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 
 import '../models/auth_session.dart';
 import 'auth_session_manager.dart';
@@ -13,11 +14,9 @@ class AuthApi {
   AuthApi({
     http.Client? client,
     this.sessionManager,
-    this.baseUrl = const String.fromEnvironment(
-      'EACC_API_BASE_URL',
-      defaultValue: 'http://localhost:3000',
-    ),
-  }) : _client = client ?? http.Client();
+    String? baseUrl,
+  }) : baseUrl = baseUrl ?? _resolveBaseUrl(),
+       _client = client ?? http.Client();
 
   Future<AuthSession> login({
     required String role,
@@ -51,6 +50,22 @@ class AuthApi {
     }
 
     return 'Could not sign in. Please check your credentials and try again.';
+  }
+
+  static String _resolveBaseUrl() {
+    const envBaseUrl = String.fromEnvironment('EACC_API_BASE_URL');
+    final trimmed = envBaseUrl.trim();
+    if (trimmed.isNotEmpty) {
+      return trimmed;
+    }
+
+    if (kReleaseMode) {
+      throw StateError(
+        'EACC_API_BASE_URL is required for production builds.',
+      );
+    }
+
+    return 'http://localhost:3000';
   }
 }
 

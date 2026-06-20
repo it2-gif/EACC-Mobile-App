@@ -158,6 +158,7 @@ class FirestoreChatService {
     required String senderRole,
     required Uint8List imageBytes,
     required String fileName,
+    void Function(double progress)? onProgress,
     String? studentName,
   }) async {
     validateImageUpload(fileName: fileName, fileSize: imageBytes.length);
@@ -171,6 +172,7 @@ class FirestoreChatService {
       type: 'image',
       contentType: _guessImageContentType(fileName),
       lastMessage: 'Photo',
+      onProgress: onProgress,
       studentName: studentName,
     );
   }
@@ -183,6 +185,7 @@ class FirestoreChatService {
     required Uint8List videoBytes,
     required String fileName,
     int? durationMs,
+    void Function(double progress)? onProgress,
     String? studentName,
   }) async {
     validateVideoUpload(fileName: fileName, fileSize: videoBytes.length);
@@ -196,6 +199,7 @@ class FirestoreChatService {
       type: 'video',
       contentType: _guessVideoContentType(fileName),
       lastMessage: 'Video',
+      onProgress: onProgress,
       durationMs: durationMs,
       studentName: studentName,
     );
@@ -209,6 +213,7 @@ class FirestoreChatService {
     required Uint8List voiceBytes,
     required String fileName,
     required int durationMs,
+    void Function(double progress)? onProgress,
     String? studentName,
   }) async {
     validateVoiceUpload(fileName: fileName, fileSize: voiceBytes.length);
@@ -222,6 +227,7 @@ class FirestoreChatService {
       type: 'voice',
       contentType: _guessVoiceContentType(fileName),
       lastMessage: 'Voice message',
+      onProgress: onProgress,
       durationMs: durationMs,
       studentName: studentName,
     );
@@ -237,6 +243,7 @@ class FirestoreChatService {
     required String type,
     required String contentType,
     required String lastMessage,
+    void Function(double progress)? onProgress,
     int? durationMs,
     String? studentName,
   }) async {
@@ -245,10 +252,25 @@ class FirestoreChatService {
         'chat_uploads/courses/$courseId/threads/$threadId/'
         '${DateTime.now().millisecondsSinceEpoch}_$safeFileName';
 
-    final uploadResult = await _storage
+    final uploadTask = _storage
         .ref()
         .child(storagePath)
         .putData(bytes, SettableMetadata(contentType: contentType));
+
+    final progressSubscription = onProgress == null
+        ? null
+        : uploadTask.snapshotEvents.listen((event) {
+            final totalBytes = event.totalBytes;
+            if (totalBytes <= 0) return;
+            onProgress((event.bytesTransferred / totalBytes).clamp(0.0, 1.0));
+          });
+
+    late final TaskSnapshot uploadResult;
+    try {
+      uploadResult = await uploadTask;
+    } finally {
+      await progressSubscription?.cancel();
+    }
     final mediaUrl = await uploadResult.ref.getDownloadURL();
 
     final threadData = _threadUpdateData(

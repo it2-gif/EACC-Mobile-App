@@ -18,7 +18,7 @@ class TeacherCoursesScreen extends StatelessWidget {
     return AppScaffold(
       title: 'Teacher Courses',
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
           ScreenHeader(
             title: 'Hello, ${session.appUser.name}',
@@ -27,7 +27,7 @@ class TeacherCoursesScreen extends StatelessWidget {
                 : 'Choose a course to view student chats.',
             icon: Icons.menu_book,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
           if (session.courses.isEmpty)
             const _EmptyCoursesState()
           else
@@ -75,10 +75,10 @@ class _EmptyCoursesState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(22),
         child: Column(
           children: const [
-            Icon(Icons.event_busy_outlined, size: 42, color: AppColors.muted),
+            Icon(Icons.event_busy_outlined, size: 44, color: AppColors.muted),
             SizedBox(height: 12),
             Text(
               'No open courses',

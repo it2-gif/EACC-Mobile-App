@@ -76,9 +76,12 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
   @override
   Widget build(BuildContext context) {
     if (hasError) {
-      return const Text(
-        'Could not play this voice message.',
-        style: TextStyle(color: AppColors.danger),
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 2),
+        child: Text(
+          'Could not play this voice message.',
+          style: TextStyle(color: AppColors.danger),
+        ),
       );
     }
 
@@ -88,25 +91,35 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
         : (position.inMilliseconds / totalMs).clamp(0.0, 1.0);
 
     return SizedBox(
-      width: 280,
+      width: double.infinity,
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          IconButton.filled(
+          IconButton.filledTonal(
             onPressed: togglePlayback,
+            style: IconButton.styleFrom(
+              foregroundColor: AppColors.primary,
+            ),
             icon: Icon(
-              state == PlayerState.playing ? Icons.pause : Icons.play_arrow,
+              state == PlayerState.playing
+                  ? Icons.pause_rounded
+                  : Icons.play_arrow_rounded,
             ),
             tooltip: state == PlayerState.playing ? 'Pause' : 'Play',
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 4,
-                  borderRadius: BorderRadius.circular(2),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 5,
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(

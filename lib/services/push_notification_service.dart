@@ -42,6 +42,30 @@ class PushNotificationService {
     }
   }
 
+  Future<void> openBrowserNotificationLaunch() async {
+    final route = _readBrowserNotificationRoute();
+    if (route == null) return;
+
+    final session = _session ?? await AuthSessionManager().restore();
+    if (session == null) return;
+    _session = session;
+
+    await _waitForNavigator();
+    if (navigatorKey.currentState == null) return;
+
+    debugPrint(
+      'Opening notification route: courseId=${route.courseId}, threadId=${route.threadId}',
+    );
+
+    _openChatFromRoute(
+      session: session,
+      courseId: route.courseId,
+      threadId: route.threadId,
+      studentName: route.studentName,
+      senderName: route.senderName,
+    );
+  }
+
   Future<void> activate(AuthSession session) async {
     _session = session;
     await _requestPermissionIfNeeded();
@@ -117,6 +141,7 @@ class PushNotificationService {
         deviceName: _deviceName,
       );
       _registeredToken = token;
+      debugPrint('Device token registered for $_platformLabel');
     } catch (error) {
       debugPrint('Device token registration failed: $error');
     }
@@ -147,18 +172,42 @@ class PushNotificationService {
     final studentName = message.data['studentName']?.toString();
     final senderName = message.data['senderName']?.toString() ?? 'EACC Chat';
 
+    _openChatFromRoute(
+      session: session,
+      courseId: courseId,
+      threadId: threadId,
+      studentName: studentName,
+      senderName: senderName,
+      course: course,
+    );
+  }
+
+  void _openChatFromRoute({
+    required AuthSession session,
+    required String courseId,
+    required String threadId,
+    String? studentName,
+    String? senderName,
+    Course? course,
+  }) {
+    final resolvedCourse = course ?? _findCourse(session, courseId);
+    final resolvedStudentName = studentName?.trim();
+    final resolvedSenderName = senderName?.trim();
+
     final title = session.appUser.role == 'teacher'
-        ? (studentName != null && studentName.trim().isNotEmpty
-              ? studentName.trim()
-              : senderName)
-        : (course?.name ?? 'Course Chat');
+        ? (resolvedStudentName != null && resolvedStudentName.isNotEmpty
+              ? resolvedStudentName
+              : (resolvedSenderName != null && resolvedSenderName.isNotEmpty
+                    ? resolvedSenderName
+                    : 'Student Chat'))
+        : (resolvedCourse?.name ?? 'Course Chat');
 
     final effectiveThreadId = session.appUser.role == 'teacher'
         ? threadId
         : session.lmsUser.lmsUserId;
 
     final threadStudentName = session.appUser.role == 'teacher'
-        ? studentName
+        ? resolvedStudentName ?? resolvedSenderName
         : session.appUser.name;
 
     navigatorKey.currentState?.push(
@@ -172,6 +221,29 @@ class PushNotificationService {
           threadStudentName: threadStudentName,
         ),
       ),
+    );
+  }
+
+  Future<void> _waitForNavigator() async {
+    for (var attempt = 0; attempt < 40; attempt++) {
+      if (navigatorKey.currentState != null) return;
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+  }
+
+  _BrowserNotificationRoute? _readBrowserNotificationRoute() {
+    final uri = Uri.base;
+    final courseId = uri.queryParameters['courseId']?.trim();
+    final threadId = uri.queryParameters['threadId']?.trim();
+    if (courseId == null || courseId.isEmpty || threadId == null || threadId.isEmpty) {
+      return null;
+    }
+
+    return _BrowserNotificationRoute(
+      courseId: courseId,
+      threadId: threadId,
+      studentName: uri.queryParameters['studentName']?.trim(),
+      senderName: uri.queryParameters['senderName']?.trim(),
     );
   }
 
@@ -204,4 +276,18 @@ class PushNotificationService {
     'EACC_FCM_VAPID_KEY',
     defaultValue: '',
   );
+}
+
+class _BrowserNotificationRoute {
+  final String courseId;
+  final String threadId;
+  final String? studentName;
+  final String? senderName;
+
+  const _BrowserNotificationRoute({
+    required this.courseId,
+    required this.threadId,
+    this.studentName,
+    this.senderName,
+  });
 }

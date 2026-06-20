@@ -46,6 +46,11 @@ dependencies:
   audioplayers: ^6.7.1
   video_player: ^2.11.1
 
+dependency_overrides:
+  # Upstream 5.2.1 still applies kotlin-android, which AGP 9 rejects.
+  audioplayers_android:
+    path: third_party/audioplayers_android
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

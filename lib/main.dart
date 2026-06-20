@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
@@ -18,6 +20,7 @@ void main() async {
   final session = await AuthSessionManager().restore();
   await PushNotificationService.instance.initialize(initialSession: session);
   runApp(EaccChatApp(initialSession: session));
+  unawaited(PushNotificationService.instance.openBrowserNotificationLaunch());
 }
 
 class EaccChatApp extends StatelessWidget {
