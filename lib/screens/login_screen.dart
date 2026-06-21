@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import '../services/auth_api.dart';
 import '../services/auth_session_manager.dart';
@@ -95,11 +97,19 @@ class _LoginScreenState extends State<LoginScreen> {
     } on FirebaseAuthException catch (error) {
       if (!mounted) return;
       setState(() => errorMessage = _firebaseErrorMessage(error));
-    } catch (_) {
+    } on http.ClientException catch (_) {
       if (!mounted) return;
       setState(
         () => errorMessage =
-            'Could not reach the EACC backend. Make sure it is running.',
+            'Could not reach the EACC backend. Check your internet connection and try again.',
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Unexpected login error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      setState(
+        () => errorMessage =
+            'Sign-in failed unexpectedly. Please try again or contact support if this continues.',
       );
     } finally {
       if (mounted) {

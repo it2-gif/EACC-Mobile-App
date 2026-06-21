@@ -68,12 +68,29 @@ class PushNotificationService {
 
   Future<void> activate(AuthSession session) async {
     _session = session;
-    await _requestPermissionIfNeeded();
-    await _registerDeviceTokenIfPossible(force: true);
+    try {
+      await _requestPermissionIfNeeded();
+      await _registerDeviceTokenIfPossible(force: true);
+    } catch (error, stackTrace) {
+      debugPrint('Push notification activation failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
+  Future<void> deactivate() async {
+    _session = null;
+    _registeredToken = null;
+
+    try {
+      await FirebaseMessaging.instance.deleteToken();
+    } catch (error) {
+      debugPrint('FCM token cleanup failed during logout: $error');
+    }
   }
 
   void clearSession() {
     _session = null;
+    _registeredToken = null;
   }
 
   void _attachListeners() {
@@ -102,12 +119,16 @@ class PushNotificationService {
   }
 
   Future<void> _requestPermissionIfNeeded() async {
-    await FirebaseMessaging.instance.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
+    try {
+      await FirebaseMessaging.instance.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+      );
+    } catch (error) {
+      debugPrint('Notification permission request failed: $error');
+    }
   }
 
   Future<void> _registerDeviceTokenIfPossible({bool force = false}) async {

@@ -21,7 +21,7 @@ class AppScaffold extends StatelessWidget {
 
   Future<void> _logout(BuildContext context) async {
     await AuthSessionManager().logout();
-    PushNotificationService.instance.clearSession();
+    await PushNotificationService.instance.deactivate();
     if (!context.mounted) return;
 
     Navigator.pushAndRemoveUntil(

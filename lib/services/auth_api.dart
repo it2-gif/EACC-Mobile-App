@@ -33,7 +33,7 @@ class AuthApi {
       }),
     );
 
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _decodeResponseBody(response.body);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw AuthApiException(_readErrorMessage(body));
     }
@@ -41,6 +41,27 @@ class AuthApi {
     final session = AuthSession.fromJson(body);
     await (sessionManager ?? AuthSessionManager()).establish(session);
     return session;
+  }
+
+  Map<String, dynamic> _decodeResponseBody(String rawBody) {
+    final trimmed = rawBody.trim();
+    if (trimmed.isEmpty) {
+      throw const AuthApiException(
+        'The server returned an empty response. Please try again.',
+      );
+    }
+
+    try {
+      final decoded = jsonDecode(trimmed);
+      if (decoded is! Map<String, dynamic>) {
+        throw const FormatException('Expected a JSON object');
+      }
+      return decoded;
+    } catch (_) {
+      throw const AuthApiException(
+        'The server returned an unexpected response. Please try again.',
+      );
+    }
   }
 
   String _readErrorMessage(Map<String, dynamic> body) {

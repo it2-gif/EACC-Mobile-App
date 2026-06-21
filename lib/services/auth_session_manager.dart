@@ -8,6 +8,7 @@ import '../models/auth_session.dart';
 
 class AuthSessionManager {
   static const _sessionKey = 'authenticated_lms_session';
+  static bool _webPersistenceConfigured = false;
 
   final FirebaseAuth _firebaseAuth;
 
@@ -22,10 +23,14 @@ class AuthSessionManager {
       );
     }
 
-    if (kIsWeb) {
+    if (kIsWeb && !_webPersistenceConfigured) {
       await _firebaseAuth.setPersistence(Persistence.LOCAL);
+      _webPersistenceConfigured = true;
     }
-    await _firebaseAuth.signOut();
+
+    if (_firebaseAuth.currentUser != null) {
+      await _firebaseAuth.signOut();
+    }
 
     final credential = await _firebaseAuth.signInWithCustomToken(customToken);
     final expectedUid = '${session.lmsUser.role}:${session.lmsUser.lmsUserId}';
