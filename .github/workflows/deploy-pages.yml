@@ -38,7 +38,9 @@ jobs:
           --dart-define=EACC_API_BASE_URL=https://eacc-mobile-app-production.up.railway.app
 
       - name: Add SPA fallback
-        run: cp build/web/index.html build/web/404.html
+        run: |
+          cp build/web/index.html build/web/404.html
+          touch build/web/.nojekyll
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
