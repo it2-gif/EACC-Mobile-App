@@ -146,6 +146,19 @@
         'Starting the app is taking longer than expected. Check your connection, then refresh.'
       );
     }, 30000);
+
+    (function registerFirebaseServiceWorker() {
+      if (!('serviceWorker' in navigator)) {
+        return;
+      }
+
+      const base = document.querySelector('base')?.getAttribute('href') || '/';
+      navigator.serviceWorker
+        .register(`${base}firebase-messaging-sw.js`, { scope: base })
+        .catch((error) => {
+          console.warn('FCM service worker registration failed:', error);
+        });
+    })();
   </script>
 
   <!-- Attach startup listeners before loading Flutter's asynchronous boot file. -->

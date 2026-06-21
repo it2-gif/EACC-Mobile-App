@@ -17,10 +17,22 @@ void main() async {
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  final session = await AuthSessionManager().restore();
-  runApp(EaccChatApp(initialSession: session));
+  runApp(EaccChatApp(initialSessionLoader: _restoreInitialSession()));
+}
 
-  unawaited(_initializeNotifications(session));
+Future<AuthSession?> _restoreInitialSession() async {
+  try {
+    final session = await AuthSessionManager()
+        .restore()
+        .timeout(const Duration(seconds: 10));
+    unawaited(_initializeNotifications(session));
+    return session;
+  } catch (error, stackTrace) {
+    debugPrint('Session restore failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+    unawaited(_initializeNotifications(null));
+    return null;
+  }
 }
 
 Future<void> _initializeNotifications(AuthSession? session) async {
@@ -36,9 +48,9 @@ Future<void> _initializeNotifications(AuthSession? session) async {
 }
 
 class EaccChatApp extends StatelessWidget {
-  final AuthSession? initialSession;
+  final Future<AuthSession?> initialSessionLoader;
 
-  const EaccChatApp({super.key, this.initialSession});
+  const EaccChatApp({super.key, required this.initialSessionLoader});
 
   @override
   Widget build(BuildContext context) {
@@ -49,22 +61,67 @@ class EaccChatApp extends StatelessWidget {
       navigatorKey: PushNotificationService.instance.navigatorKey,
       scaffoldMessengerKey:
           PushNotificationService.instance.scaffoldMessengerKey,
-      home: _initialScreen(),
+      home: _InitialSessionGate(sessionLoader: initialSessionLoader),
     );
   }
+}
 
-  Widget _initialScreen() {
-    final session = initialSession;
-    if (session == null) return const LoginScreen();
+class _InitialSessionGate extends StatelessWidget {
+  final Future<AuthSession?> sessionLoader;
 
-    if (session.appUser.role == 'student') {
-      return StudentCoursesScreen(session: session);
-    }
+  const _InitialSessionGate({required this.sessionLoader});
 
-    if (session.appUser.role == 'teacher') {
-      return TeacherCoursesScreen(session: session);
-    }
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<AuthSession?>(
+      future: sessionLoader,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const _StartupScreen();
+        }
 
-    return const LoginScreen();
+        final session = snapshot.data;
+        if (session == null) return const LoginScreen();
+
+        if (session.appUser.role == 'student') {
+          return StudentCoursesScreen(session: session);
+        }
+
+        if (session.appUser.role == 'teacher') {
+          return TeacherCoursesScreen(session: session);
+        }
+
+        return const LoginScreen();
+      },
+    );
+  }
+}
+
+class _StartupScreen extends StatelessWidget {
+  const _StartupScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox.square(
+              dimension: 34,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Opening EACC Chat...',
+              style: TextStyle(
+                color: AppColors.muted,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

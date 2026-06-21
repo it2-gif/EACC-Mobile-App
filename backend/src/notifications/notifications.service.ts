@@ -126,6 +126,7 @@ export class NotificationsService {
         senderRole: input.senderRole,
         senderName: input.senderName,
         studentName: input.studentName ?? '',
+        previewText: this.messageBody(input),
       },
       webpush: {
         notification: {

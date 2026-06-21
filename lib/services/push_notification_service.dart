@@ -98,14 +98,7 @@ class PushNotificationService {
     _listenersAttached = true;
 
     FirebaseMessaging.onMessage.listen((message) {
-      final notification = message.notification;
-      if (notification == null) return;
-
-      _showTopBanner(
-        title: notification.title ?? 'New message',
-        body: notification.body,
-        onOpen: () => unawaited(_openChatFromMessage(message)),
-      );
+      _handleForegroundMessage(message);
     });
 
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
@@ -134,13 +127,49 @@ class PushNotificationService {
   Future<void> _registerDeviceTokenIfPossible({bool force = false}) async {
     if (_session == null) return;
 
+    if (kIsWeb && _webVapidKey.isEmpty) {
+      debugPrint(
+        'Web push is disabled: set EACC_FCM_VAPID_KEY from Firebase Console '
+        '(Project settings -> Cloud Messaging -> Web Push certificates).',
+      );
+      return;
+    }
+
+    if (kIsWeb) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+
     final token = await FirebaseMessaging.instance.getToken(
-      vapidKey: kIsWeb && _webVapidKey.isNotEmpty ? _webVapidKey : null,
+      vapidKey: kIsWeb ? _webVapidKey : null,
     );
-    if (token == null || token.isEmpty) return;
+    if (token == null || token.isEmpty) {
+      debugPrint('FCM device token was not returned for $_platformLabel.');
+      return;
+    }
     if (!force && _registeredToken == token) return;
 
     await _registerSpecificToken(token);
+  }
+
+  void _handleForegroundMessage(RemoteMessage message) {
+    final data = message.data;
+    final notification = message.notification;
+    final title = notification?.title ??
+        data['senderName']?.toString() ??
+        'New message';
+    final body = notification?.body ??
+        data['previewText']?.toString() ??
+        'You received a new chat message';
+
+    if (title.trim().isEmpty && body.trim().isEmpty) {
+      return;
+    }
+
+    _showTopBanner(
+      title: title,
+      body: body,
+      onOpen: () => unawaited(_openChatFromMessage(message)),
+    );
   }
 
   Future<void> _registerSpecificToken(String token) async {

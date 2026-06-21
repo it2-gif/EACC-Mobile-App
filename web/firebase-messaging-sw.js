@@ -13,15 +13,28 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+function appBasePath() {
+  const scope = self.registration?.scope || self.location.href;
+  const pathname = new URL(scope).pathname;
+  return pathname.endsWith('/') ? pathname : `${pathname}/`;
+}
+
+function appUrl(query) {
+  const base = appBasePath();
+  return `${self.location.origin}${base}${query ? `?${query}` : ''}`;
+}
+
 messaging.onBackgroundMessage((payload) => {
+  const base = appBasePath();
   const title = payload.notification?.title || payload.data?.senderName || 'EACC Chat';
-  const body = payload.notification?.body || 'New message';
+  const body =
+    payload.notification?.body || payload.data?.previewText || 'New message';
 
   self.registration.showNotification(title, {
     body,
     data: payload.data || {},
-    icon: '/icons/Icon-192.png',
-    badge: '/icons/Icon-192.png',
+    icon: `${base}icons/Icon-192.png`,
+    badge: `${base}icons/Icon-192.png`,
   });
 });
 
@@ -33,9 +46,10 @@ self.addEventListener('notificationclick', (event) => {
   const threadId = data.threadId || '';
   const studentName = data.studentName || '';
   const senderName = data.senderName || '';
-  const targetUrl = threadId
-    ? `/?courseId=${encodeURIComponent(courseId)}&threadId=${encodeURIComponent(threadId)}&studentName=${encodeURIComponent(studentName)}&senderName=${encodeURIComponent(senderName)}`
-    : '/';
+  const query = threadId
+    ? `courseId=${encodeURIComponent(courseId)}&threadId=${encodeURIComponent(threadId)}&studentName=${encodeURIComponent(studentName)}&senderName=${encodeURIComponent(senderName)}`
+    : '';
+  const targetUrl = appUrl(query);
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {

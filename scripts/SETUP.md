@@ -79,3 +79,24 @@ flutter run -d chrome
 3. Confirm the teacher sees the student thread and can reply.
 4. Restart Chrome and confirm the signed-in course screen is restored.
 5. Sign out and confirm the app returns to login.
+
+## 6. Enable web push notifications
+
+Web push requires a VAPID key from Firebase:
+
+1. Open Firebase Console -> Project settings -> Cloud Messaging.
+2. Under **Web Push certificates**, copy the **Key pair** value.
+3. For local web builds:
+
+```powershell
+flutter run -d chrome `
+  --dart-define=EACC_FCM_VAPID_KEY=YOUR_VAPID_KEY_HERE
+```
+
+4. For GitHub Pages, add a repository secret named `EACC_FCM_VAPID_KEY`
+   with the same value. The deploy workflow passes it into the web build.
+
+5. After login, allow notifications when the browser asks.
+
+Without the VAPID key, the app can still chat in real time through Firestore,
+but browser pop-up notifications will not be delivered on web.

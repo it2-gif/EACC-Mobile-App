@@ -107,10 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
       debugPrint('Unexpected login error: $error');
       debugPrintStack(stackTrace: stackTrace);
       if (!mounted) return;
-      setState(
-        () => errorMessage =
-            'Sign-in failed unexpectedly. Please try again or contact support if this continues.',
-      );
+      setState(() => errorMessage = _unexpectedLoginErrorMessage(error));
     } finally {
       if (mounted) {
         setState(() => isLoading = false);
@@ -124,7 +121,40 @@ class _LoginScreenState extends State<LoginScreen> {
       return 'Firebase Authentication is not enabled for this project.';
     }
 
+    if (error.code == 'unauthorized-domain' ||
+        error.message?.contains('unauthorized domain') == true) {
+      return 'This website is not allowed in Firebase Authentication yet. Add it2-gif.github.io to Firebase Auth authorized domains.';
+    }
+
+    if (error.code == 'invalid-custom-token' ||
+        error.code == 'custom-token-mismatch') {
+      return 'The backend Firebase token does not match this Firebase project.';
+    }
+
+    if (error.code == 'network-request-failed') {
+      return 'Firebase could not finish secure sign-in. Check your connection and try again.';
+    }
+
     return error.message ?? 'Firebase could not complete the secure sign-in.';
+  }
+
+  String _unexpectedLoginErrorMessage(Object error) {
+    final details = error.toString();
+    final lowerDetails = details.toLowerCase();
+
+    if (lowerDetails.contains('unauthorized-domain') ||
+        lowerDetails.contains('unauthorized domain')) {
+      return 'This website is not allowed in Firebase Authentication yet. Add it2-gif.github.io to Firebase Auth authorized domains.';
+    }
+
+    if (lowerDetails.contains('failed to fetch') ||
+        lowerDetails.contains('xmlhttprequest') ||
+        lowerDetails.contains('clientexception') ||
+        lowerDetails.contains('socketexception')) {
+      return 'Could not reach the EACC backend. Check your internet connection and try again.';
+    }
+
+    return 'Login reached the backend, but secure sign-in could not finish. Please refresh and try again.';
   }
 
   @override

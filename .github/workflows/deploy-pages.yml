@@ -32,11 +32,14 @@ jobs:
         run: flutter pub get
 
       - name: Build web
+        env:
+          EACC_FCM_VAPID_KEY: ${{ secrets.EACC_FCM_VAPID_KEY }}
         run: >
           flutter build web --release
           --base-href "/${{ github.event.repository.name }}/"
           --pwa-strategy=none
           --dart-define=EACC_API_BASE_URL=https://eacc-mobile-app-production.up.railway.app
+          --dart-define=EACC_FCM_VAPID_KEY=${EACC_FCM_VAPID_KEY}
 
       - name: Add SPA fallback
         run: |
