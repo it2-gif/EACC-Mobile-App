@@ -18,21 +18,94 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta
+    name="description"
+    content="Secure EACC course messaging for students and teachers."
+  >
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="chatt_eacc">
+  <meta name="apple-mobile-web-app-title" content="EACC Chat">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>chatt_eacc</title>
+  <title>EACC Chat</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: #f5f7fb;
+      color: #17233b;
+      font-family: Arial, sans-serif;
+    }
+
+    #app-loader {
+      box-sizing: border-box;
+      display: grid;
+      min-height: 100%;
+      place-items: center;
+      padding: 24px;
+      text-align: center;
+      transition: opacity 180ms ease;
+    }
+
+    #app-loader.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loader-mark {
+      width: 44px;
+      height: 44px;
+      margin: 0 auto 18px;
+      border: 4px solid #dbe6f5;
+      border-top-color: #1767b2;
+      border-radius: 50%;
+      animation: spin 700ms linear infinite;
+    }
+
+    #app-loader h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+    }
+
+    #app-loader p {
+      max-width: 420px;
+      margin: 0;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    #app-loader.failed .loader-mark {
+      display: none;
+    }
+
+    #app-loader.failed h1 {
+      color: #b42318;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
 </head>
 <body>
+  <div id="app-loader" role="status" aria-live="polite">
+    <div>
+      <div class="loader-mark" aria-hidden="true"></div>
+      <h1>Opening EACC Chat</h1>
+      <p id="app-loader-message">Preparing your secure course messages...</p>
+    </div>
+  </div>
+
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
@@ -42,5 +115,30 @@
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
   <script src="flutter_bootstrap.js" async></script>
+  <script>
+    const loader = document.getElementById('app-loader');
+    const loaderMessage = document.getElementById('app-loader-message');
+
+    window.addEventListener('flutter-first-frame', () => {
+      loader.classList.add('hidden');
+      window.setTimeout(() => loader.remove(), 200);
+    });
+
+    function showStartupError() {
+      loader.classList.add('failed');
+      loader.querySelector('h1').textContent = 'EACC Chat could not start';
+      loaderMessage.textContent =
+        'Refresh the page. If the problem continues, clear this site’s stored data and try again.';
+    }
+
+    window.addEventListener('error', showStartupError);
+    window.addEventListener('unhandledrejection', showStartupError);
+
+    window.setTimeout(() => {
+      if (document.body.contains(loader)) {
+        showStartupError();
+      }
+    }, 20000);
+  </script>
 </body>
 </html>

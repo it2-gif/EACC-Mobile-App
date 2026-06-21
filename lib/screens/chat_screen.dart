@@ -50,6 +50,8 @@ class _ChatScreenState extends State<ChatScreen> {
   bool isOlderPositionRestoreScheduled = false;
   bool shouldScrollAfterSending = false;
   bool hasScrolledToInitialBottom = false;
+  bool hasScheduledInitialBottomScroll = false;
+  bool isInitialChatReady = false;
   int messageLimit = messagesPerPage;
   String? latestMessageId;
   double scrollOffsetBeforeLoadingOlder = 0;
@@ -82,13 +84,59 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !scrollController.hasClients) return;
+      _jumpToBottomIfPossible(animate: true);
+    });
+  }
 
+  void _jumpToBottomIfPossible({required bool animate}) {
+    if (!mounted || !scrollController.hasClients) return;
+
+    final targetOffset = scrollController.position.maxScrollExtent;
+    if (animate) {
       scrollController.animateTo(
-        scrollController.position.maxScrollExtent,
+        targetOffset,
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOut,
       );
+      return;
+    }
+
+    scrollController.jumpTo(targetOffset);
+  }
+
+  Future<void> scheduleInitialBottomScroll() async {
+    if (hasScheduledInitialBottomScroll) return;
+    hasScheduledInitialBottomScroll = true;
+
+    var stableFrames = 0;
+    var previousMaxExtent = -1.0;
+
+    // A builder-backed list can refine its scroll extent over several frames,
+    // especially on web. Keep following the extent until it settles.
+    for (var attempt = 0; attempt < 16 && stableFrames < 3; attempt++) {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+
+      if (!scrollController.hasClients) {
+        await Future<void>.delayed(const Duration(milliseconds: 16));
+        continue;
+      }
+
+      final maxExtent = scrollController.position.maxScrollExtent;
+      scrollController.jumpTo(maxExtent);
+
+      if ((maxExtent - previousMaxExtent).abs() < 0.5) {
+        stableFrames++;
+      } else {
+        stableFrames = 0;
+        previousMaxExtent = maxExtent;
+      }
+    }
+
+    if (!mounted) return;
+    _jumpToBottomIfPossible(animate: false);
+    setState(() {
+      isInitialChatReady = true;
     });
   }
 
@@ -404,9 +452,7 @@ class _ChatScreenState extends State<ChatScreen> {
         text: text,
         studentName: _resolvedStudentName,
       );
-      unawaited(
-        _sendPushNotification(messageType: 'text', previewText: text),
-      );
+      unawaited(_sendPushNotification(messageType: 'text', previewText: text));
     } catch (error) {
       shouldScrollAfterSending = false;
       await _logFirestoreSendDebug(error);
@@ -440,10 +486,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final imageBytes = await image.readAsBytes();
       shouldScrollAfterSending = true;
 
-      await _sendImageAttachment(
-        imageBytes: imageBytes,
-        fileName: image.name,
-      );
+      await _sendImageAttachment(imageBytes: imageBytes, fileName: image.name);
     } on ChatUploadException catch (error) {
       shouldScrollAfterSending = false;
       if (mounted) {
@@ -498,10 +541,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final videoBytes = await video.readAsBytes();
       shouldScrollAfterSending = true;
 
-      await _sendVideoAttachment(
-        videoBytes: videoBytes,
-        fileName: video.name,
-      );
+      await _sendVideoAttachment(videoBytes: videoBytes, fileName: video.name);
     } on ChatUploadException catch (error) {
       shouldScrollAfterSending = false;
       if (mounted) {
@@ -809,7 +849,8 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           if (isUploadingMedia || failedAttachment != null)
             _AttachmentStatusBar(
-              label: mediaUploadLabel ??
+              label:
+                  mediaUploadLabel ??
                   (failedAttachment != null
                       ? _attachmentLabel(failedAttachment!.kind)
                       : 'Uploading media'),
@@ -831,163 +872,201 @@ class _ChatScreenState extends State<ChatScreen> {
                     limit: messageLimit,
                   ),
                   builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            size: 48,
-                            color: Colors.red.shade300,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Something went wrong',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.admin,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${snapshot.error}',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: AppColors.muted),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final docs = sortMessages(snapshot.data?.docs ?? []);
-                final canLoadOlder = docs.length >= messageLimit;
-                final currentLatestMessageId = docs.isEmpty
-                    ? null
-                    : docs.last.id;
-
-                restorePositionAfterLoadingOlderMessages();
-
-                if (currentLatestMessageId != latestMessageId) {
-                  latestMessageId = currentLatestMessageId;
-                  final latestSenderRole = docs.isEmpty
-                      ? null
-                      : docs.last.data()['sender_role']?.toString();
-                  if (latestSenderRole != null &&
-                      latestSenderRole != widget.currentUserRole) {
-                    unawaited(markThreadAsRead());
-                  }
-                  if (!isLoadingOlderMessages) {
-                    scrollToBottom();
-                  }
-                }
-
-                if (!hasScrolledToInitialBottom && docs.isNotEmpty) {
-                  hasScrolledToInitialBottom = true;
-                  scrollToBottom();
-                }
-
-                if (shouldScrollAfterSending && docs.isNotEmpty) {
-                  shouldScrollAfterSending = false;
-                  scrollToBottom();
-                }
-
-                if (docs.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 72,
-                            height: 72,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: const Icon(
-                              Icons.forum_outlined,
-                              size: 34,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'No messages yet',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            'Send the first message to start this conversation.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: AppColors.muted,
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                  itemCount: docs.length + (canLoadOlder ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (canLoadOlder && index == 0) {
+                    if (snapshot.hasError) {
                       return Center(
                         child: Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: TextButton.icon(
-                            onPressed: isLoadingOlderMessages
-                                ? null
-                                : loadOlderMessages,
-                            icon: isLoadingOlderMessages
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.history),
-                            label: const Text('Load older messages'),
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                size: 48,
+                                color: Colors.red.shade300,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Something went wrong',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.admin,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${snapshot.error}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: AppColors.muted),
+                              ),
+                            ],
                           ),
                         ),
                       );
                     }
 
-                    final messageIndex = canLoadOlder ? index - 1 : index;
-                    final data = docs[messageIndex].data();
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-                    return MessageBubble(
-                      type: data['type'] ?? 'text',
-                      text: data['text'] ?? '',
-                      mediaUrl: data['media_url'],
-                      durationMs: data['duration_ms'],
-                      senderName: data['sender_name'] ?? '',
-                      senderRole: data['sender_role'] ?? '',
-                      currentUserRole: widget.currentUserRole,
-                      currentSenderName: widget.senderName,
-                      createdAt: data['created_at'],
+                    final docs = sortMessages(snapshot.data?.docs ?? []);
+                    final canLoadOlder = docs.length >= messageLimit;
+                    final currentLatestMessageId = docs.isEmpty
+                        ? null
+                        : docs.last.id;
+
+                    restorePositionAfterLoadingOlderMessages();
+
+                    if (currentLatestMessageId != latestMessageId) {
+                      latestMessageId = currentLatestMessageId;
+                      final latestSenderRole = docs.isEmpty
+                          ? null
+                          : docs.last.data()['sender_role']?.toString();
+                      if (latestSenderRole != null &&
+                          latestSenderRole != widget.currentUserRole) {
+                        unawaited(markThreadAsRead());
+                      }
+                      if (hasScrolledToInitialBottom &&
+                          !isLoadingOlderMessages) {
+                        scrollToBottom();
+                      }
+                    }
+
+                    if (!hasScrolledToInitialBottom && docs.isNotEmpty) {
+                      hasScrolledToInitialBottom = true;
+                      unawaited(scheduleInitialBottomScroll());
+                    }
+
+                    if (shouldScrollAfterSending && docs.isNotEmpty) {
+                      shouldScrollAfterSending = false;
+                      scrollToBottom();
+                    }
+
+                    if (docs.isEmpty) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 72,
+                                height: 72,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.08,
+                                  ),
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: const Icon(
+                                  Icons.forum_outlined,
+                                  size: 34,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'No messages yet',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              const Text(
+                                'Send the first message to start this conversation.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: AppColors.muted,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    return Stack(
+                      children: [
+                        AnimatedSlide(
+                          offset: isInitialChatReady
+                              ? Offset.zero
+                              : const Offset(0, 0.015),
+                          duration: const Duration(milliseconds: 240),
+                          curve: Curves.easeOutCubic,
+                          child: AnimatedOpacity(
+                            opacity: isInitialChatReady ? 1 : 0,
+                            duration: const Duration(milliseconds: 180),
+                            curve: Curves.easeOut,
+                            child: ListView.builder(
+                              controller: scrollController,
+                              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                              itemCount: docs.length + (canLoadOlder ? 1 : 0),
+                              itemBuilder: (context, index) {
+                                if (canLoadOlder && index == 0) {
+                                  return Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: TextButton.icon(
+                                        onPressed: isLoadingOlderMessages
+                                            ? null
+                                            : loadOlderMessages,
+                                        icon: isLoadingOlderMessages
+                                            ? const SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                    ),
+                                              )
+                                            : const Icon(Icons.history),
+                                        label: const Text(
+                                          'Load older messages',
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                final messageIndex = canLoadOlder
+                                    ? index - 1
+                                    : index;
+                                final data = docs[messageIndex].data();
+
+                                return MessageBubble(
+                                  type: data['type'] ?? 'text',
+                                  text: data['text'] ?? '',
+                                  mediaUrl: data['media_url'],
+                                  durationMs: data['duration_ms'],
+                                  senderName: data['sender_name'] ?? '',
+                                  senderRole: data['sender_role'] ?? '',
+                                  currentUserRole: widget.currentUserRole,
+                                  currentSenderName: widget.senderName,
+                                  createdAt: data['created_at'],
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        if (!isInitialChatReady)
+                          const Positioned.fill(
+                            child: IgnorePointer(
+                              child: Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     );
-                  },
-                );
                   },
                 );
               },
@@ -1203,10 +1282,7 @@ class _ChatScreenState extends State<ChatScreen> {
         content: Text('$fallbackMessage: $error'),
         action: failedAttachment == null
             ? null
-            : SnackBarAction(
-                label: 'Retry',
-                onPressed: retryLastAttachment,
-              ),
+            : SnackBarAction(label: 'Retry', onPressed: retryLastAttachment),
         duration: const Duration(seconds: 5),
       ),
     );
@@ -1412,10 +1488,7 @@ class _AttachmentStatusBar extends StatelessWidget {
           const SizedBox(height: 10),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: progressValue,
-              minHeight: 4,
-            ),
+            child: LinearProgressIndicator(value: progressValue, minHeight: 4),
           ),
         ],
       ),

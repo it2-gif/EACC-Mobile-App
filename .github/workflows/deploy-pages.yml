@@ -35,6 +35,7 @@ jobs:
         run: >
           flutter build web --release
           --base-href "/${{ github.event.repository.name }}/"
+          --pwa-strategy=none
           --dart-define=EACC_API_BASE_URL=https://eacc-mobile-app-production.up.railway.app
 
       - name: Add SPA fallback
