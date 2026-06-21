@@ -18,9 +18,21 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   final session = await AuthSessionManager().restore();
-  await PushNotificationService.instance.initialize(initialSession: session);
   runApp(EaccChatApp(initialSession: session));
-  unawaited(PushNotificationService.instance.openBrowserNotificationLaunch());
+
+  unawaited(_initializeNotifications(session));
+}
+
+Future<void> _initializeNotifications(AuthSession? session) async {
+  try {
+    await PushNotificationService.instance
+        .initialize(initialSession: session)
+        .timeout(const Duration(seconds: 12));
+    await PushNotificationService.instance.openBrowserNotificationLaunch();
+  } catch (error, stackTrace) {
+    debugPrint('Notification initialization failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
 }
 
 class EaccChatApp extends StatelessWidget {
@@ -35,7 +47,8 @@ class EaccChatApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       navigatorKey: PushNotificationService.instance.navigatorKey,
-      scaffoldMessengerKey: PushNotificationService.instance.scaffoldMessengerKey,
+      scaffoldMessengerKey:
+          PushNotificationService.instance.scaffoldMessengerKey,
       home: _initialScreen(),
     );
   }
