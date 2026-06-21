@@ -84,19 +84,10 @@ class PushNotificationService {
       final notification = message.notification;
       if (notification == null) return;
 
-      final messenger = scaffoldMessengerKey.currentState;
-      messenger?.showSnackBar(
-        SnackBar(
-          content: Text(
-            notification.body?.trim().isNotEmpty == true
-                ? '${notification.title ?? 'New message'}: ${notification.body}'
-                : notification.title ?? 'New message',
-          ),
-          action: SnackBarAction(
-            label: 'Open',
-            onPressed: () => unawaited(_openChatFromMessage(message)),
-          ),
-        ),
+      _showTopBanner(
+        title: notification.title ?? 'New message',
+        body: notification.body,
+        onOpen: () => unawaited(_openChatFromMessage(message)),
       );
     });
 
@@ -180,6 +171,37 @@ class PushNotificationService {
       senderName: senderName,
       course: course,
     );
+  }
+
+  void _showTopBanner({
+    required String title,
+    String? body,
+    required VoidCallback onOpen,
+  }) {
+    final overlay = navigatorKey.currentState?.overlay;
+    if (overlay == null) return;
+
+    var isRemoved = false;
+    void dismiss(OverlayEntry entry) {
+      if (isRemoved) return;
+      isRemoved = true;
+      entry.remove();
+    }
+
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (context) => _TopNotificationBanner(
+        title: title,
+        body: body,
+        onOpen: () {
+          dismiss(entry);
+          onOpen();
+        },
+        onDismiss: () => dismiss(entry),
+      ),
+    );
+
+    overlay.insert(entry);
   }
 
   void _openChatFromRoute({
@@ -276,6 +298,134 @@ class PushNotificationService {
     'EACC_FCM_VAPID_KEY',
     defaultValue: '',
   );
+}
+
+class _TopNotificationBanner extends StatefulWidget {
+  final String title;
+  final String? body;
+  final VoidCallback onOpen;
+  final VoidCallback onDismiss;
+
+  const _TopNotificationBanner({
+    required this.title,
+    required this.body,
+    required this.onOpen,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_TopNotificationBanner> createState() => _TopNotificationBannerState();
+}
+
+class _TopNotificationBannerState extends State<_TopNotificationBanner> {
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.delayed(const Duration(seconds: 5), () {
+      if (mounted) {
+        widget.onDismiss();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top + 12;
+
+    return Positioned(
+      top: topPadding,
+      left: 12,
+      right: 12,
+      child: SafeArea(
+        bottom: false,
+        child: Material(
+          color: Colors.transparent,
+          child: Dismissible(
+            key: UniqueKey(),
+            direction: DismissDirection.up,
+            onDismissed: (_) => widget.onDismiss(),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F2742),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 20,
+                    offset: Offset(0, 10),
+                  ),
+                ],
+                border: Border.all(color: Colors.white12),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: widget.onOpen,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2B66B0),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.notifications_active_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              widget.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                              ),
+                            ),
+                            if (widget.body != null &&
+                                widget.body!.trim().isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                widget.body!.trim(),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFFD8E2F0),
+                                  fontSize: 13,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Colors.white70,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _BrowserNotificationRoute {

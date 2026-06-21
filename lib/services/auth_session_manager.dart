@@ -8,8 +8,6 @@ import '../models/auth_session.dart';
 
 class AuthSessionManager {
   static const _sessionKey = 'authenticated_lms_session';
-  static const _expiresAtKey = 'authenticated_lms_session_expires_at';
-  static const sessionDuration = Duration(hours: 12);
 
   final FirebaseAuth _firebaseAuth;
 
@@ -25,7 +23,7 @@ class AuthSessionManager {
     }
 
     if (kIsWeb) {
-      await _firebaseAuth.setPersistence(Persistence.SESSION);
+      await _firebaseAuth.setPersistence(Persistence.LOCAL);
     }
     await _firebaseAuth.signOut();
 
@@ -44,25 +42,14 @@ class AuthSessionManager {
       _sessionKey,
       jsonEncode(session.toStoredJson()),
     );
-    await preferences.setString(
-      _expiresAtKey,
-      DateTime.now().add(sessionDuration).toUtc().toIso8601String(),
-    );
   }
 
   Future<AuthSession?> restore() async {
     final preferences = await SharedPreferences.getInstance();
     final storedSession = preferences.getString(_sessionKey);
-    final storedExpiry = preferences.getString(_expiresAtKey);
     final firebaseUser = _firebaseAuth.currentUser;
 
-    if (storedSession == null || storedExpiry == null || firebaseUser == null) {
-      await logout();
-      return null;
-    }
-
-    final expiresAt = DateTime.tryParse(storedExpiry);
-    if (expiresAt == null || !DateTime.now().toUtc().isBefore(expiresAt)) {
+    if (storedSession == null || firebaseUser == null) {
       await logout();
       return null;
     }
@@ -93,7 +80,6 @@ class AuthSessionManager {
   Future<void> clear() async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_sessionKey);
-    await preferences.remove(_expiresAtKey);
   }
 }
 

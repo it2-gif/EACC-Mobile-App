@@ -49,6 +49,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool isLoadingOlderMessages = false;
   bool isOlderPositionRestoreScheduled = false;
   bool shouldScrollAfterSending = false;
+  bool hasScrolledToInitialBottom = false;
   int messageLimit = messagesPerPage;
   String? latestMessageId;
   double scrollOffsetBeforeLoadingOlder = 0;
@@ -886,6 +887,11 @@ class _ChatScreenState extends State<ChatScreen> {
                   if (!isLoadingOlderMessages) {
                     scrollToBottom();
                   }
+                }
+
+                if (!hasScrolledToInitialBottom && docs.isNotEmpty) {
+                  hasScrolledToInitialBottom = true;
+                  scrollToBottom();
                 }
 
                 if (shouldScrollAfterSending && docs.isNotEmpty) {
