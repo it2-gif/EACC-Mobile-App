@@ -434,8 +434,6 @@ Secure Student and Teacher Authentication
 - Teachers can access threads only for courses present in their signed claims.
 - Message sender role and name must match the signed Firebase identity.
 - Storage rules enforce the same course/thread access and a 5 MB image limit.
-- Admin Firebase access remains intentionally disabled until admin LMS
-  integration is implemented.
 
 Verification completed on 2026-06-18:
 
@@ -471,3 +469,68 @@ Rich Media Chat
 - Android and iOS camera, microphone, and photo-library permissions are
   configured.
 - Firestore and Storage rules support image, voice, and video messages.
+
+Admin Authentication and Dashboard
+===================================
+
+- Admin LMS login uses the same PHP session flow as student and teacher:
+  - GET /login.php to establish PHPSESSID
+  - POST /login_1.php with ty=admin, username, and inputPassword
+  - GET /front.php to confirm authenticated session
+- The admin dashboard (front.php) has no user-specific identity fields.
+- The admin username is used as the stable LMS user ID.
+- The display name is derived from the username for clean presentation.
+- The backend creates Firebase custom tokens for admin using the UID format:
+  - admin:<username>
+- Admin signed claims contain the role, LMS user ID, display name, and app
+  user ID. Admin does not carry courseIds in claims because Firestore rules
+  grant admin access to all courses by role.
+- Flutter admin login flows through the same _loginLmsUser path as student
+  and teacher. No special-casing in the login UI.
+- Admin sessions persist and restore correctly on app restart.
+
+Admin Firestore and Storage rules:
+
+- Admin (role == 'admin') can read all courses, threads, and messages.
+- Admin can create and update threads and messages with sender validation.
+- Admin messages must carry sender_role matching the signed token role and
+  sender_name matching the signed token displayName.
+- Admin can read and upload to all chat_uploads paths with the same file type
+  and size limits as student and teacher.
+
+Admin Flutter screens:
+
+- Admin Dashboard: Welcome header with admin name, live stat cards showing
+  course count and thread count from Firestore, navigation tiles to Courses,
+  Users, and Chat Monitor.
+- Admin Courses: Live Firestore list of all courses with real-time thread
+  counts. Tap a course to view all student threads.
+- Admin Threads: All student threads for a course with last message preview,
+  sender name, time, and ADMIN badge. Tap to open the chat as admin.
+- Admin Users: Live user list from the backend GET /v1/admin/users endpoint.
+  Users are grouped by role (admins, teachers, students) with color-coded
+  icons and active/inactive status badges.
+- Admin Chat Monitor: Aggregated view of all threads across every course,
+  sorted by most recent activity. Pull-to-refresh supported. Tap any thread
+  to join the chat as EACC Admin.
+
+Backend admin module:
+
+- GET /v1/admin/users returns all users from PostgreSQL with id, lmsUserId,
+  role, name, email, status, and lastLoginAt.
+- AdminModule registered in the root AppModule.
+
+Verification completed on 2026-06-23:
+
+- Backend TypeScript compilation: no errors.
+- Backend: 9 test suites and 19 tests passed.
+- Flutter analyzer: no issues found.
+- Flutter: 20 tests passed (including new admin session test).
+
+Activation still required:
+
+1. Add Firebase service-account credentials to backend/.env if not done.
+2. Restart the backend and verify admin login returns firebase.customToken.
+3. Deploy updated firestore.rules and storage.rules to Firebase.
+4. Log in as admin on the LMS and verify the dashboard loads correctly.
+5. Open a course, open a thread, and post a message as EACC Admin.

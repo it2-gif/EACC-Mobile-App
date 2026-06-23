@@ -107,23 +107,23 @@
   </div>
 
   <script>
-    const loader = document.getElementById('app-loader');
+    const appLoader = document.getElementById('app-loader');
     const loaderMessage = document.getElementById('app-loader-message');
     let startupFinished = false;
 
     window.addEventListener('flutter-first-frame', () => {
       startupFinished = true;
-      loader.classList.add('hidden');
-      window.setTimeout(() => loader.remove(), 200);
+      appLoader.classList.add('hidden');
+      window.setTimeout(() => appLoader.remove(), 200);
     });
 
     function showStartupError(message) {
-      if (startupFinished || !document.body.contains(loader)) {
+      if (startupFinished || !document.body.contains(appLoader)) {
         return;
       }
 
-      loader.classList.add('failed');
-      loader.querySelector('h1').textContent = 'EACC Chat could not start';
+      appLoader.classList.add('failed');
+      appLoader.querySelector('h1').textContent = 'EACC Chat could not start';
       loaderMessage.textContent = message;
     }
 

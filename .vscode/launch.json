@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "EACC Chat (Chrome)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "chrome",
+      "args": [
+        "--dart-define=EACC_FCM_VAPID_KEY=BI9vFbWr5a4snY-mJk2uiae56Nf-zEA3axDqG1PzWruGrENyyguwW1ZHHfo8A7xCAC3AMxYMZelwnbYnNh-BZvg"
+      ]
+    },
+    {
+      "name": "EACC Chat (Android)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "android",
+      "args": [
+        "--dart-define=EACC_FCM_VAPID_KEY=BI9vFbWr5a4snY-mJk2uiae56Nf-zEA3axDqG1PzWruGrENyyguwW1ZHHfo8A7xCAC3AMxYMZelwnbYnNh-BZvg"
+      ]
+    },
+    {
+      "name": "EACC Chat (iOS)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "ios",
+      "args": [
+        "--dart-define=EACC_FCM_VAPID_KEY=BI9vFbWr5a4snY-mJk2uiae56Nf-zEA3axDqG1PzWruGrENyyguwW1ZHHfo8A7xCAC3AMxYMZelwnbYnNh-BZvg"
+      ]
+    }
+  ]
+}

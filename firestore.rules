@@ -6,6 +6,11 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return isSignedIn()
+        && request.auth.token.role == 'admin';
+    }
+
     function isSupportedRole() {
       return isSignedIn()
         && request.auth.token.role in ['student', 'teacher'];
@@ -75,27 +80,40 @@ service cloud.firestore {
         );
     }
 
+    function isAdminThreadUpdate(threadId) {
+      return request.resource.data.thread_id == threadId
+        && request.resource.data.last_sender_role == 'admin'
+        && request.resource.data.last_sender_name == request.auth.token.displayName;
+    }
+
     match /courses/{courseId} {
-      allow read: if hasCourse(courseId);
+      allow read: if isAdmin() || hasCourse(courseId);
       allow write: if false;
 
       match /threads/{threadId} {
-        allow read: if canAccessThread(courseId, threadId);
-        allow create: if canAccessThread(courseId, threadId)
-          && isOutgoingThreadUpdate(threadId);
-        allow update: if canAccessThread(courseId, threadId)
-          && (
-            isOutgoingThreadUpdate(threadId)
-            || isReadReceiptUpdate(threadId)
-          );
+        allow read: if isAdmin() || canAccessThread(courseId, threadId);
+        allow create: if isAdmin()
+            ? isAdminThreadUpdate(threadId)
+            : canAccessThread(courseId, threadId) && isOutgoingThreadUpdate(threadId);
+        allow update: if isAdmin()
+            ? isAdminThreadUpdate(threadId)
+            : canAccessThread(courseId, threadId)
+              && (
+                isOutgoingThreadUpdate(threadId)
+                || isReadReceiptUpdate(threadId)
+              );
         allow delete: if false;
 
         match /messages/{messageId} {
-          allow read: if canAccessThread(courseId, threadId);
-          allow create: if canAccessThread(courseId, threadId)
-            && hasValidSender()
-            && request.resource.data.type in ['text', 'image', 'video', 'voice']
-            && request.resource.data.created_at == request.time;
+          allow read: if isAdmin() || canAccessThread(courseId, threadId);
+          allow create: if isAdmin()
+              ? hasValidSender()
+                && request.resource.data.type in ['text', 'image', 'video', 'voice']
+                && request.resource.data.created_at == request.time
+              : canAccessThread(courseId, threadId)
+                && hasValidSender()
+                && request.resource.data.type in ['text', 'image', 'video', 'voice']
+                && request.resource.data.created_at == request.time;
           allow update, delete: if false;
         }
       }

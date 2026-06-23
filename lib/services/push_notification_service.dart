@@ -254,6 +254,17 @@ class PushNotificationService {
     overlay.insert(entry);
   }
 
+  /// Debug-only helper: shows the animated banner with sample data immediately.
+  /// Call this from a UI button during development to verify the banner UI
+  /// without needing a real FCM message.
+  void showTestBanner() {
+    _showTopBanner(
+      title: 'Mohamed El-Sayad',
+      body: 'Hello! I have a question about the assignment due tomorrow.',
+      onOpen: () => debugPrint('[Test] Notification tapped — would open chat'),
+    );
+  }
+
   void _openChatFromRoute({
     required AuthSession session,
     required String courseId,
@@ -367,111 +378,275 @@ class _TopNotificationBanner extends StatefulWidget {
   State<_TopNotificationBanner> createState() => _TopNotificationBannerState();
 }
 
-class _TopNotificationBannerState extends State<_TopNotificationBanner> {
+class _TopNotificationBannerState extends State<_TopNotificationBanner>
+    with TickerProviderStateMixin {
+  // Slide controller — forward = enter, reverse = exit.
+  late final AnimationController _slideController;
+  // Progress controller — forward = bar drains from full to empty.
+  late final AnimationController _progressController;
+
+  late final Animation<Offset> _slideAnim;
+  late final Animation<double> _fadeAnim;
+
+  bool _isDismissing = false;
+
+  static const _slideInDuration = Duration(milliseconds: 480);
+  static const _slideOutDuration = Duration(milliseconds: 280);
+  static const _displayDuration = Duration(milliseconds: 4800);
+
   @override
   void initState() {
     super.initState();
-    Future<void>.delayed(const Duration(seconds: 5), () {
-      if (mounted) {
-        widget.onDismiss();
-      }
+
+    _slideController = AnimationController(vsync: this, value: 0);
+    _progressController = AnimationController(
+      vsync: this,
+      duration: _displayDuration,
+    );
+
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, -1.6),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _slideController,
+        curve: Curves.easeOutBack,
+        reverseCurve: Curves.easeInCubic,
+      ),
+    );
+
+    _fadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _slideController,
+        curve: const Interval(0.0, 0.55),
+      ),
+    );
+
+    // Slide in, then start the progress drain.
+    _slideController
+        .animateTo(1.0, duration: _slideInDuration)
+        .then((_) {
+      if (mounted) _progressController.forward();
     });
+
+    // Auto-dismiss after display duration.
+    Future<void>.delayed(_slideInDuration + _displayDuration, _dismiss);
+  }
+
+  Future<void> _dismiss() async {
+    if (_isDismissing || !mounted) return;
+    _isDismissing = true;
+    _progressController.stop();
+    await _slideController.animateTo(0.0, duration: _slideOutDuration);
+    if (mounted) widget.onDismiss();
+  }
+
+  @override
+  void dispose() {
+    _slideController.dispose();
+    _progressController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final topPadding = MediaQuery.of(context).padding.top + 12;
+    final topInset = MediaQuery.of(context).padding.top;
 
     return Positioned(
-      top: topPadding,
+      top: topInset + 10,
       left: 12,
       right: 12,
-      child: SafeArea(
-        bottom: false,
-        child: Material(
-          color: Colors.transparent,
-          child: Dismissible(
-            key: UniqueKey(),
-            direction: DismissDirection.up,
-            onDismissed: (_) => widget.onDismiss(),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F2742),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 20,
-                    offset: Offset(0, 10),
-                  ),
-                ],
-                border: Border.all(color: Colors.white12),
-              ),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: widget.onOpen,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2B66B0),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.notifications_active_rounded,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              widget.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
-                              ),
-                            ),
-                            if (widget.body != null &&
-                                widget.body!.trim().isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                widget.body!.trim(),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Color(0xFFD8E2F0),
-                                  fontSize: 13,
-                                  height: 1.3,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        color: Colors.white70,
-                      ),
-                    ],
-                  ),
-                ),
+      child: SlideTransition(
+        position: _slideAnim,
+        child: FadeTransition(
+          opacity: _fadeAnim,
+          child: GestureDetector(
+            onVerticalDragEnd: (details) {
+              if (details.primaryVelocity != null &&
+                  details.primaryVelocity! < -100) {
+                _dismiss();
+              }
+            },
+            child: Material(
+              color: Colors.transparent,
+              child: _BannerCard(
+                title: widget.title,
+                body: widget.body,
+                progressController: _progressController,
+                onOpen: () {
+                  _dismiss();
+                  widget.onOpen();
+                },
+                onDismiss: _dismiss,
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── The visual card ─────────────────────────────────────────────────────────
+
+class _BannerCard extends StatelessWidget {
+  final String title;
+  final String? body;
+  final AnimationController progressController;
+  final VoidCallback onOpen;
+  final VoidCallback onDismiss;
+
+  const _BannerCard({
+    required this.title,
+    required this.body,
+    required this.progressController,
+    required this.onOpen,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D1F35),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x55000000),
+            blurRadius: 28,
+            spreadRadius: 2,
+            offset: Offset(0, 12),
+          ),
+        ],
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(18),
+        splashColor: Colors.white.withValues(alpha: 0.06),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 10, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // App icon
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF1D5DA8), Color(0xFF0C2E68)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.chat_bubble_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Text block
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // App label + "now"
+                        Row(
+                          children: [
+                            const Text(
+                              'EACC Chat',
+                              style: TextStyle(
+                                color: Color(0xFF7FA8D4),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            const Spacer(),
+                            const Text(
+                              'now',
+                              style: TextStyle(
+                                color: Color(0xFF4C6A8C),
+                                fontSize: 11,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+
+                        // Sender name
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14.5,
+                            height: 1.2,
+                          ),
+                        ),
+
+                        // Message body
+                        if (body != null && body!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            body!.trim(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFFB0C8E4),
+                              fontSize: 13,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  // Dismiss (×) button
+                  GestureDetector(
+                    onTap: onDismiss,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 0, 4, 0),
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: 18,
+                        color: Colors.white.withValues(alpha: 0.35),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Draining progress bar
+            AnimatedBuilder(
+              animation: progressController,
+              builder: (context, _) {
+                return LinearProgressIndicator(
+                  value: 1.0 - progressController.value,
+                  backgroundColor: Colors.white.withValues(alpha: 0.06),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    Color(0xFF2B66B0),
+                  ),
+                  minHeight: 3,
+                );
+              },
+            ),
+          ],
         ),
       ),
     );

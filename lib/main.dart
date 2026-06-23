@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
 import 'models/auth_session.dart';
+import 'screens/admin_dashboard_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/student_courses_screen.dart';
 import 'screens/teacher_courses_screen.dart';
@@ -89,6 +90,10 @@ class _InitialSessionGate extends StatelessWidget {
 
         if (session.appUser.role == 'teacher') {
           return TeacherCoursesScreen(session: session);
+        }
+
+        if (session.appUser.role == 'admin') {
+          return AdminDashboardScreen(session: session);
         }
 
         return const LoginScreen();

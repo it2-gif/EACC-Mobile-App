@@ -26,7 +26,7 @@ const loginPaths: Record<LmsUserRole, string> = {
 const dashboardPaths: Record<LmsUserRole, string> = {
   student: '/members/',
   teacher: '/teacher/index.php',
-  admin: '/',
+  admin: '/front.php',
 };
 
 @Injectable()
@@ -90,6 +90,7 @@ export class EaccLmsClient implements LmsClient {
       mergeSessionCookie(sessionCookie, response.headers),
       timeout,
       credentials.role,
+      credentials,
     );
 
     if (credentials.role === 'student' || credentials.role === 'teacher') {
@@ -163,6 +164,7 @@ export class EaccLmsClient implements LmsClient {
     sessionCookie: string,
     timeout: number,
     role: LmsUserRole,
+    credentials?: LmsLoginCredentials,
   ): Promise<NormalizedLmsUser> {
     const html = await this.loadAuthenticatedHtml(url, sessionCookie, timeout);
 
@@ -172,6 +174,10 @@ export class EaccLmsClient implements LmsClient {
 
     if (role === 'teacher') {
       return parseTeacherDashboardHtml(html, role);
+    }
+
+    if (role === 'admin') {
+      return parseAdminIdentity(credentials!.username);
     }
 
     throw new LmsUnavailableError();
@@ -212,6 +218,27 @@ function tryParseJson(value: string): { value: unknown } | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Admin identity is derived from the login username.
+ * front.php contains no user-specific identity fields, so the username
+ * acts as the stable LMS user ID. The display name is capitalised from
+ * the username for a clean presentation in chat.
+ */
+function parseAdminIdentity(username: string): NormalizedLmsUser {
+  const trimmed = username.trim().toLowerCase();
+  const displayName = trimmed
+    .split(/[._\-\s]+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+  return {
+    lmsUserId: trimmed,
+    role: 'admin',
+    name: displayName || trimmed,
+    courses: [],
+  };
 }
 
 function extractSessionCookie(headers: Headers): string | undefined {

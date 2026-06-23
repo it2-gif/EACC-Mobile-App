@@ -2,6 +2,11 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.role == 'admin';
+    }
+
     function isSupportedRole() {
       return request.auth != null
         && request.auth.token.role in ['student', 'teacher'];
@@ -24,10 +29,8 @@ service firebase.storage {
         );
     }
 
-    match /chat_uploads/courses/{courseId}/threads/{threadId}/{fileName} {
-      allow read: if canAccessThread(courseId, threadId);
-      allow create: if canAccessThread(courseId, threadId)
-        && request.resource.size > 0
+    function isValidUpload() {
+      return request.resource.size > 0
         && (
           (
             request.resource.contentType.matches('image/.*')
@@ -42,6 +45,13 @@ service firebase.storage {
             && request.resource.size <= 50 * 1024 * 1024
           )
         );
+    }
+
+    match /chat_uploads/courses/{courseId}/threads/{threadId}/{fileName} {
+      allow read: if isAdmin() || canAccessThread(courseId, threadId);
+      allow create: if isAdmin()
+          ? isValidUpload()
+          : canAccessThread(courseId, threadId) && isValidUpload();
       allow update, delete: if false;
     }
   }

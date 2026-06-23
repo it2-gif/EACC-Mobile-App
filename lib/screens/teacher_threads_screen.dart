@@ -18,8 +18,8 @@ class TeacherThreadsScreen extends StatelessWidget {
     super.key,
     required this.courseId,
     required this.courseName,
+    required this.senderName,
     this.viewerRole = 'teacher',
-    this.senderName = 'Mohamed El-Sayad',
     this.students = const [],
   });
 

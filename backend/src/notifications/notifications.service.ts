@@ -57,7 +57,7 @@ export class NotificationsService {
   ) {
     const identity = await this.firebaseAuth.verifyIdToken(firebaseIdToken);
     const senderAppUserId = this.readAppUserId(identity);
-    const senderRole = this.readRole(identity);
+    const senderRole = this.readSenderRole(identity);
     const senderCourseIds = this.readCourseIds(identity);
 
     if (senderRole !== input.senderRole) {
@@ -67,19 +67,29 @@ export class NotificationsService {
       });
     }
 
-    if (!senderCourseIds.includes(input.courseId)) {
+    // Admin has no courseIds in their token — they have global access.
+    if (senderRole !== 'admin' && !senderCourseIds.includes(input.courseId)) {
       throw new UnauthorizedException({
         code: 'COURSE_ACCESS_DENIED',
         message: 'The Firebase identity does not have access to this course.',
       });
     }
 
-    const targetRole =
-      senderRole === 'student' ? UserRole.TEACHER : UserRole.STUDENT;
+    // Determine which course members to notify based on who sent the message.
+    // - Student sends  → notify all teachers of the course.
+    // - Teacher sends  → notify the specific student (threadId = student lmsUserId).
+    // - Admin sends    → notify both the specific student AND all teachers.
+    const rolesForQuery: UserRole[] =
+      senderRole === 'student'
+        ? [UserRole.TEACHER]
+        : senderRole === 'teacher'
+          ? [UserRole.STUDENT]
+          : [UserRole.STUDENT, UserRole.TEACHER]; // admin notifies both
+
     const targetMemberships = await this.prisma.courseMembership.findMany({
       where: {
         course: { lmsCourseId: input.courseId },
-        role: targetRole,
+        role: { in: rolesForQuery },
         status: MembershipStatus.ACTIVE,
         user: { status: UserStatus.ACTIVE },
       },
@@ -94,13 +104,16 @@ export class NotificationsService {
       },
     });
 
+    // When notifying the student side (teacher or admin sent), filter to the
+    // specific student whose thread this is.
     const recipients =
       senderRole === 'student'
-        ? targetMemberships
+        ? targetMemberships // all teachers
         : targetMemberships.filter(
-            (membership) =>
-              membership.user.lmsUserId === input.threadId &&
-              membership.role === UserRole.STUDENT,
+            (m) =>
+              m.role === UserRole.TEACHER ||
+              (m.role === UserRole.STUDENT &&
+                m.user.lmsUserId === input.threadId),
           );
 
     const recipientTokens = recipients
@@ -185,8 +198,14 @@ export class NotificationsService {
     return identity.appUserId;
   }
 
-  private readRole(identity: DecodedIdToken): 'student' | 'teacher' {
-    if (identity.role === 'student' || identity.role === 'teacher') {
+  private readSenderRole(
+    identity: DecodedIdToken,
+  ): 'student' | 'teacher' | 'admin' {
+    if (
+      identity.role === 'student' ||
+      identity.role === 'teacher' ||
+      identity.role === 'admin'
+    ) {
       return identity.role;
     }
 

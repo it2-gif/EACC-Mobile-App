@@ -10,8 +10,8 @@ export class SendChatNotificationDto {
   threadId!: string;
 
   @IsString()
-  @IsIn(['student', 'teacher'])
-  senderRole!: 'student' | 'teacher';
+  @IsIn(['student', 'teacher', 'admin'])
+  senderRole!: 'student' | 'teacher' | 'admin';
 
   @IsString()
   @MaxLength(200)

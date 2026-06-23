@@ -20,7 +20,7 @@ export interface FirebaseIdentity {
   appUserId: string;
   lmsUserId: string;
   displayName: string;
-  role: 'student' | 'teacher';
+  role: 'student' | 'teacher' | 'admin';
   courseIds: string[];
 }
 

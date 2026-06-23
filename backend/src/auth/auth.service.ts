@@ -29,16 +29,13 @@ export class AuthService {
       const lmsUser = await this.lmsClient.authenticate(credentials);
       const synced = await this.authSync.syncLmsUser(lmsUser);
       const courseIds = synced.courses.map((course) => course.lmsCourseId);
-      const firebaseCustomToken =
-        lmsUser.role === 'student' || lmsUser.role === 'teacher'
-          ? await this.firebaseTokens.createCustomToken({
-              appUserId: synced.user.id,
-              lmsUserId: lmsUser.lmsUserId,
-              displayName: synced.user.name,
-              role: lmsUser.role,
-              courseIds,
-            })
-          : undefined;
+      const firebaseCustomToken = await this.firebaseTokens.createCustomToken({
+        appUserId: synced.user.id,
+        lmsUserId: lmsUser.lmsUserId,
+        displayName: synced.user.name,
+        role: lmsUser.role,
+        courseIds,
+      });
 
       return {
         status: 'authenticated',
@@ -59,12 +56,8 @@ export class AuthService {
               (lmsCourse) => lmsCourse.lmsCourseId === course.lmsCourseId,
             )?.students ?? [],
         })),
-        firebase: firebaseCustomToken
-          ? {
-              customToken: firebaseCustomToken,
-            }
-          : undefined,
-        nextStep: firebaseCustomToken ? 'ready' : 'admin_auth_pending',
+        firebase: { customToken: firebaseCustomToken },
+        nextStep: 'ready',
       };
     } catch (error) {
       if (error instanceof InvalidLmsCredentialsError) {

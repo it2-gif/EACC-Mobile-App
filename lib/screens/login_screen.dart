@@ -6,6 +6,7 @@ import '../services/auth_api.dart';
 import '../services/auth_session_manager.dart';
 import '../services/push_notification_service.dart';
 import '../theme/app_theme.dart';
+import 'admin_dashboard_screen.dart';
 import 'student_courses_screen.dart';
 import 'teacher_courses_screen.dart';
 
@@ -48,15 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    if (role == 'student' || role == 'teacher') {
-      await _loginLmsUser(role: role, username: username, password: password);
-      return;
-    }
-
-    setState(() {
-      errorMessage =
-          'Admin login is not connected yet. Student and teacher sign-in are live now.';
-    });
+    await _loginLmsUser(role: role, username: username, password: password);
   }
 
   Future<void> _loginLmsUser({
@@ -82,9 +75,14 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => role == 'student'
-              ? StudentCoursesScreen(session: session)
-              : TeacherCoursesScreen(session: session),
+          builder: (_) {
+            if (role == 'admin') {
+              return AdminDashboardScreen(session: session);
+            }
+            return role == 'student'
+                ? StudentCoursesScreen(session: session)
+                : TeacherCoursesScreen(session: session);
+          },
         ),
       );
     } on AuthApiException catch (error) {
@@ -236,11 +234,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              selectedRole == 'student'
+                           selectedRole == 'student'
                                   ? 'Student login'
                                   : selectedRole == 'teacher'
                                   ? 'Teacher login'
-                                  : 'Admin login coming later',
+                                  : 'Admin login',
                               style: const TextStyle(
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.ink,
@@ -307,7 +305,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 10),
                     Text(
                       selectedRole == 'admin'
-                          ? 'Admin sign-in will be enabled after the real LMS admin integration is completed.'
+                          ? 'Admin sign-in is verified through the EACC LMS.'
                           : 'This sign-in is verified through the EACC LMS.',
                       textAlign: TextAlign.center,
                       style: const TextStyle(

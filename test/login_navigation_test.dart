@@ -47,6 +47,16 @@ const teacherSession = AuthSession(
   courses: [],
 );
 
+const adminSession = AuthSession(
+  lmsUser: LmsUser(lmsUserId: 'admin', role: 'admin', name: 'Admin'),
+  appUser: AppUser(
+    id: 'a1b2c3d4-0000-0000-0000-000000000000',
+    role: 'admin',
+    name: 'Admin',
+  ),
+  courses: [],
+);
+
 Future<void> pumpLogin(WidgetTester tester, {AuthApi? authApi}) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -102,7 +112,7 @@ void main() {
   });
 
   testWidgets('admin role opens the admin dashboard', (tester) async {
-    await pumpLogin(tester);
+    await pumpLogin(tester, authApi: FakeAuthApi(adminSession));
     await selectRole(tester, 'Admin');
 
     await submitLogin(tester);

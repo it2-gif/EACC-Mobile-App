@@ -63,6 +63,6 @@ void main() {
       currentSenderName: 'Esam Test',
     );
 
-    expect(bubble.displaySender, 'EACC Admin - Admin');
+    expect(bubble.displaySender, 'EACC Admin');
   });
 }

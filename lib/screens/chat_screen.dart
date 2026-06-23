@@ -1221,7 +1221,7 @@ class _ChatScreenState extends State<ChatScreen> {
     required String messageType,
     required String previewText,
   }) async {
-    if (widget.currentUserRole == 'admin') return;
+    // All roles (student, teacher, admin) send push notifications.
 
     try {
       await _notificationApi.notifyChatMessage(
