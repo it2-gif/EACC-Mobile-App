@@ -159,6 +159,38 @@
           console.warn('FCM service worker registration failed:', error);
         });
     })();
+
+    // Synthesize a soft two-note notification chime via Web Audio API.
+    // Called from Flutter when a foreground push-notification banner appears.
+    function playNotificationTone() {
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = new Ctx();
+
+        function chime(freq, startTime, duration, peakVol) {
+          const osc  = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, startTime);
+          gain.gain.setValueAtTime(0, startTime);
+          gain.gain.linearRampToValueAtTime(peakVol, startTime + 0.018);
+          gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+          osc.start(startTime);
+          osc.stop(startTime + duration + 0.01);
+        }
+
+        const t = ctx.currentTime;
+        chime(880,    t,        0.28, 0.30);   // A5  — first note
+        chime(1318.5, t + 0.13, 0.32, 0.22);   // E6  — second note (higher)
+
+        setTimeout(() => ctx.close(), 1200);
+      } catch (_) {
+        // Web Audio not available — silent fallback.
+      }
+    }
   </script>
 
   <!-- Attach startup listeners before loading Flutter's asynchronous boot file. -->

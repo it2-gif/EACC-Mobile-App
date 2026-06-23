@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
@@ -41,15 +40,6 @@ class AppScaffold extends StatelessWidget {
         shape: const Border(bottom: BorderSide(color: AppColors.border)),
         actions: [
           ...?actions,
-          // ── Debug-only: test the notification banner ──────────────────────
-          if (kDebugMode)
-            IconButton(
-              icon: const Icon(Icons.notifications_active_outlined),
-              tooltip: 'Test notification banner',
-              onPressed: () =>
-                  PushNotificationService.instance.showTestBanner(),
-            ),
-          // ─────────────────────────────────────────────────────────────────
           if (showLogout)
             IconButton(
               onPressed: () async => _logout(context),

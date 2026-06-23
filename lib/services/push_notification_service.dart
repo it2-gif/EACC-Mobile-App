@@ -9,6 +9,7 @@ import '../firebase_options.dart';
 import '../models/auth_session.dart';
 import '../models/course.dart';
 import '../screens/chat_screen.dart';
+import '../utils/notification_sound.dart';
 import 'auth_session_manager.dart';
 import 'notification_api.dart';
 
@@ -165,6 +166,9 @@ class PushNotificationService {
       return;
     }
 
+    // Play the notification chime, then show the banner.
+    playNotificationSound();
+
     _showTopBanner(
       title: title,
       body: body,
@@ -252,17 +256,6 @@ class PushNotificationService {
     );
 
     overlay.insert(entry);
-  }
-
-  /// Debug-only helper: shows the animated banner with sample data immediately.
-  /// Call this from a UI button during development to verify the banner UI
-  /// without needing a real FCM message.
-  void showTestBanner() {
-    _showTopBanner(
-      title: 'Mohamed El-Sayad',
-      body: 'Hello! I have a question about the assignment due tomorrow.',
-      onOpen: () => debugPrint('[Test] Notification tapped — would open chat'),
-    );
   }
 
   void _openChatFromRoute({
@@ -357,7 +350,8 @@ class PushNotificationService {
 
   static const String _webVapidKey = String.fromEnvironment(
     'EACC_FCM_VAPID_KEY',
-    defaultValue: '',
+    defaultValue:
+        'BI9vFbWr5a4snY-mJk2uiae56Nf-zEA3axDqG1PzWruGrENyyguwW1ZHHfo8A7xCAC3AMxYMZelwnbYnNh-BZvg',
   );
 }
 
