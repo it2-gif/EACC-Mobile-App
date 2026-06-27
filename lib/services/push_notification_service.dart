@@ -12,6 +12,7 @@ import '../screens/chat_screen.dart';
 import '../utils/notification_sound.dart';
 import 'auth_session_manager.dart';
 import 'notification_api.dart';
+import 'web_browser_notification.dart';
 import 'web_fcm_token.dart';
 
 @pragma('vm:entry-point')
@@ -195,6 +196,19 @@ class PushNotificationService {
 
     // Play the notification chime, then show the banner.
     playNotificationSound();
+
+    if (kIsWeb) {
+      unawaited(
+        showWebBrowserNotification(
+          title: title,
+          body: body,
+          courseId: data['courseId']?.toString() ?? '',
+          threadId: data['threadId']?.toString() ?? '',
+          studentName: data['studentName']?.toString() ?? '',
+          senderName: data['senderName']?.toString() ?? title,
+        ),
+      );
+    }
 
     _showTopBanner(
       title: title,

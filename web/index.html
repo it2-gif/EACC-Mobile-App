@@ -225,6 +225,45 @@
         );
         return token;
       };
+
+      window.eaccShowBrowserNotification = async function(
+        title,
+        body,
+        courseId,
+        threadId,
+        studentName,
+        senderName
+      ) {
+        if (Notification.permission !== 'granted') {
+          console.debug(
+            'EACC browser notification skipped: permission is',
+            Notification.permission
+          );
+          return false;
+        }
+
+        const base = eaccAppBaseHref();
+        const workerUrl = eaccAbsoluteUrl(`${base}firebase-messaging-sw.js`);
+        const scopeUrl = eaccAbsoluteUrl(base);
+        const registration =
+          (await navigator.serviceWorker.getRegistration(scopeUrl)) ||
+          (await navigator.serviceWorker.register(workerUrl, {
+            scope: scopeUrl,
+          }));
+
+        await registration.showNotification(title || 'EACC Chat', {
+          body: body || 'New message',
+          data: {
+            courseId: courseId || '',
+            threadId: threadId || '',
+            studentName: studentName || '',
+            senderName: senderName || '',
+          },
+          icon: `${base}icons/Icon-192.png`,
+          badge: `${base}icons/Icon-192.png`,
+        });
+        return true;
+      };
     })();
 
     // Synthesize a soft two-note notification chime via Web Audio API.
