@@ -84,6 +84,14 @@ class PushNotificationService {
     _session = null;
     _registeredToken = null;
 
+    if (kIsWeb) {
+      debugPrint(
+        'FCM web token cleanup skipped: GitHub Pages uses the scoped '
+        'EACC service worker bridge.',
+      );
+      return;
+    }
+
     try {
       await FirebaseMessaging.instance.deleteToken();
     } catch (error) {
