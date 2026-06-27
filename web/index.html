@@ -154,14 +154,27 @@
       );
     }, 120000);
 
+    function eaccAppBaseHref() {
+      return document.querySelector('base')?.getAttribute('href') || '/';
+    }
+
+    function eaccAbsoluteUrl(path) {
+      return new URL(path, window.location.origin).href;
+    }
+
     (function registerFirebaseServiceWorker() {
       if (!('serviceWorker' in navigator)) {
         return;
       }
 
-      const base = document.querySelector('base')?.getAttribute('href') || '/';
+      const base = eaccAppBaseHref();
+      const workerUrl = eaccAbsoluteUrl(`${base}firebase-messaging-sw.js`);
+      const scopeUrl = eaccAbsoluteUrl(base);
       navigator.serviceWorker
-        .register(`${base}firebase-messaging-sw.js`, { scope: base })
+        .register(workerUrl, { scope: scopeUrl })
+        .then(() => {
+          console.debug('EACC FCM service worker registered:', workerUrl);
+        })
         .catch((error) => {
           console.warn('FCM service worker registration failed:', error);
         });
@@ -187,17 +200,30 @@
       }
 
       window.eaccGetFcmToken = async function(vapidKey) {
-        const base = document.querySelector('base')?.getAttribute('href') || '/';
+        if (!vapidKey) {
+          console.warn('EACC FCM VAPID key is missing.');
+          return null;
+        }
+
+        const base = eaccAppBaseHref();
+        const workerUrl = eaccAbsoluteUrl(`${base}firebase-messaging-sw.js`);
+        const scopeUrl = eaccAbsoluteUrl(base);
         const registration =
-          (await navigator.serviceWorker.getRegistration(base)) ||
-          (await navigator.serviceWorker.register(`${base}firebase-messaging-sw.js`, {
-            scope: base,
+          (await navigator.serviceWorker.getRegistration(scopeUrl)) ||
+          (await navigator.serviceWorker.register(workerUrl, {
+            scope: scopeUrl,
           }));
 
-        return firebase.messaging().getToken({
+        const token = await firebase.messaging().getToken({
           vapidKey,
           serviceWorkerRegistration: registration,
         });
+        console.debug(
+          token
+            ? 'EACC FCM web token created.'
+            : 'EACC FCM web token was empty.'
+        );
+        return token;
       };
     })();
 

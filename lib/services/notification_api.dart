@@ -71,7 +71,7 @@ class NotificationApi {
     );
 
     debugPrint(
-      'Notification API response $path: ${response.statusCode}',
+      'Notification API response $path: ${response.statusCode} ${response.body}',
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {

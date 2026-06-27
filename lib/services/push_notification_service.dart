@@ -170,8 +170,12 @@ class PushNotificationService {
       return bridgeToken;
     }
 
-    debugPrint('FCM web bridge unavailable; falling back to Firebase plugin.');
-    return FirebaseMessaging.instance.getToken(vapidKey: _webVapidKey);
+    debugPrint(
+      'FCM web token was not created. GitHub Pages must use the EACC '
+      'service-worker bridge; the Firebase plugin fallback expects a root '
+      'service worker and is intentionally skipped.',
+    );
+    return null;
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
