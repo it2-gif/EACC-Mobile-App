@@ -4,7 +4,14 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import {
+  CourseStatus,
+  MembershipStatus,
+  UserRole,
+  UserStatus,
+} from '../../generated/prisma/enums';
 import { Environment } from '../config/environment';
+import { PrismaService } from '../database/prisma.service';
 import { FirebaseTokenService } from '../firebase/firebase-token.service';
 import { EaccLmsClient } from '../lms/eacc-lms.client';
 import {
@@ -20,6 +27,7 @@ export class AuthService {
   constructor(
     private readonly lmsClient: EaccLmsClient,
     private readonly authSync: AuthSyncService,
+    private readonly prisma: PrismaService,
     private readonly firebaseTokens: FirebaseTokenService,
     private readonly config: ConfigService<Environment, true>,
   ) {}
@@ -29,6 +37,8 @@ export class AuthService {
       const lmsUser = await this.lmsClient.authenticate(credentials);
       const synced = await this.authSync.syncLmsUser(lmsUser);
       const courseIds = synced.courses.map((course) => course.lmsCourseId);
+      const adminCourses =
+        lmsUser.role === 'admin' ? await this.loadAdminCourses() : null;
       const firebaseCustomToken = await this.firebaseTokens.createCustomToken({
         appUserId: synced.user.id,
         lmsUserId: lmsUser.lmsUserId,
@@ -46,16 +56,18 @@ export class AuthService {
           name: synced.user.name,
           email: synced.user.email,
         },
-        courses: synced.courses.map((course) => ({
-          id: course.id,
-          lmsCourseId: course.lmsCourseId,
-          name: course.name,
-          category: course.category,
-          students:
-            lmsUser.courses.find(
-              (lmsCourse) => lmsCourse.lmsCourseId === course.lmsCourseId,
-            )?.students ?? [],
-        })),
+        courses:
+          adminCourses ??
+          synced.courses.map((course) => ({
+            id: course.id,
+            lmsCourseId: course.lmsCourseId,
+            name: course.name,
+            category: course.category,
+            students:
+              lmsUser.courses.find(
+                (lmsCourse) => lmsCourse.lmsCourseId === course.lmsCourseId,
+              )?.students ?? [],
+          })),
         firebase: { customToken: firebaseCustomToken },
         nextStep: 'ready',
       };
@@ -87,5 +99,40 @@ export class AuthService {
 
       throw error;
     }
+  }
+
+  private async loadAdminCourses() {
+    const courses = await this.prisma.course.findMany({
+      where: { status: CourseStatus.ACTIVE },
+      orderBy: [{ name: 'asc' }],
+      include: {
+        memberships: {
+          where: {
+            role: UserRole.STUDENT,
+            status: MembershipStatus.ACTIVE,
+            user: { status: UserStatus.ACTIVE },
+          },
+          include: {
+            user: {
+              select: {
+                lmsUserId: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return courses.map((course) => ({
+      id: course.id,
+      lmsCourseId: course.lmsCourseId,
+      name: course.name,
+      category: course.category,
+      students: course.memberships.map((membership) => ({
+        lmsUserId: membership.user.lmsUserId,
+        name: membership.user.name,
+      })),
+    }));
   }
 }

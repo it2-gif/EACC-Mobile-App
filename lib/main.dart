@@ -16,9 +16,12 @@ import 'theme/app_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  runApp(EaccChatApp(initialSessionLoader: _bootstrapInitialSession()));
+}
 
-  runApp(EaccChatApp(initialSessionLoader: _restoreInitialSession()));
+Future<AuthSession?> _bootstrapInitialSession() async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  return _restoreInitialSession();
 }
 
 Future<AuthSession?> _restoreInitialSession() async {
@@ -81,6 +84,13 @@ class _InitialSessionGate extends StatelessWidget {
           return const _StartupScreen();
         }
 
+        if (snapshot.hasError) {
+          return _StartupErrorScreen(
+            message:
+                'Firebase could not finish starting the app. Refresh the page and try again.',
+          );
+        }
+
         final session = snapshot.data;
         if (session == null) return const LoginScreen();
 
@@ -125,6 +135,52 @@ class _StartupScreen extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StartupErrorScreen extends StatelessWidget {
+  final String message;
+
+  const _StartupErrorScreen({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                size: 42,
+                color: AppColors.danger,
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'EACC Chat could not start',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.danger,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.muted,
+                  height: 1.45,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

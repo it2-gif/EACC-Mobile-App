@@ -1,8 +1,8 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../models/auth_session.dart';
+import '../services/auth_session_manager.dart';
+import '../services/push_notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
 import 'admin_chats_screen.dart';
@@ -15,8 +15,9 @@ class AdminDashboardScreen extends StatelessWidget {
 
   const AdminDashboardScreen({super.key, required this.session});
 
-  void _logout(BuildContext context) async {
-    await FirebaseAuth.instance.signOut();
+  Future<void> _logout(BuildContext context) async {
+    await AuthSessionManager().logout();
+    await PushNotificationService.instance.deactivate();
     if (!context.mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
@@ -38,7 +39,7 @@ class AdminDashboardScreen extends StatelessWidget {
           const SizedBox(height: 20),
 
           // Live stat cards
-          _StatsRow(),
+          _StatsRow(session: session),
           const SizedBox(height: 24),
 
           // Navigation tiles
@@ -172,107 +173,39 @@ class _WelcomeHeader extends StatelessWidget {
 // ─── Live stat cards ─────────────────────────────────────────────────────────
 
 class _StatsRow extends StatelessWidget {
-  const _StatsRow();
+  final AuthSession session;
+
+  const _StatsRow({required this.session});
 
   @override
   Widget build(BuildContext context) {
-    Stream<QuerySnapshot<Map<String, dynamic>>>? coursesStream;
-    try {
-      coursesStream = FirebaseFirestore.instance.collection('courses').snapshots();
-    } catch (_) {
-      // Firebase not initialized (test environment).
-    }
-
-    if (coursesStream == null) {
-      return Row(
-        children: [
-          Expanded(
-            child: _StatCard(
-              icon: Icons.menu_book_rounded,
-              label: 'Courses',
-              value: 0,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _StatCard(
-              icon: Icons.chat_bubble_rounded,
-              label: 'Threads',
-              value: 0,
-              color: const Color(0xFF6A3DE8),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: coursesStream,
-      builder: (context, coursesSnapshot) {
-        final courseCount = coursesSnapshot.data?.docs.length ?? 0;
-
-        return Row(
-          children: [
-            Expanded(
-              child: _StatCard(
-                icon: Icons.menu_book_rounded,
-                label: 'Courses',
-                value: courseCount,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _ThreadCountCard(courseIds: coursesSnapshot.data?.docs.map((d) => d.id).toList() ?? []),
-            ),
-          ],
-        );
-      },
+    final courseCount = session.courses.length;
+    final threadCount = session.courses.fold<int>(
+      0,
+      (total, course) => total + course.students.length,
     );
-  }
-}
 
-class _ThreadCountCard extends StatelessWidget {
-  final List<String> courseIds;
-
-  const _ThreadCountCard({required this.courseIds});
-
-  @override
-  Widget build(BuildContext context) {
-    if (courseIds.isEmpty) {
-      return const _StatCard(
-        icon: Icons.chat_bubble_rounded,
-        label: 'Threads',
-        value: 0,
-        color: Color(0xFF6A3DE8),
-      );
-    }
-
-    return StreamBuilder<int>(
-      stream: _countAllThreads(courseIds),
-      builder: (context, snap) {
-        return _StatCard(
-          icon: Icons.chat_bubble_rounded,
-          label: 'Threads',
-          value: snap.data ?? 0,
-          color: const Color(0xFF6A3DE8),
-        );
-      },
+    return Row(
+      children: [
+        Expanded(
+          child: _StatCard(
+            icon: Icons.menu_book_rounded,
+            label: 'Courses',
+            value: courseCount,
+            color: AppColors.primary,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _StatCard(
+            icon: Icons.chat_bubble_rounded,
+            label: 'Threads',
+            value: threadCount,
+            color: const Color(0xFF6A3DE8),
+          ),
+        ),
+      ],
     );
-  }
-
-  Stream<int> _countAllThreads(List<String> courseIds) async* {
-    final db = FirebaseFirestore.instance;
-
-    // Emit total thread count by listening to the first course, then accumulate
-    // (simplified: just emit a count from all thread collections)
-    int total = 0;
-    for (final id in courseIds) {
-      final snap = await db.collection('courses').doc(id).collection('threads').get();
-      total += snap.docs.length;
-    }
-    yield total;
   }
 }
 

@@ -110,9 +110,14 @@
     const appLoader = document.getElementById('app-loader');
     const loaderMessage = document.getElementById('app-loader-message');
     let startupFinished = false;
+    let startupTimeoutId = null;
 
     window.addEventListener('flutter-first-frame', () => {
       startupFinished = true;
+      if (startupTimeoutId !== null) {
+        window.clearTimeout(startupTimeoutId);
+        startupTimeoutId = null;
+      }
       appLoader.classList.add('hidden');
       window.setTimeout(() => appLoader.remove(), 200);
     });
@@ -141,11 +146,11 @@
       );
     });
 
-    window.setTimeout(() => {
+    startupTimeoutId = window.setTimeout(() => {
       showStartupError(
-        'Starting the app is taking longer than expected. Check your connection, then refresh.'
+        'Starting the app is taking longer than expected. Please wait a bit longer, then refresh.'
       );
-    }, 30000);
+    }, 120000);
 
     (function registerFirebaseServiceWorker() {
       if (!('serviceWorker' in navigator)) {
