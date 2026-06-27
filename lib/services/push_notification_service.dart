@@ -12,6 +12,7 @@ import '../screens/chat_screen.dart';
 import '../utils/notification_sound.dart';
 import 'auth_session_manager.dart';
 import 'notification_api.dart';
+import 'web_fcm_token.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -150,9 +151,9 @@ class PushNotificationService {
       'Requesting FCM device token for $_platformLabel. '
       'Web VAPID key configured: ${!kIsWeb || _webVapidKey.isNotEmpty}',
     );
-    final token = await FirebaseMessaging.instance.getToken(
-      vapidKey: kIsWeb ? _webVapidKey : null,
-    );
+    final token = kIsWeb
+        ? await _getWebToken()
+        : await FirebaseMessaging.instance.getToken();
     if (token == null || token.isEmpty) {
       debugPrint('FCM device token was not returned for $_platformLabel.');
       return;
@@ -160,6 +161,17 @@ class PushNotificationService {
     if (!force && _registeredToken == token) return;
 
     await _registerSpecificToken(token);
+  }
+
+  Future<String?> _getWebToken() async {
+    final bridgeToken = await requestWebFcmToken(_webVapidKey);
+    if (bridgeToken != null && bridgeToken.isNotEmpty) {
+      debugPrint('FCM web token returned from EACC service worker bridge.');
+      return bridgeToken;
+    }
+
+    debugPrint('FCM web bridge unavailable; falling back to Firebase plugin.');
+    return FirebaseMessaging.instance.getToken(vapidKey: _webVapidKey);
   }
 
   void _handleForegroundMessage(RemoteMessage message) {

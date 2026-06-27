@@ -34,6 +34,8 @@
 
   <title>EACC Chat</title>
   <link rel="manifest" href="manifest.json">
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js"></script>
   <style>
     html,
     body {
@@ -163,6 +165,40 @@
         .catch((error) => {
           console.warn('FCM service worker registration failed:', error);
         });
+    })();
+
+    (function configureFirebaseMessagingBridge() {
+      if (!window.firebase || !('serviceWorker' in navigator)) {
+        return;
+      }
+
+      const firebaseConfig = {
+        apiKey: 'AIzaSyBZKeyhvuYUlBcdqylVIexJOZdQ7-S4lFI',
+        authDomain: 'eacc-mobile-app.firebaseapp.com',
+        projectId: 'eacc-mobile-app',
+        storageBucket: 'eacc-mobile-app.firebasestorage.app',
+        messagingSenderId: '492936842220',
+        appId: '1:492936842220:web:de1c69381e413074c34ec9',
+        measurementId: 'G-S9GL3J0R9H',
+      };
+
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+
+      window.eaccGetFcmToken = async function(vapidKey) {
+        const base = document.querySelector('base')?.getAttribute('href') || '/';
+        const registration =
+          (await navigator.serviceWorker.getRegistration(base)) ||
+          (await navigator.serviceWorker.register(`${base}firebase-messaging-sw.js`, {
+            scope: base,
+          }));
+
+        return firebase.messaging().getToken({
+          vapidKey,
+          serviceWorkerRegistration: registration,
+        });
+      };
     })();
 
     // Synthesize a soft two-note notification chime via Web Audio API.
