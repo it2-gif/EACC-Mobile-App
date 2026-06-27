@@ -96,6 +96,23 @@ class PushNotificationService {
     _registeredToken = null;
   }
 
+  void showInAppNotification({
+    required String title,
+    String? body,
+    VoidCallback? onOpen,
+    bool playSound = true,
+  }) {
+    if (title.trim().isEmpty && (body == null || body.trim().isEmpty)) {
+      return;
+    }
+
+    if (playSound) {
+      playNotificationSound();
+    }
+
+    _showTopBanner(title: title, body: body, onOpen: onOpen ?? () {});
+  }
+
   void _attachListeners() {
     if (_listenersAttached) return;
     _listenersAttached = true;
@@ -194,9 +211,6 @@ class PushNotificationService {
       return;
     }
 
-    // Play the notification chime, then show the banner.
-    playNotificationSound();
-
     if (kIsWeb) {
       unawaited(
         showWebBrowserNotification(
@@ -210,7 +224,7 @@ class PushNotificationService {
       );
     }
 
-    _showTopBanner(
+    showInAppNotification(
       title: title,
       body: body,
       onOpen: () => unawaited(_openChatFromMessage(message)),

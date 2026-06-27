@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../models/auth_session.dart';
+import '../models/course.dart';
 import '../services/firestore_chat_service.dart';
+import '../services/push_notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/course_card.dart';
@@ -32,40 +34,81 @@ class StudentCoursesScreen extends StatelessWidget {
             const _EmptyCoursesState()
           else
             ...session.courses.map(
-              (course) => StreamBuilder<int>(
-                stream: FirestoreChatService.getStudentUnreadCount(
-                  courseId: course.id,
-                  threadId: session.lmsUser.lmsUserId,
-                ),
-                builder: (context, snapshot) {
-                  final unreadCount = snapshot.data ?? 0;
-
-                  return CourseCard(
-                    course: course,
-                    unreadCount: unreadCount,
-                    unreadLabel: unreadCount == 1
-                        ? '1 unread'
-                        : '$unreadCount unread',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ChatScreen(
-                            title: course.name,
-                            currentUserRole: 'student',
-                            courseId: course.id,
-                            threadId: session.lmsUser.lmsUserId,
-                            senderName: session.appUser.name,
-                            threadStudentName: session.appUser.name,
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
+              (course) => _StudentCourseCard(session: session, course: course),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _StudentCourseCard extends StatefulWidget {
+  final AuthSession session;
+  final Course course;
+
+  const _StudentCourseCard({required this.session, required this.course});
+
+  @override
+  State<_StudentCourseCard> createState() => _StudentCourseCardState();
+}
+
+class _StudentCourseCardState extends State<_StudentCourseCard> {
+  int? _lastUnreadCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<int>(
+      stream: FirestoreChatService.getStudentUnreadCount(
+        courseId: widget.course.id,
+        threadId: widget.session.lmsUser.lmsUserId,
+      ),
+      builder: (context, snapshot) {
+        final unreadCount = snapshot.data ?? 0;
+        _showBannerWhenUnreadIncreases(unreadCount);
+
+        return CourseCard(
+          course: widget.course,
+          unreadCount: unreadCount,
+          unreadLabel: unreadCount == 1 ? '1 unread' : '$unreadCount unread',
+          onTap: _openChat,
+        );
+      },
+    );
+  }
+
+  void _showBannerWhenUnreadIncreases(int unreadCount) {
+    final previous = _lastUnreadCount;
+    _lastUnreadCount = unreadCount;
+
+    if (previous == null || unreadCount <= previous) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      PushNotificationService.instance.showInAppNotification(
+        title: widget.course.name,
+        body: unreadCount == 1
+            ? 'Your teacher sent a new message.'
+            : '$unreadCount unread messages from your teacher.',
+        onOpen: _openChat,
+      );
+    });
+  }
+
+  void _openChat() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          title: widget.course.name,
+          currentUserRole: 'student',
+          courseId: widget.course.id,
+          threadId: widget.session.lmsUser.lmsUserId,
+          senderName: widget.session.appUser.name,
+          threadStudentName: widget.session.appUser.name,
+        ),
       ),
     );
   }
