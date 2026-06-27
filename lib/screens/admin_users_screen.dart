@@ -51,11 +51,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AppScaffold(
-      title: 'Users',
-      showLogout: false,
-      body: _buildBody(),
-    );
+    return AppScaffold(title: 'Users', showLogout: false, body: _buildBody());
   }
 
   Widget _buildBody() {
@@ -70,7 +66,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, size: 52, color: AppColors.danger),
+              const Icon(
+                Icons.error_outline,
+                size: 52,
+                color: AppColors.danger,
+              ),
               const SizedBox(height: 14),
               const Text(
                 'Could not load users',
@@ -104,7 +104,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       children: [
         ScreenHeader(
           title: 'All Users',
-          subtitle: '${users.length} registered user${users.length == 1 ? '' : 's'}',
+          subtitle:
+              '${users.length} registered user${users.length == 1 ? '' : 's'}',
           icon: Icons.people_rounded,
         ),
         const SizedBox(height: 18),
@@ -248,8 +249,9 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: (isActive ? AppColors.success : AppColors.muted)
-            .withValues(alpha: 0.12),
+        color: (isActive ? AppColors.success : AppColors.muted).withValues(
+          alpha: 0.12,
+        ),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(

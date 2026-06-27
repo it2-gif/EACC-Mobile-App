@@ -182,10 +182,10 @@ class PushNotificationService {
     debugPrint('Foreground push received: ${message.messageId ?? 'no id'}');
     final data = message.data;
     final notification = message.notification;
-    final title = notification?.title ??
-        data['senderName']?.toString() ??
-        'New message';
-    final body = notification?.body ??
+    final title =
+        notification?.title ?? data['senderName']?.toString() ?? 'New message';
+    final body =
+        notification?.body ??
         data['previewText']?.toString() ??
         'You received a new chat message';
 
@@ -205,7 +205,9 @@ class PushNotificationService {
 
   Future<void> _registerSpecificToken(String token) async {
     if (_session == null || token.isEmpty) {
-      debugPrint('Device token registration skipped: missing session or token.');
+      debugPrint(
+        'Device token registration skipped: missing session or token.',
+      );
       return;
     }
 
@@ -242,7 +244,10 @@ class PushNotificationService {
 
     final courseId = message.data['courseId']?.toString();
     final threadId = message.data['threadId']?.toString();
-    if (courseId == null || courseId.isEmpty || threadId == null || threadId.isEmpty) {
+    if (courseId == null ||
+        courseId.isEmpty ||
+        threadId == null ||
+        threadId.isEmpty) {
       return;
     }
 
@@ -344,7 +349,10 @@ class PushNotificationService {
     final uri = Uri.base;
     final courseId = uri.queryParameters['courseId']?.trim();
     final threadId = uri.queryParameters['threadId']?.trim();
-    if (courseId == null || courseId.isEmpty || threadId == null || threadId.isEmpty) {
+    if (courseId == null ||
+        courseId.isEmpty ||
+        threadId == null ||
+        threadId.isEmpty) {
       return null;
     }
 
@@ -431,16 +439,14 @@ class _TopNotificationBannerState extends State<_TopNotificationBanner>
       duration: _displayDuration,
     );
 
-    _slideAnim = Tween<Offset>(
-      begin: const Offset(0, -1.6),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _slideController,
-        curve: Curves.easeOutBack,
-        reverseCurve: Curves.easeInCubic,
-      ),
-    );
+    _slideAnim = Tween<Offset>(begin: const Offset(0, -1.6), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _slideController,
+            curve: Curves.easeOutBack,
+            reverseCurve: Curves.easeInCubic,
+          ),
+        );
 
     _fadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
@@ -450,9 +456,7 @@ class _TopNotificationBannerState extends State<_TopNotificationBanner>
     );
 
     // Slide in, then start the progress drain.
-    _slideController
-        .animateTo(1.0, duration: _slideInDuration)
-        .then((_) {
+    _slideController.animateTo(1.0, duration: _slideInDuration).then((_) {
       if (mounted) _progressController.forward();
     });
 

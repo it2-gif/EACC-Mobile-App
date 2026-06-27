@@ -97,9 +97,7 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
         children: [
           IconButton.filledTonal(
             onPressed: togglePlayback,
-            style: IconButton.styleFrom(
-              foregroundColor: AppColors.primary,
-            ),
+            style: IconButton.styleFrom(foregroundColor: AppColors.primary),
             icon: Icon(
               state == PlayerState.playing
                   ? Icons.pause_rounded

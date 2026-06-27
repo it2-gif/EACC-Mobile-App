@@ -64,7 +64,9 @@ class AdminThreadsScreen extends StatelessWidget {
                     leading: CircleAvatar(
                       backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                       child: Text(
-                        student.name.isNotEmpty ? student.name[0].toUpperCase() : '?',
+                        student.name.isNotEmpty
+                            ? student.name[0].toUpperCase()
+                            : '?',
                         style: const TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w700,

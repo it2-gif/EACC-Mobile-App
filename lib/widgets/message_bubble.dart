@@ -124,9 +124,7 @@ class MessageBubble extends StatelessWidget {
     final isVideo = type == 'video' && mediaUrl != null && mediaUrl!.isNotEmpty;
     final isVoice = type == 'voice' && mediaUrl != null && mediaUrl!.isNotEmpty;
     final maxBubbleWidth = MediaQuery.sizeOf(context).width * 0.78;
-    final bubbleColor = isMe
-        ? AppColors.bubbleMe
-        : AppColors.bubbleOther;
+    final bubbleColor = isMe ? AppColors.bubbleMe : AppColors.bubbleOther;
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -155,45 +153,45 @@ class MessageBubble extends StatelessWidget {
               ),
             ],
           ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.only(
+          child: ClipRRect(
+            borderRadius: BorderRadius.only(
               topLeft: const Radius.circular(16),
               topRight: const Radius.circular(16),
               bottomLeft: Radius.circular(isMe ? 16 : 6),
               bottomRight: Radius.circular(isMe ? 6 : 16),
-              ),
-              child: Container(
-                color: bubbleColor,
+            ),
+            child: Container(
+              color: bubbleColor,
               padding: const EdgeInsets.fromLTRB(13, 11, 13, 11),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Container(
                         width: 22,
                         height: 22,
-                          decoration: BoxDecoration(
-                            color: nameColor.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
+                        decoration: BoxDecoration(
+                          color: nameColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
                         child: Icon(roleIcon, size: 13, color: nameColor),
-                        ),
+                      ),
                       const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            displaySender,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w800,
-                              color: nameColor,
-                            ),
+                      Expanded(
+                        child: Text(
+                          displaySender,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                            color: nameColor,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 8),
                   if (isImage)
                     GestureDetector(
@@ -207,18 +205,19 @@ class MessageBubble extends StatelessWidget {
                               width: double.infinity,
                               height: 200,
                               fit: BoxFit.cover,
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
 
-                                return Container(
-                                  height: 200,
-                                  alignment: Alignment.center,
-                                  color: AppColors.background,
-                                  child: const CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                );
-                              },
+                                    return Container(
+                                      height: 200,
+                                      alignment: Alignment.center,
+                                      color: AppColors.background,
+                                      child: const CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    );
+                                  },
                               errorBuilder: (context, error, stackTrace) {
                                 return Container(
                                   height: 120,
@@ -257,9 +256,7 @@ class MessageBubble extends StatelessWidget {
                       ),
                     )
                   else if (isVideo)
-                    _MediaFrame(
-                      child: VideoMessagePlayer(url: mediaUrl!),
-                    )
+                    _MediaFrame(child: VideoMessagePlayer(url: mediaUrl!))
                   else if (isVoice)
                     _MediaFrame(
                       child: VoiceMessagePlayer(

@@ -26,9 +26,9 @@ Future<AuthSession?> _bootstrapInitialSession() async {
 
 Future<AuthSession?> _restoreInitialSession() async {
   try {
-    final session = await AuthSessionManager()
-        .restore()
-        .timeout(const Duration(seconds: 10));
+    final session = await AuthSessionManager().restore().timeout(
+      const Duration(seconds: 10),
+    );
     unawaited(_initializeNotifications(session));
     return session;
   } catch (error, stackTrace) {
@@ -174,10 +174,7 @@ class _StartupErrorScreen extends StatelessWidget {
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppColors.muted,
-                  height: 1.45,
-                ),
+                style: const TextStyle(color: AppColors.muted, height: 1.45),
               ),
             ],
           ),

@@ -11,12 +11,9 @@ class AuthApi {
   final AuthSessionManager? sessionManager;
   final String baseUrl;
 
-  AuthApi({
-    http.Client? client,
-    this.sessionManager,
-    String? baseUrl,
-  }) : baseUrl = baseUrl ?? _resolveBaseUrl(),
-       _client = client ?? http.Client();
+  AuthApi({http.Client? client, this.sessionManager, String? baseUrl})
+    : baseUrl = baseUrl ?? _resolveBaseUrl(),
+      _client = client ?? http.Client();
 
   Future<AuthSession> login({
     required String role,
@@ -81,9 +78,7 @@ class AuthApi {
     }
 
     if (kReleaseMode) {
-      throw StateError(
-        'EACC_API_BASE_URL is required for production builds.',
-      );
+      throw StateError('EACC_API_BASE_URL is required for production builds.');
     }
 
     return 'http://localhost:3000';

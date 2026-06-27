@@ -8,25 +8,20 @@ class NotificationApi {
   final http.Client _client;
   final String baseUrl;
 
-  NotificationApi({
-    http.Client? client,
-    String? baseUrl,
-  }) : baseUrl = baseUrl ?? _resolveBaseUrl(),
-       _client = client ?? http.Client();
+  NotificationApi({http.Client? client, String? baseUrl})
+    : baseUrl = baseUrl ?? _resolveBaseUrl(),
+      _client = client ?? http.Client();
 
   Future<void> registerDeviceToken({
     required String token,
     required String platform,
     String? deviceName,
   }) async {
-    await _post(
-      '/v1/notifications/device-token',
-      {
-        'token': token,
-        'platform': platform,
-        'deviceName': deviceName,
-      },
-    );
+    await _post('/v1/notifications/device-token', {
+      'token': token,
+      'platform': platform,
+      'deviceName': deviceName,
+    });
   }
 
   Future<void> notifyChatMessage({
@@ -38,18 +33,15 @@ class NotificationApi {
     String? previewText,
     String? studentName,
   }) async {
-    await _post(
-      '/v1/notifications/chat-message',
-      {
-        'courseId': courseId,
-        'threadId': threadId,
-        'senderRole': senderRole,
-        'senderName': senderName,
-        'messageType': messageType,
-        'previewText': previewText,
-        'studentName': studentName,
-      },
-    );
+    await _post('/v1/notifications/chat-message', {
+      'courseId': courseId,
+      'threadId': threadId,
+      'senderRole': senderRole,
+      'senderName': senderName,
+      'messageType': messageType,
+      'previewText': previewText,
+      'studentName': studentName,
+    });
   }
 
   Future<void> _post(String path, Map<String, dynamic> body) async {
@@ -87,9 +79,7 @@ class NotificationApi {
     }
 
     if (kReleaseMode) {
-      throw StateError(
-        'EACC_API_BASE_URL is required for production builds.',
-      );
+      throw StateError('EACC_API_BASE_URL is required for production builds.');
     }
 
     return 'http://localhost:3000';

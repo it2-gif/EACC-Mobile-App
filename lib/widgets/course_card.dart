@@ -95,7 +95,9 @@ class CourseCard extends StatelessWidget {
                               color: AppColors.primary.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(999),
                               border: Border.all(
-                                color: AppColors.primary.withValues(alpha: 0.16),
+                                color: AppColors.primary.withValues(
+                                  alpha: 0.16,
+                                ),
                               ),
                             ),
                             child: Text(

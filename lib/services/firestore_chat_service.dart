@@ -86,12 +86,11 @@ class FirestoreChatService {
     return _threadsRef(courseId: courseId).doc(threadId).snapshots();
   }
 
-  static Stream<int> getTeacherUnreadThreadCount({
-    required String courseId,
-  }) {
+  static Stream<int> getTeacherUnreadThreadCount({required String courseId}) {
     return getThreads(courseId: courseId).map(
       (snapshot) => snapshot.docs.where((doc) {
-        final unread = (doc.data()['teacher_unread_count'] as num?)?.toInt() ?? 0;
+        final unread =
+            (doc.data()['teacher_unread_count'] as num?)?.toInt() ?? 0;
         return unread > 0;
       }).length,
     );
@@ -421,10 +420,9 @@ class FirestoreChatService {
       update['student_name'] = studentName.trim();
     }
 
-    await _threadsRef(courseId: courseId).doc(threadId).set(
-      update,
-      SetOptions(merge: true),
-    );
+    await _threadsRef(
+      courseId: courseId,
+    ).doc(threadId).set(update, SetOptions(merge: true));
   }
 
   static Map<String, dynamic> _threadUpdateData({

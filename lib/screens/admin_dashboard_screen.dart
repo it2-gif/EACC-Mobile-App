@@ -277,7 +277,10 @@ class _NavTile extends StatelessWidget {
     return Card(
       child: ListTile(
         onTap: onTap,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 10,
+        ),
         leading: Container(
           width: 44,
           height: 44,

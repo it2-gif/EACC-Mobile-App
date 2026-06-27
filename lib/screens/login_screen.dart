@@ -234,7 +234,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                           selectedRole == 'student'
+                              selectedRole == 'student'
                                   ? 'Student login'
                                   : selectedRole == 'teacher'
                                   ? 'Teacher login'
@@ -297,7 +297,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ? Icons.visibility_outlined
                                 : Icons.visibility_off_outlined,
                           ),
-                          tooltip: obscurePassword ? 'Show password' : 'Hide password',
+                          tooltip: obscurePassword
+                              ? 'Show password'
+                              : 'Hide password',
                         ),
                       ),
                       onSubmitted: (_) => login(),

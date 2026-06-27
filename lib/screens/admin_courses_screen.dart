@@ -42,10 +42,7 @@ class AdminCoursesScreen extends StatelessWidget {
             ...courses.map((course) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: _CourseCard(
-                  course: course,
-                  session: session,
-                ),
+                child: _CourseCard(course: course, session: session),
               );
             }),
         ],
@@ -58,10 +55,7 @@ class _CourseCard extends StatelessWidget {
   final Course course;
   final AuthSession session;
 
-  const _CourseCard({
-    required this.course,
-    required this.session,
-  });
+  const _CourseCard({required this.course, required this.session});
 
   @override
   Widget build(BuildContext context) {

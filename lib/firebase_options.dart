@@ -85,5 +85,4 @@ class DefaultFirebaseOptions {
     storageBucket: 'eacc-mobile-app.firebasestorage.app',
     measurementId: 'G-QE7ETCPZSY',
   );
-
 }

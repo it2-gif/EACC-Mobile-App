@@ -33,12 +33,7 @@ class AdminChatsScreen extends StatelessWidget {
           if (items.isEmpty)
             const _EmptyState()
           else
-            ...items.map(
-              (item) => _ChatTile(
-                item: item,
-                session: session,
-              ),
-            ),
+            ...items.map((item) => _ChatTile(item: item, session: session)),
         ],
       ),
     );
@@ -61,8 +56,9 @@ class AdminChatsScreen extends StatelessWidget {
     }
 
     items.sort((a, b) {
-      final courseCompare =
-          a.courseName.toLowerCase().compareTo(b.courseName.toLowerCase());
+      final courseCompare = a.courseName.toLowerCase().compareTo(
+        b.courseName.toLowerCase(),
+      );
       if (courseCompare != 0) return courseCompare;
       return a.studentName.toLowerCase().compareTo(b.studentName.toLowerCase());
     });
@@ -103,7 +99,9 @@ class _ChatTile extends StatelessWidget {
         leading: CircleAvatar(
           backgroundColor: AppColors.primary.withValues(alpha: 0.1),
           child: Text(
-            item.studentName.isNotEmpty ? item.studentName[0].toUpperCase() : '?',
+            item.studentName.isNotEmpty
+                ? item.studentName[0].toUpperCase()
+                : '?',
             style: const TextStyle(
               color: AppColors.primary,
               fontWeight: FontWeight.w700,
@@ -115,7 +113,10 @@ class _ChatTile extends StatelessWidget {
             Expanded(
               child: Text(
                 item.studentName,
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
