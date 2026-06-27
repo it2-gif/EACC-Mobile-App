@@ -466,6 +466,105 @@ class _ChatScreenState extends State<ChatScreen> {
     if (mounted) setState(() => isSending = false);
   }
 
+  Future<void> editMessage({
+    required String messageId,
+    required String currentText,
+  }) async {
+    final editController = TextEditingController(text: currentText);
+
+    final updatedText = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit message'),
+        content: TextField(
+          controller: editController,
+          autofocus: true,
+          minLines: 1,
+          maxLines: 5,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(hintText: 'Update your message'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, editController.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    editController.dispose();
+
+    if (updatedText == null ||
+        updatedText.isEmpty ||
+        updatedText == currentText.trim()) {
+      return;
+    }
+
+    try {
+      await FirestoreChatService.editTextMessage(
+        courseId: widget.courseId,
+        threadId: widget.threadId,
+        messageId: messageId,
+        text: updatedText,
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to edit message: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> deleteMessage(String messageId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete message?'),
+        content: const Text(
+          'This will remove the message content from this conversation.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await FirestoreChatService.deleteMessage(
+        courseId: widget.courseId,
+        threadId: widget.threadId,
+        messageId: messageId,
+        deletedByRole: widget.currentUserRole,
+        deletedByName: widget.senderName,
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete message: $error')),
+        );
+      }
+    }
+  }
+
   Future<void> pickAndSendImage(ImageSource source) async {
     if (isUploadingMedia || isSending || isRecordingVoice) return;
 
@@ -730,6 +829,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final isBusy = isSending || isUploadingMedia || isRecordingVoice;
+    final isSendingOrUploading = isSending || isUploadingMedia;
     final chatSubtitle = 'Course ${widget.courseId}';
 
     return Scaffold(
@@ -813,36 +913,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       color: Color(0xFF7A4E00),
                       fontWeight: FontWeight.w600,
                     ),
-                  ),
-                ],
-              ),
-            ),
-          if (isRecordingVoice)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: AppColors.danger.withValues(alpha: 0.08),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.fiber_manual_record,
-                    size: 16,
-                    color: AppColors.danger,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Recording ${_formatRecordingDuration()}',
-                      style: const TextStyle(
-                        color: AppColors.danger,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: cancelVoiceRecording,
-                    icon: const Icon(Icons.delete_outline),
-                    label: const Text('Cancel'),
                   ),
                 ],
               ),
@@ -1034,7 +1104,14 @@ class _ChatScreenState extends State<ChatScreen> {
                                   );
                                 }
 
-                                final data = visibleDocs[index].data();
+                                final message = visibleDocs[index];
+                                final data = message.data();
+                                final canManageMessage = _canManageMessage(
+                                  senderRole:
+                                      data['sender_role']?.toString() ?? '',
+                                  senderName:
+                                      data['sender_name']?.toString() ?? '',
+                                );
 
                                 return MessageBubble(
                                   type: data['type'] ?? 'text',
@@ -1046,6 +1123,23 @@ class _ChatScreenState extends State<ChatScreen> {
                                   currentUserRole: widget.currentUserRole,
                                   currentSenderName: widget.senderName,
                                   createdAt: data['created_at'],
+                                  editedAt: data['edited_at'],
+                                  deletedAt: data['deleted_at'],
+                                  onEdit:
+                                      canManageMessage &&
+                                          data['type'] == 'text' &&
+                                          data['deleted_at'] == null
+                                      ? () => editMessage(
+                                          messageId: message.id,
+                                          currentText:
+                                              data['text']?.toString() ?? '',
+                                        )
+                                      : null,
+                                  onDelete:
+                                      canManageMessage &&
+                                          data['deleted_at'] == null
+                                      ? () => deleteMessage(message.id)
+                                      : null,
                                 );
                               },
                             ),
@@ -1098,61 +1192,78 @@ class _ChatScreenState extends State<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   IconButton.filledTonal(
-                    onPressed: isBusy ? null : showAttachmentOptions,
-                    icon: const Icon(Icons.add),
-                    tooltip: 'Add attachment',
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.background,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: TextField(
-                        controller: messageController,
-                        enabled: !isBusy,
-                        maxLines: 5,
-                        minLines: 1,
-                        textCapitalization: TextCapitalization.sentences,
-                        decoration: InputDecoration(
-                          hintText: isRecordingVoice
-                              ? 'Recording ${_formatRecordingDuration()}'
-                              : isUploadingMedia
-                              ? 'Uploading media...'
-                              : 'Write a message',
-                          filled: false,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          border: InputBorder.none,
-                        ),
-                        onSubmitted: (_) => sendMessage(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filledTonal(
-                    onPressed: isSending || isUploadingMedia
+                    onPressed: isRecordingVoice
+                        ? cancelVoiceRecording
+                        : isBusy
                         ? null
-                        : toggleVoiceRecording,
+                        : showAttachmentOptions,
                     style: IconButton.styleFrom(
                       foregroundColor: isRecordingVoice
                           ? AppColors.danger
-                          : AppColors.primary,
+                          : null,
                     ),
                     icon: Icon(
-                      isRecordingVoice ? Icons.stop_circle : Icons.mic_none,
+                      isRecordingVoice
+                          ? Icons.delete_outline_rounded
+                          : Icons.add,
                     ),
                     tooltip: isRecordingVoice
-                        ? 'Stop and send'
-                        : 'Record voice message',
+                        ? 'Cancel recording'
+                        : 'Add attachment',
                   ),
                   const SizedBox(width: 8),
+                  Expanded(
+                    child: isRecordingVoice
+                        ? _RecordingComposerPill(
+                            duration: _formatRecordingDuration(),
+                          )
+                        : Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: TextField(
+                              controller: messageController,
+                              enabled: !isBusy,
+                              maxLines: 5,
+                              minLines: 1,
+                              textCapitalization: TextCapitalization.sentences,
+                              decoration: InputDecoration(
+                                hintText: isUploadingMedia
+                                    ? 'Uploading media...'
+                                    : 'Write a message',
+                                filled: false,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                                border: InputBorder.none,
+                              ),
+                              onSubmitted: (_) => sendMessage(),
+                            ),
+                          ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (!isRecordingVoice) ...[
+                    IconButton.filledTonal(
+                      onPressed: isSendingOrUploading
+                          ? null
+                          : toggleVoiceRecording,
+                      style: IconButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                      ),
+                      icon: const Icon(Icons.mic_none),
+                      tooltip: 'Record voice message',
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   FilledButton(
-                    onPressed: isBusy ? null : sendMessage,
+                    onPressed: isSendingOrUploading
+                        ? null
+                        : isRecordingVoice
+                        ? stopAndSendVoiceMessage
+                        : sendMessage,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
@@ -1160,7 +1271,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       padding: EdgeInsets.zero,
                       shape: const CircleBorder(),
                     ),
-                    child: isBusy
+                    child: isSendingOrUploading
                         ? const SizedBox(
                             width: 18,
                             height: 18,
@@ -1215,6 +1326,16 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     return null;
+  }
+
+  bool _canManageMessage({
+    required String senderRole,
+    required String senderName,
+  }) {
+    if (widget.currentUserRole == 'admin') return true;
+
+    return senderRole == widget.currentUserRole &&
+        senderName == widget.senderName;
   }
 
   Future<void> _sendPushNotification({
@@ -1423,6 +1544,72 @@ class _ReadReceiptBar extends StatelessWidget {
     }
 
     return 'Delivered';
+  }
+}
+
+class _RecordingComposerPill extends StatelessWidget {
+  final String duration;
+
+  const _RecordingComposerPill({required this.duration});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 50),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.danger.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: AppColors.danger.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.graphic_eq_rounded,
+              size: 19,
+              color: AppColors.danger,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Recording $duration',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.danger,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Tap send when you are done',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.muted,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

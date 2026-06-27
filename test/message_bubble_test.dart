@@ -16,6 +16,8 @@ MessageBubble buildBubble({
     currentUserRole: currentUserRole,
     currentSenderName: currentSenderName,
     createdAt: DateTime(2026, 6, 18, 13, 30),
+    editedAt: null,
+    deletedAt: null,
   );
 }
 

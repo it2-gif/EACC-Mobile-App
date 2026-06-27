@@ -86,6 +86,33 @@ service cloud.firestore {
         && request.resource.data.last_sender_name == request.auth.token.displayName;
     }
 
+    function isMessageOwner() {
+      return resource.data.sender_role == request.auth.token.role
+        && resource.data.sender_name == request.auth.token.displayName;
+    }
+
+    function isTextMessageEdit() {
+      return resource.data.type == 'text'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'text',
+          'edited_at'
+        ])
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.edited_at == request.time;
+    }
+
+    function isSoftMessageDelete() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'deleted_at',
+          'deleted_by_role',
+          'deleted_by_name'
+        ])
+        && request.resource.data.deleted_at == request.time
+        && request.resource.data.deleted_by_role == request.auth.token.role
+        && request.resource.data.deleted_by_name == request.auth.token.displayName;
+    }
+
     match /courses/{courseId} {
       allow read: if isAdmin() || hasCourse(courseId);
       allow write: if false;
@@ -114,7 +141,12 @@ service cloud.firestore {
                 && hasValidSender()
                 && request.resource.data.type in ['text', 'image', 'video', 'voice']
                 && request.resource.data.created_at == request.time;
-          allow update, delete: if false;
+          allow update: if isAdmin()
+              ? (isTextMessageEdit() || isSoftMessageDelete())
+              : canAccessThread(courseId, threadId)
+                && isMessageOwner()
+                && (isTextMessageEdit() || isSoftMessageDelete());
+          allow delete: if false;
         }
       }
     }

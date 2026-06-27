@@ -15,6 +15,10 @@ class MessageBubble extends StatelessWidget {
   final String currentUserRole;
   final String currentSenderName;
   final dynamic createdAt;
+  final dynamic editedAt;
+  final dynamic deletedAt;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const MessageBubble({
     super.key,
@@ -27,6 +31,10 @@ class MessageBubble extends StatelessWidget {
     required this.currentUserRole,
     required this.currentSenderName,
     required this.createdAt,
+    required this.editedAt,
+    required this.deletedAt,
+    this.onEdit,
+    this.onDelete,
   });
 
   bool get isMe {
@@ -77,6 +85,16 @@ class MessageBubble extends StatelessWidget {
         return Icons.person;
     }
   }
+
+  bool get isDeleted => deletedAt != null;
+
+  bool get isEdited => editedAt != null && !isDeleted;
+
+  bool get canShowActions => onEdit != null || onDelete != null;
+
+  bool get canEdit => onEdit != null && type == 'text' && !isDeleted;
+
+  bool get canDelete => onDelete != null && !isDeleted;
 
   void _openImage(BuildContext context) {
     if (mediaUrl == null || mediaUrl!.isEmpty) return;
@@ -190,10 +208,41 @@ class MessageBubble extends StatelessWidget {
                           ),
                         ),
                       ),
+                      if (canShowActions)
+                        _MessageActionsMenu(
+                          canEdit: canEdit,
+                          canDelete: canDelete,
+                          onEdit: onEdit,
+                          onDelete: onDelete,
+                        ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  if (isImage)
+                  if (isDeleted)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(
+                          Icons.block_rounded,
+                          size: 16,
+                          color: AppColors.muted,
+                        ),
+                        SizedBox(width: 7),
+                        Flexible(
+                          child: Text(
+                            'This message was deleted',
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.4,
+                              color: AppColors.muted,
+                              fontStyle: FontStyle.italic,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  else if (isImage)
                     GestureDetector(
                       onTap: () => _openImage(context),
                       child: ClipRRect(
@@ -277,13 +326,28 @@ class MessageBubble extends StatelessWidget {
                     const SizedBox(height: 8),
                     Align(
                       alignment: Alignment.bottomRight,
-                      child: Text(
-                        time,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.muted,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      child: Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
+                        children: [
+                          if (isEdited)
+                            const Text(
+                              'Edited',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.muted,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          Text(
+                            time,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.muted,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -296,6 +360,95 @@ class MessageBubble extends StatelessWidget {
     );
   }
 }
+
+class _MessageActionsMenu extends StatelessWidget {
+  final bool canEdit;
+  final bool canDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+
+  const _MessageActionsMenu({
+    required this.canEdit,
+    required this.canDelete,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!canEdit && !canDelete) {
+      return const SizedBox.shrink();
+    }
+
+    return PopupMenuButton<_MessageAction>(
+      tooltip: 'Message options',
+      padding: EdgeInsets.zero,
+      iconSize: 18,
+      position: PopupMenuPosition.under,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      icon: const Icon(Icons.more_horiz_rounded, color: AppColors.muted),
+      onSelected: (action) {
+        switch (action) {
+          case _MessageAction.edit:
+            onEdit?.call();
+            break;
+          case _MessageAction.delete:
+            onDelete?.call();
+            break;
+        }
+      },
+      itemBuilder: (context) => [
+        if (canEdit)
+          const PopupMenuItem(
+            value: _MessageAction.edit,
+            child: _MessageActionRow(
+              icon: Icons.edit_outlined,
+              label: 'Edit message',
+            ),
+          ),
+        if (canDelete)
+          const PopupMenuItem(
+            value: _MessageAction.delete,
+            child: _MessageActionRow(
+              icon: Icons.delete_outline,
+              label: 'Delete message',
+              isDanger: true,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _MessageActionRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isDanger;
+
+  const _MessageActionRow({
+    required this.icon,
+    required this.label,
+    this.isDanger = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isDanger ? AppColors.danger : AppColors.ink;
+
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: TextStyle(color: color, fontWeight: FontWeight.w700),
+        ),
+      ],
+    );
+  }
+}
+
+enum _MessageAction { edit, delete }
 
 class _MediaFrame extends StatelessWidget {
   final Widget child;

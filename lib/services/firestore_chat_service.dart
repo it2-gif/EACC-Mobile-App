@@ -150,6 +150,38 @@ class FirestoreChatService {
     );
   }
 
+  static Future<void> editTextMessage({
+    required String courseId,
+    required String threadId,
+    required String messageId,
+    required String text,
+  }) async {
+    await _messagesRef(
+      courseId: courseId,
+      threadId: threadId,
+    ).doc(messageId).update({
+      'text': text.trim(),
+      'edited_at': FieldValue.serverTimestamp(),
+    });
+  }
+
+  static Future<void> deleteMessage({
+    required String courseId,
+    required String threadId,
+    required String messageId,
+    required String deletedByRole,
+    required String deletedByName,
+  }) async {
+    await _messagesRef(
+      courseId: courseId,
+      threadId: threadId,
+    ).doc(messageId).update({
+      'deleted_at': FieldValue.serverTimestamp(),
+      'deleted_by_role': deletedByRole,
+      'deleted_by_name': deletedByName,
+    });
+  }
+
   static Future<void> sendImageMessage({
     required String courseId,
     required String threadId,
