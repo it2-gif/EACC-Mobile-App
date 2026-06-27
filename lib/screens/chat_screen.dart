@@ -91,7 +91,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _jumpToBottomIfPossible({required bool animate}) {
     if (!mounted || !scrollController.hasClients) return;
 
-    final targetOffset = scrollController.position.maxScrollExtent;
+    final targetOffset = scrollController.position.minScrollExtent;
     if (animate) {
       scrollController.animateTo(
         targetOffset,
@@ -123,7 +123,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       final maxExtent = scrollController.position.maxScrollExtent;
-      scrollController.jumpTo(maxExtent);
+      scrollController.jumpTo(scrollController.position.minScrollExtent);
 
       if ((maxExtent - previousMaxExtent).abs() < 0.5) {
         stableFrames++;
@@ -909,6 +909,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     }
 
                     final docs = sortMessages(snapshot.data?.docs ?? []);
+                    final visibleDocs = docs.reversed.toList();
                     final canLoadOlder = docs.length >= messageLimit;
                     final currentLatestMessageId = docs.isEmpty
                         ? null
@@ -1002,13 +1003,15 @@ class _ChatScreenState extends State<ChatScreen> {
                             curve: Curves.easeOut,
                             child: ListView.builder(
                               controller: scrollController,
+                              reverse: true,
                               padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
                               itemCount: docs.length + (canLoadOlder ? 1 : 0),
                               itemBuilder: (context, index) {
-                                if (canLoadOlder && index == 0) {
+                                if (canLoadOlder &&
+                                    index == visibleDocs.length) {
                                   return Center(
                                     child: Padding(
-                                      padding: const EdgeInsets.only(bottom: 8),
+                                      padding: const EdgeInsets.only(top: 8),
                                       child: TextButton.icon(
                                         onPressed: isLoadingOlderMessages
                                             ? null
@@ -1031,10 +1034,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   );
                                 }
 
-                                final messageIndex = canLoadOlder
-                                    ? index - 1
-                                    : index;
-                                final data = docs[messageIndex].data();
+                                final data = visibleDocs[index].data();
 
                                 return MessageBubble(
                                   type: data['type'] ?? 'text',
