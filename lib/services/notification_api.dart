@@ -54,8 +54,12 @@ class NotificationApi {
 
   Future<void> _post(String path, Map<String, dynamic> body) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      debugPrint('Notification API skipped $path: no Firebase user.');
+      return;
+    }
 
+    debugPrint('Notification API POST $path -> $baseUrl');
     final idToken = await user.getIdToken();
     final response = await _client.post(
       Uri.parse('$baseUrl$path'),
@@ -64,6 +68,10 @@ class NotificationApi {
         'Authorization': 'Bearer $idToken',
       },
       body: jsonEncode(body),
+    );
+
+    debugPrint(
+      'Notification API response $path: ${response.statusCode}',
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {

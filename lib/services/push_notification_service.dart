@@ -114,11 +114,14 @@ class PushNotificationService {
 
   Future<void> _requestPermissionIfNeeded() async {
     try {
-      await FirebaseMessaging.instance.requestPermission(
+      final settings = await FirebaseMessaging.instance.requestPermission(
         alert: true,
         badge: true,
         sound: true,
         provisional: false,
+      );
+      debugPrint(
+        'Notification permission status: ${settings.authorizationStatus.name}',
       );
     } catch (error) {
       debugPrint('Notification permission request failed: $error');
@@ -126,7 +129,10 @@ class PushNotificationService {
   }
 
   Future<void> _registerDeviceTokenIfPossible({bool force = false}) async {
-    if (_session == null) return;
+    if (_session == null) {
+      debugPrint('Device token registration skipped: no active session.');
+      return;
+    }
 
     if (kIsWeb && _webVapidKey.isEmpty) {
       debugPrint(
@@ -140,6 +146,10 @@ class PushNotificationService {
       await Future<void>.delayed(const Duration(seconds: 1));
     }
 
+    debugPrint(
+      'Requesting FCM device token for $_platformLabel. '
+      'Web VAPID key configured: ${!kIsWeb || _webVapidKey.isNotEmpty}',
+    );
     final token = await FirebaseMessaging.instance.getToken(
       vapidKey: kIsWeb ? _webVapidKey : null,
     );
@@ -153,6 +163,7 @@ class PushNotificationService {
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
+    debugPrint('Foreground push received: ${message.messageId ?? 'no id'}');
     final data = message.data;
     final notification = message.notification;
     final title = notification?.title ??
@@ -177,7 +188,10 @@ class PushNotificationService {
   }
 
   Future<void> _registerSpecificToken(String token) async {
-    if (_session == null || token.isEmpty) return;
+    if (_session == null || token.isEmpty) {
+      debugPrint('Device token registration skipped: missing session or token.');
+      return;
+    }
 
     try {
       await _api.registerDeviceToken(
@@ -186,7 +200,10 @@ class PushNotificationService {
         deviceName: _deviceName,
       );
       _registeredToken = token;
-      debugPrint('Device token registered for $_platformLabel');
+      final tokenPreview = token.length > 12 ? token.substring(0, 12) : token;
+      debugPrint(
+        'Device token registered for $_platformLabel: $tokenPreview...',
+      );
     } catch (error) {
       debugPrint('Device token registration failed: $error');
     }

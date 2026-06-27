@@ -1224,6 +1224,10 @@ class _ChatScreenState extends State<ChatScreen> {
     // All roles (student, teacher, admin) send push notifications.
 
     try {
+      debugPrint(
+        'Sending push notification: course=${widget.courseId}, '
+        'thread=${widget.threadId}, type=$messageType',
+      );
       await _notificationApi.notifyChatMessage(
         courseId: widget.courseId,
         threadId: widget.threadId,
