@@ -156,6 +156,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < 390;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -165,7 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Container(
-                padding: const EdgeInsets.all(24),
+                padding: EdgeInsets.all(compact ? 18 : 24),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   border: Border.all(color: AppColors.border),
@@ -187,13 +190,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           borderRadius: BorderRadius.circular(8),
                           child: Image.asset(
                             'eacc-blue-logo.png',
-                            height: 110,
-                            width: 220,
+                            height: compact ? 88 : 110,
+                            width: compact ? 190 : 220,
                             fit: BoxFit.contain,
                             semanticLabel: 'Egyptian American Center',
                           ),
                         ),
-                        const SizedBox(height: 18),
+                        SizedBox(height: compact ? 14 : 18),
                         const Text(
                           'EACC Chat',
                           textAlign: TextAlign.center,
@@ -213,7 +216,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: compact ? 18 : 24),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -274,6 +277,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 16),
                     TextField(
                       controller: usernameController,
+                      autofillHints: const [
+                        AutofillHints.username,
+                        AutofillHints.email,
+                      ],
+                      keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(
                         labelText: 'Username or email',
@@ -283,6 +291,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 16),
                     TextField(
                       controller: passwordController,
+                      autofillHints: const [AutofillHints.password],
                       obscureText: obscurePassword,
                       textInputAction: TextInputAction.done,
                       decoration: InputDecoration(

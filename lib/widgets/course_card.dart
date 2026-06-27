@@ -19,13 +19,16 @@ class CourseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasTeacher =
+        course.teacherName != null && course.teacherName!.trim().isNotEmpty;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(15),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -44,7 +47,7 @@ class CourseCard extends StatelessWidget {
                   color: AppColors.primary,
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -70,48 +73,15 @@ class CourseCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            course.category,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.muted,
-                              fontSize: 13,
-                              height: 1.2,
-                            ),
-                          ),
-                        ),
-                        if (course.teacherName != null &&
-                            course.teacherName!.isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: AppColors.primary.withValues(
-                                  alpha: 0.16,
-                                ),
-                              ),
-                            ),
-                            child: Text(
-                              course.teacherName!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.primaryDark,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                      ],
+                    Text(
+                      course.category,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 13,
+                        height: 1.2,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Wrap(
@@ -162,8 +132,7 @@ class CourseCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                        if (course.teacherName != null &&
-                            course.teacherName!.isNotEmpty)
+                        if (hasTeacher)
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
@@ -174,15 +143,31 @@ class CourseCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(999),
                               border: Border.all(color: AppColors.border),
                             ),
-                            child: Text(
-                              course.teacherName!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.ink,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.person_outline_rounded,
+                                  size: 14,
+                                  color: AppColors.ink,
+                                ),
+                                const SizedBox(width: 5),
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 160,
+                                  ),
+                                  child: Text(
+                                    course.teacherName!,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: AppColors.ink,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                       ],

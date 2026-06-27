@@ -43,181 +43,198 @@ class TeacherThreadsScreen extends StatelessWidget {
           ],
         ),
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirestoreChatService.getThreads(courseId: courseId),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return _FullState(
-              icon: Icons.error_outline,
-              title: 'Could not load student chats',
-              subtitle: '${snapshot.error}',
-            );
-          }
+      body: SafeArea(
+        top: false,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirestoreChatService.getThreads(courseId: courseId),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return _FullState(
+                    icon: Icons.error_outline,
+                    title: 'Could not load student chats',
+                    subtitle: '${snapshot.error}',
+                  );
+                }
 
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-          final threads = snapshot.data?.docs ?? [];
-          final items = _buildStudentChatItems(threads);
+                final threads = snapshot.data?.docs ?? [];
+                final items = _buildStudentChatItems(threads);
 
-          if (items.isEmpty) {
-            return const _FullState(
-              icon: Icons.forum_outlined,
-              title: 'No students found',
-              subtitle: 'No enrolled students were found for this course.',
-            );
-          }
+                if (items.isEmpty) {
+                  return const _FullState(
+                    icon: Icons.forum_outlined,
+                    title: 'No students found',
+                    subtitle:
+                        'No enrolled students were found for this course.',
+                  );
+                }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              final item = items[index];
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final item = items[index];
 
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ChatScreen(
-                          title: item.studentName,
-                          currentUserRole: viewerRole,
-                          courseId: courseId,
-                          threadId: item.threadId,
-                          senderName: senderName,
-                          threadStudentName: item.studentName,
-                        ),
-                      ),
-                    );
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: AppColors.primary.withValues(alpha: 0.14),
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(
+                                title: item.studentName,
+                                currentUserRole: viewerRole,
+                                courseId: courseId,
+                                threadId: item.threadId,
+                                senderName: senderName,
+                                threadStudentName: item.studentName,
+                              ),
                             ),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            item.studentName.isNotEmpty
-                                ? item.studentName[0].toUpperCase()
-                                : '?',
-                            style: const TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      item.studentName,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 15.5,
-                                      ),
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.12,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.14,
                                     ),
                                   ),
-                                  if (item.unreadCount > 0)
-                                    Container(
-                                      margin: const EdgeInsets.only(left: 8),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary,
-                                        borderRadius: BorderRadius.circular(
-                                          999,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  item.studentName.isNotEmpty
+                                      ? item.studentName[0].toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            item.studentName,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 15.5,
+                                            ),
+                                          ),
                                         ),
-                                      ),
-                                      child: Text(
-                                        item.unreadCount > 99
-                                            ? '99+'
-                                            : '${item.unreadCount}',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                        ),
+                                        if (item.unreadCount > 0)
+                                          Container(
+                                            margin: const EdgeInsets.only(
+                                              left: 8,
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primary,
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                            ),
+                                            child: Text(
+                                              item.unreadCount > 99
+                                                  ? '99+'
+                                                  : '${item.unreadCount}',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Text(
+                                      item.lastMessage,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: AppColors.muted,
+                                        height: 1.2,
                                       ),
                                     ),
-                                ],
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                item.lastMessage,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: AppColors.muted,
-                                  height: 1.2,
+                                  ],
                                 ),
+                              ),
+                              const SizedBox(width: 12),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (item.lastTime.isNotEmpty)
+                                    Text(
+                                      item.lastTime,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.muted,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.background,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: AppColors.border,
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.chevron_right,
+                                      size: 18,
+                                      color: AppColors.muted,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (item.lastTime.isNotEmpty)
-                              Text(
-                                item.lastTime,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.muted,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            const SizedBox(height: 8),
-                            Container(
-                              width: 28,
-                              height: 28,
-                              decoration: BoxDecoration(
-                                color: AppColors.background,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: AppColors.border),
-                              ),
-                              child: const Icon(
-                                Icons.chevron_right,
-                                size: 18,
-                                color: AppColors.muted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
-        },
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ),
       ),
     );
   }

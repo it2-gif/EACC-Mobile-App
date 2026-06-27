@@ -42,80 +42,91 @@ class AdminThreadsScreen extends StatelessWidget {
           ],
         ),
       ),
-      body: items.isEmpty
-          ? const _FullState(
-              icon: Icons.forum_outlined,
-              title: 'No students found',
-              subtitle:
-                  'This course has no synced students yet, so there is no chat list to show.',
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final student = items[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    leading: CircleAvatar(
-                      backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                      child: Text(
-                        student.name.isNotEmpty
-                            ? student.name[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
+      body: SafeArea(
+        top: false,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: items.isEmpty
+                ? const _FullState(
+                    icon: Icons.forum_outlined,
+                    title: 'No students found',
+                    subtitle:
+                        'This course has no synced students yet, so there is no chat list to show.',
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final student = items[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          leading: CircleAvatar(
+                            backgroundColor: AppColors.primary.withValues(
+                              alpha: 0.1,
+                            ),
+                            child: Text(
+                              student.name.isNotEmpty
+                                  ? student.name[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            student.name,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          subtitle: const Text(
+                            'Open the conversation for this student.',
+                            style: TextStyle(color: AppColors.muted),
+                          ),
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.admin.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              'ADMIN',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: AppColors.admin,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(
+                                title: student.name,
+                                currentUserRole: 'admin',
+                                courseId: courseId,
+                                threadId: student.id,
+                                senderName: session.appUser.name,
+                                threadStudentName: student.name,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    title: Text(
-                      student.name,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    subtitle: const Text(
-                      'Open the conversation for this student.',
-                      style: TextStyle(color: AppColors.muted),
-                    ),
-                    trailing: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.admin.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        'ADMIN',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: AppColors.admin,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ChatScreen(
-                          title: student.name,
-                          currentUserRole: 'admin',
-                          courseId: courseId,
-                          threadId: student.id,
-                          senderName: session.appUser.name,
-                          threadStudentName: student.name,
-                        ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
+          ),
+        ),
+      ),
     );
   }
 }

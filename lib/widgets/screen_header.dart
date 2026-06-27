@@ -16,11 +16,19 @@ class ScreenHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < 380;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      clipBehavior: Clip.antiAlias,
+      padding: EdgeInsets.all(compact ? 16 : 18),
       decoration: BoxDecoration(
-        color: AppColors.primaryDark,
+        gradient: const LinearGradient(
+          colors: [AppColors.primary, AppColors.primaryDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
@@ -34,8 +42,8 @@ class ScreenHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: compact ? 44 : 48,
+            height: compact ? 44 : 48,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(8),
@@ -55,7 +63,7 @@ class ScreenHeader extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 21,
+                    fontSize: 20,
                     height: 1.05,
                     fontWeight: FontWeight.w800,
                   ),

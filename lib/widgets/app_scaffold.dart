@@ -36,6 +36,7 @@ class AppScaffold extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        toolbarHeight: 60,
         title: Text(title),
         shape: const Border(bottom: BorderSide(color: AppColors.border)),
         actions: [
@@ -48,7 +49,16 @@ class AppScaffold extends StatelessWidget {
             ),
         ],
       ),
-      body: body,
+      body: SafeArea(
+        top: false,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: body,
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 class AppColors {
   static const primary = Color(0xFF1D5DA8);
@@ -26,6 +27,16 @@ class AppTheme {
       useMaterial3: true,
       scaffoldBackgroundColor: AppColors.background,
       visualDensity: VisualDensity.standard,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.linux: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: FadeForwardsPageTransitionsBuilder(),
+        },
+      ),
       textTheme: const TextTheme(
         headlineSmall: TextStyle(
           color: AppColors.ink,
@@ -45,6 +56,12 @@ class AppTheme {
         surfaceTintColor: Colors.white,
         elevation: 0,
         centerTitle: false,
+        titleTextStyle: TextStyle(
+          color: AppColors.ink,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0,
+        ),
       ),
       cardTheme: CardThemeData(
         color: AppColors.surface,
@@ -60,7 +77,16 @@ class AppTheme {
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
+          minimumSize: const Size(48, 50),
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(48, 50),
+          foregroundColor: AppColors.primaryDark,
+          side: const BorderSide(color: AppColors.border),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
