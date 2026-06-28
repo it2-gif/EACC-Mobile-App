@@ -5,6 +5,7 @@ import '../services/auth_session_manager.dart';
 import '../services/push_notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
+import 'admin_announcements_screen.dart';
 import 'admin_chats_screen.dart';
 import 'admin_courses_screen.dart';
 import 'admin_users_screen.dart';
@@ -88,6 +89,19 @@ class AdminDashboardScreen extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (_) => AdminChatsScreen(session: session),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          _NavTile(
+            icon: Icons.campaign_rounded,
+            title: 'Announcements',
+            subtitle: 'Send course announcements or private broadcasts',
+            color: AppColors.admin,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AdminAnnouncementsScreen(session: session),
               ),
             ),
           ),

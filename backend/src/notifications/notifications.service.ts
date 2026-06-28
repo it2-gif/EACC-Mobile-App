@@ -79,12 +79,23 @@ export class NotificationsService {
     // - Student sends  → notify all teachers of the course.
     // - Teacher sends  → notify the specific student (threadId = student lmsUserId).
     // - Admin sends    → notify both the specific student AND all teachers.
+    const isCourseAudience = input.audience === 'course';
+
+    if (isCourseAudience && senderRole === 'student') {
+      throw new UnauthorizedException({
+        code: 'ANNOUNCEMENT_ACCESS_DENIED',
+        message: 'Students cannot send course announcements.',
+      });
+    }
+
     const rolesForQuery: UserRole[] =
-      senderRole === 'student'
-        ? [UserRole.TEACHER]
-        : senderRole === 'teacher'
-          ? [UserRole.STUDENT]
-          : [UserRole.STUDENT, UserRole.TEACHER]; // admin notifies both
+      isCourseAudience
+        ? [UserRole.STUDENT]
+        : senderRole === 'student'
+          ? [UserRole.TEACHER]
+          : senderRole === 'teacher'
+            ? [UserRole.STUDENT]
+            : [UserRole.STUDENT, UserRole.TEACHER]; // admin notifies both
 
     const targetMemberships = await this.prisma.courseMembership.findMany({
       where: {
@@ -107,14 +118,16 @@ export class NotificationsService {
     // When notifying the student side (teacher or admin sent), filter to the
     // specific student whose thread this is.
     const recipients =
-      senderRole === 'student'
-        ? targetMemberships // all teachers
-        : targetMemberships.filter(
-            (m) =>
-              m.role === UserRole.TEACHER ||
-              (m.role === UserRole.STUDENT &&
-                m.user.lmsUserId === input.threadId),
-          );
+      isCourseAudience
+        ? targetMemberships
+        : senderRole === 'student'
+          ? targetMemberships // all teachers
+          : targetMemberships.filter(
+              (m) =>
+                m.role === UserRole.TEACHER ||
+                (m.role === UserRole.STUDENT &&
+                  m.user.lmsUserId === input.threadId),
+            );
 
     const recipientTokens = recipients
       .flatMap((membership) => membership.user.deviceTokens)
@@ -129,7 +142,7 @@ export class NotificationsService {
     const response = await this.firebaseAuth.messaging().sendEachForMulticast({
       tokens: uniqueRecipientTokens,
       notification: {
-        title: input.senderName,
+        title: this.notificationTitle(input),
         body: this.messageBody(input),
       },
       data: {
@@ -143,7 +156,7 @@ export class NotificationsService {
       },
       webpush: {
         notification: {
-          title: input.senderName,
+          title: this.notificationTitle(input),
           body: this.messageBody(input),
         },
       },
@@ -256,5 +269,13 @@ export class NotificationsService {
           ? previewText
           : 'Sent a message';
     }
+  }
+
+  private notificationTitle(input: SendChatNotificationDto): string {
+    if (input.audience === 'course') {
+      return `Announcement from ${input.senderName}`;
+    }
+
+    return input.senderName;
   }
 }

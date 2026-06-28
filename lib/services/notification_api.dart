@@ -32,6 +32,7 @@ class NotificationApi {
     required String messageType,
     String? previewText,
     String? studentName,
+    String? audience,
   }) async {
     await _post('/v1/notifications/chat-message', {
       'courseId': courseId,
@@ -41,6 +42,7 @@ class NotificationApi {
       'messageType': messageType,
       'previewText': previewText,
       'studentName': studentName,
+      'audience': audience,
     });
   }
 

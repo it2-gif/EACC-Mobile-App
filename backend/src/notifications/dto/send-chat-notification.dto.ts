@@ -30,4 +30,9 @@ export class SendChatNotificationDto {
   @IsString()
   @MaxLength(200)
   studentName?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['thread', 'course'])
+  audience?: 'thread' | 'course';
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/auth_session.dart';
 import '../models/course.dart';
+import '../services/firestore_chat_service.dart';
 import '../theme/app_theme.dart';
 import 'chat_screen.dart';
 
@@ -48,82 +49,78 @@ class AdminThreadsScreen extends StatelessWidget {
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
-            child: items.isEmpty
-                ? const _FullState(
-                    icon: Icons.forum_outlined,
-                    title: 'No students found',
-                    subtitle:
-                        'This course has no synced students yet, so there is no chat list to show.',
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                    itemCount: items.length,
-                    itemBuilder: (context, index) {
-                      final student = items[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          leading: CircleAvatar(
-                            backgroundColor: AppColors.primary.withValues(
-                              alpha: 0.1,
-                            ),
-                            child: Text(
-                              student.name.isNotEmpty
-                                  ? student.name[0].toUpperCase()
-                                  : '?',
-                              style: const TextStyle(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          title: Text(
-                            student.name,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          subtitle: const Text(
-                            'Open the conversation for this student.',
-                            style: TextStyle(color: AppColors.muted),
-                          ),
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.admin.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              'ADMIN',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: AppColors.admin,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ChatScreen(
-                                title: student.name,
-                                currentUserRole: 'admin',
-                                courseId: courseId,
-                                threadId: student.id,
-                                senderName: session.appUser.name,
-                                threadStudentName: student.name,
-                              ),
-                            ),
-                          ),
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              itemCount: items.length + 1,
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return _AdminThreadTile(
+                    title: 'Announcement chat',
+                    subtitle: 'Pinned course-wide announcement thread.',
+                    icon: Icons.campaign_rounded,
+                    color: AppColors.admin,
+                    badge: const Icon(
+                      Icons.push_pin_rounded,
+                      size: 16,
+                      color: AppColors.admin,
+                    ),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatScreen(
+                          title: 'Announcement chat',
+                          currentUserRole: 'admin',
+                          courseId: courseId,
+                          threadId: FirestoreChatService.announcementThreadId,
+                          senderName: session.appUser.name,
                         ),
-                      );
-                    },
+                      ),
+                    ),
+                  );
+                }
+
+                final student = items[index - 1];
+                return _AdminThreadTile(
+                  title: student.name,
+                  subtitle: 'Open the conversation for this student.',
+                  iconLabel: student.name.isNotEmpty
+                      ? student.name[0].toUpperCase()
+                      : '?',
+                  color: AppColors.primary,
+                  badge: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.admin.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text(
+                      'ADMIN',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: AppColors.admin,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChatScreen(
+                        title: student.name,
+                        currentUserRole: 'admin',
+                        courseId: courseId,
+                        threadId: student.id,
+                        senderName: session.appUser.name,
+                        threadStudentName: student.name,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -131,40 +128,67 @@ class AdminThreadsScreen extends StatelessWidget {
   }
 }
 
-class _FullState extends StatelessWidget {
-  final IconData icon;
+class _AdminThreadTile extends StatelessWidget {
   final String title;
   final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final String? iconLabel;
+  final Widget? badge;
 
-  const _FullState({
-    required this.icon,
+  const _AdminThreadTile({
     required this.title,
     required this.subtitle,
+    required this.color,
+    required this.onTap,
+    this.icon,
+    this.iconLabel,
+    this.badge,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        leading: CircleAvatar(
+          backgroundColor: color.withValues(alpha: 0.1),
+          child: icon == null
+              ? Text(
+                  iconLabel ?? '?',
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                )
+              : Icon(icon, color: color),
+        ),
+        title: Row(
           children: [
-            Icon(icon, size: 52, color: AppColors.muted),
-            const SizedBox(height: 14),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.muted),
-            ),
+            ?badge,
           ],
         ),
+        subtitle: Text(
+          subtitle,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: AppColors.muted),
+        ),
+        trailing: const Icon(
+          Icons.chevron_right_rounded,
+          color: AppColors.muted,
+        ),
+        onTap: onTap,
       ),
     );
   }

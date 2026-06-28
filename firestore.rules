@@ -27,13 +27,22 @@ service cloud.firestore {
         && request.auth.token.lmsUserId == threadId;
     }
 
+    function isAnnouncementThread(threadId) {
+      return threadId == 'announcements';
+    }
+
     function isTeacher() {
       return request.auth.token.role == 'teacher';
     }
 
     function canAccessThread(courseId, threadId) {
       return hasCourse(courseId)
-        && (isTeacher() || isStudentThread(threadId));
+        && (isTeacher() || isStudentThread(threadId) || isAnnouncementThread(threadId));
+    }
+
+    function canWriteThread(courseId, threadId) {
+      return canAccessThread(courseId, threadId)
+        && (!isAnnouncementThread(threadId) || isTeacher());
     }
 
     function hasValidSender() {
@@ -121,10 +130,10 @@ service cloud.firestore {
         allow read: if isAdmin() || canAccessThread(courseId, threadId);
         allow create: if isAdmin()
             ? isAdminThreadUpdate(threadId)
-            : canAccessThread(courseId, threadId) && isOutgoingThreadUpdate(threadId);
+            : canWriteThread(courseId, threadId) && isOutgoingThreadUpdate(threadId);
         allow update: if isAdmin()
             ? isAdminThreadUpdate(threadId)
-            : canAccessThread(courseId, threadId)
+            : canWriteThread(courseId, threadId)
               && (
                 isOutgoingThreadUpdate(threadId)
                 || isReadReceiptUpdate(threadId)
@@ -137,7 +146,7 @@ service cloud.firestore {
               ? hasValidSender()
                 && request.resource.data.type in ['text', 'image', 'video', 'voice']
                 && request.resource.data.created_at == request.time
-              : canAccessThread(courseId, threadId)
+              : canWriteThread(courseId, threadId)
                 && hasValidSender()
                 && request.resource.data.type in ['text', 'image', 'video', 'voice']
                 && request.resource.data.created_at == request.time;

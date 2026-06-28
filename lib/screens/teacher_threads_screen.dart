@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 
 import '../models/course.dart';
 import '../services/firestore_chat_service.dart';
+import '../services/notification_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/time_format.dart';
 import 'chat_screen.dart';
 
 class TeacherThreadsScreen extends StatelessWidget {
+  static final NotificationApi _notificationApi = NotificationApi();
+
   final String courseId;
   final String courseName;
   final String viewerRole;
@@ -42,6 +45,15 @@ class TeacherThreadsScreen extends StatelessWidget {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Broadcast message',
+            icon: const Icon(Icons.mark_email_unread_rounded),
+            onPressed: students.isEmpty
+                ? null
+                : () => _showStudentBroadcastSheet(context),
+          ),
+        ],
       ),
       body: SafeArea(
         top: false,
@@ -67,20 +79,18 @@ class TeacherThreadsScreen extends StatelessWidget {
                 final threads = snapshot.data?.docs ?? [];
                 final items = _buildStudentChatItems(threads);
 
-                if (items.isEmpty) {
-                  return const _FullState(
-                    icon: Icons.forum_outlined,
-                    title: 'No students found',
-                    subtitle:
-                        'No enrolled students were found for this course.',
-                  );
-                }
-
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: items.length,
+                  itemCount: items.length + 1,
                   itemBuilder: (context, index) {
-                    final item = items[index];
+                    if (index == 0) {
+                      return _AnnouncementThreadCard(
+                        courseId: courseId,
+                        onTap: () => _openAnnouncementChat(context),
+                      );
+                    }
+
+                    final item = items[index - 1];
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -239,6 +249,217 @@ class TeacherThreadsScreen extends StatelessWidget {
     );
   }
 
+  void _openAnnouncementChat(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          title: 'Announcement chat',
+          currentUserRole: viewerRole,
+          courseId: courseId,
+          threadId: FirestoreChatService.announcementThreadId,
+          senderName: senderName,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showStudentBroadcastSheet(BuildContext context) async {
+    final selectedIds = students.map((student) => student.id).toSet();
+    final messageController = TextEditingController();
+    var isSending = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Future<void> sendBroadcast() async {
+              final text = messageController.text.trim();
+              if (text.isEmpty || selectedIds.isEmpty || isSending) return;
+
+              setSheetState(() => isSending = true);
+              try {
+                final selectedStudents = students.where(
+                  (student) => selectedIds.contains(student.id),
+                );
+                for (final student in selectedStudents) {
+                  await FirestoreChatService.sendTextMessage(
+                    courseId: courseId,
+                    threadId: student.id,
+                    senderName: senderName,
+                    senderRole: viewerRole,
+                    text: text,
+                    studentName: student.name,
+                  );
+                  await _notificationApi.notifyChatMessage(
+                    courseId: courseId,
+                    threadId: student.id,
+                    senderRole: viewerRole,
+                    senderName: senderName,
+                    messageType: 'text',
+                    previewText: text,
+                    studentName: student.name,
+                  );
+                }
+
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Message sent to ${selectedIds.length} student${selectedIds.length == 1 ? '' : 's'}.',
+                      ),
+                    ),
+                  );
+                }
+              } catch (error) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Broadcast failed: $error')),
+                  );
+                }
+              } finally {
+                if (context.mounted) {
+                  setSheetState(() => isSending = false);
+                }
+              }
+            }
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  12,
+                  16,
+                  16 + MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 620),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 42,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppColors.border,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      const Text(
+                        'Send to selected students',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'The same message will be delivered in each private chat.',
+                        style: TextStyle(color: AppColors.muted),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: messageController,
+                        minLines: 3,
+                        maxLines: 5,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: const InputDecoration(
+                          hintText: 'Write the message',
+                          prefixIcon: Icon(Icons.edit_note_rounded),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          TextButton(
+                            onPressed: () => setSheetState(() {
+                              selectedIds
+                                ..clear()
+                                ..addAll(students.map((student) => student.id));
+                            }),
+                            child: const Text('Select all'),
+                          ),
+                          TextButton(
+                            onPressed: () =>
+                                setSheetState(selectedIds.clear),
+                            child: const Text('Clear'),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '${selectedIds.length}/${students.length}',
+                            style: const TextStyle(
+                              color: AppColors.muted,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Flexible(
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: students.length,
+                          itemBuilder: (context, index) {
+                            final student = students[index];
+                            final selected = selectedIds.contains(student.id);
+                            return CheckboxListTile(
+                              value: selected,
+                              dense: true,
+                              title: Text(student.name),
+                              subtitle: Text('Student ${student.id}'),
+                              onChanged: (value) {
+                                setSheetState(() {
+                                  if (value == true) {
+                                    selectedIds.add(student.id);
+                                  } else {
+                                    selectedIds.remove(student.id);
+                                  }
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: isSending ? null : sendBroadcast,
+                          icon: isSending
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.send_rounded),
+                          label: const Text('Send message'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    messageController.dispose();
+  }
+
   List<_StudentChatItem> _buildStudentChatItems(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> threads,
   ) {
@@ -249,6 +470,8 @@ class TeacherThreadsScreen extends StatelessWidget {
     for (final doc in threads) {
       final data = doc.data();
       final threadId = doc.id;
+      if (threadId == FirestoreChatService.announcementThreadId) continue;
+
       final rosterStudent = rosterById[threadId];
       final studentName =
           rosterStudent?.name ?? data['student_name']?.toString() ?? 'Student';
@@ -316,6 +539,116 @@ class _StudentChatItem {
     required this.unreadCount,
     required this.lastMessageAt,
   });
+}
+
+class _AnnouncementThreadCard extends StatelessWidget {
+  final String courseId;
+  final VoidCallback onTap;
+
+  const _AnnouncementThreadCard({
+    required this.courseId,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirestoreChatService.getAnnouncementThread(courseId: courseId),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data();
+        final lastMessage =
+            data?['last_message']?.toString() ?? 'Post a course announcement';
+        final lastTime = formatThreadTime(
+          data?['last_message_at'] ?? data?['updated_at'],
+        );
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 14),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppColors.admin.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.admin.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.campaign_rounded,
+                      color: AppColors.admin,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Announcement chat',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 15.5,
+                                ),
+                              ),
+                            ),
+                            Icon(
+                              Icons.push_pin_rounded,
+                              size: 16,
+                              color: AppColors.admin,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          lastMessage,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            height: 1.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (lastTime.isNotEmpty)
+                        Text(
+                          lastTime,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.muted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      const SizedBox(height: 8),
+                      const Icon(Icons.chevron_right, color: AppColors.muted),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _FullState extends StatelessWidget {

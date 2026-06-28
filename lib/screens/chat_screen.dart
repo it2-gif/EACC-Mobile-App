@@ -64,6 +64,12 @@ class _ChatScreenState extends State<ChatScreen> {
   String? mediaUploadLabel;
   _PendingAttachment? failedAttachment;
 
+  bool get isAnnouncementThread =>
+      widget.threadId == FirestoreChatService.announcementThreadId;
+
+  bool get canSendInThread =>
+      !isAnnouncementThread || widget.currentUserRole != 'student';
+
   @override
   void dispose() {
     recordingTimer?.cancel();
@@ -141,7 +147,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> markThreadAsRead() async {
-    if (widget.currentUserRole == 'admin') return;
+    if (widget.currentUserRole == 'admin' || isAnnouncementThread) return;
 
     try {
       await FirestoreChatService.markThreadRead(
@@ -190,6 +196,8 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void showAttachmentOptions() {
+    if (!canSendInThread) return;
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -274,7 +282,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> toggleVoiceRecording() async {
-    if (isSending || isUploadingMedia) return;
+    if (!canSendInThread || isSending || isUploadingMedia) return;
     if (isRecordingVoice) {
       await stopAndSendVoiceMessage();
     } else {
@@ -432,7 +440,11 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> sendMessage() async {
     final text = messageController.text.trim();
 
-    if (text.isEmpty || isSending || isUploadingMedia || isRecordingVoice) {
+    if (!canSendInThread ||
+        text.isEmpty ||
+        isSending ||
+        isUploadingMedia ||
+        isRecordingVoice) {
       return;
     }
 
@@ -830,7 +842,11 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     final isBusy = isSending || isUploadingMedia || isRecordingVoice;
     final isSendingOrUploading = isSending || isUploadingMedia;
-    final chatSubtitle = 'Course ${widget.courseId}';
+    final chatSubtitle = isAnnouncementThread
+        ? widget.currentUserRole == 'student'
+              ? 'Course ${widget.courseId} - announcements only'
+              : 'Course ${widget.courseId} - announcement chat'
+        : 'Course ${widget.courseId}';
 
     return Scaffold(
       backgroundColor: AppColors.chatBackground,
@@ -1036,19 +1052,25 @@ class _ChatScreenState extends State<ChatScreen> {
                                 ),
                               ),
                               const SizedBox(height: 16),
-                              const Text(
-                                'No messages yet',
+                              Text(
+                                isAnnouncementThread
+                                    ? 'No announcements yet'
+                                    : 'No messages yet',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
                               const SizedBox(height: 6),
-                              const Text(
-                                'Send the first message to start this conversation.',
+                              Text(
+                                isAnnouncementThread
+                                    ? widget.currentUserRole == 'student'
+                                          ? 'Your teacher will post course updates here.'
+                                          : 'Post the first course announcement here.'
+                                    : 'Send the first message to start this conversation.',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   color: AppColors.muted,
                                   height: 1.35,
                                 ),
@@ -1166,7 +1188,7 @@ class _ChatScreenState extends State<ChatScreen> {
               },
             ),
           ),
-          if (widget.currentUserRole != 'admin')
+          if (widget.currentUserRole != 'admin' && !isAnnouncementThread)
             _ReadReceiptBar(
               currentUserRole: widget.currentUserRole,
               threadStream: FirestoreChatService.getThread(
@@ -1175,120 +1197,128 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
           SafeArea(
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: const Border(top: BorderSide(color: AppColors.border)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 14,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  IconButton.filledTonal(
-                    onPressed: isRecordingVoice
-                        ? cancelVoiceRecording
-                        : isBusy
-                        ? null
-                        : showAttachmentOptions,
-                    style: IconButton.styleFrom(
-                      foregroundColor: isRecordingVoice
-                          ? AppColors.danger
-                          : null,
-                    ),
-                    icon: Icon(
-                      isRecordingVoice
-                          ? Icons.delete_outline_rounded
-                          : Icons.add,
-                    ),
-                    tooltip: isRecordingVoice
-                        ? 'Cancel recording'
-                        : 'Add attachment',
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: isRecordingVoice
-                        ? _RecordingComposerPill(
-                            duration: _formatRecordingDuration(),
-                          )
-                        : Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.background,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: TextField(
-                              controller: messageController,
-                              enabled: !isBusy,
-                              maxLines: 5,
-                              minLines: 1,
-                              textCapitalization: TextCapitalization.sentences,
-                              decoration: InputDecoration(
-                                hintText: isUploadingMedia
-                                    ? 'Uploading media...'
-                                    : 'Write a message',
-                                filled: false,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 14,
-                                ),
-                                border: InputBorder.none,
-                              ),
-                              onSubmitted: (_) => sendMessage(),
-                            ),
-                          ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (!isRecordingVoice) ...[
-                    IconButton.filledTonal(
-                      onPressed: isSendingOrUploading
-                          ? null
-                          : toggleVoiceRecording,
-                      style: IconButton.styleFrom(
-                        foregroundColor: AppColors.primary,
+            child: canSendInThread
+                ? Container(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: const Border(
+                        top: BorderSide(color: AppColors.border),
                       ),
-                      icon: const Icon(Icons.mic_none),
-                      tooltip: 'Record voice message',
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.06),
+                          blurRadius: 14,
+                          offset: const Offset(0, -2),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                  ],
-                  FilledButton(
-                    onPressed: isSendingOrUploading
-                        ? null
-                        : isRecordingVoice
-                        ? stopAndSendVoiceMessage
-                        : sendMessage,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.square(48),
-                      padding: EdgeInsets.zero,
-                      shape: const CircleBorder(),
-                    ),
-                    child: isSendingOrUploading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(
-                            Icons.send_rounded,
-                            color: Colors.white,
-                            size: 20,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        IconButton.filledTonal(
+                          onPressed: isRecordingVoice
+                              ? cancelVoiceRecording
+                              : isBusy
+                                  ? null
+                                  : showAttachmentOptions,
+                          style: IconButton.styleFrom(
+                            foregroundColor: isRecordingVoice
+                                ? AppColors.danger
+                                : null,
                           ),
-                  ),
-                ],
-              ),
-            ),
+                          icon: Icon(
+                            isRecordingVoice
+                                ? Icons.delete_outline_rounded
+                                : Icons.add,
+                          ),
+                          tooltip: isRecordingVoice
+                              ? 'Cancel recording'
+                              : 'Add attachment',
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: isRecordingVoice
+                              ? _RecordingComposerPill(
+                                  duration: _formatRecordingDuration(),
+                                )
+                              : Container(
+                                  decoration: BoxDecoration(
+                                    color: AppColors.background,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: AppColors.border,
+                                    ),
+                                  ),
+                                  child: TextField(
+                                    controller: messageController,
+                                    enabled: !isBusy,
+                                    maxLines: 5,
+                                    minLines: 1,
+                                    textCapitalization:
+                                        TextCapitalization.sentences,
+                                    decoration: InputDecoration(
+                                      hintText: isUploadingMedia
+                                          ? 'Uploading media...'
+                                          : 'Write a message',
+                                      filled: false,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 14,
+                                          ),
+                                      border: InputBorder.none,
+                                    ),
+                                    onSubmitted: (_) => sendMessage(),
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(width: 8),
+                        if (!isRecordingVoice) ...[
+                          IconButton.filledTonal(
+                            onPressed: isSendingOrUploading
+                                ? null
+                                : toggleVoiceRecording,
+                            style: IconButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                            ),
+                            icon: const Icon(Icons.mic_none),
+                            tooltip: 'Record voice message',
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        FilledButton(
+                          onPressed: isSendingOrUploading
+                              ? null
+                              : isRecordingVoice
+                                  ? stopAndSendVoiceMessage
+                                  : sendMessage,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size.square(48),
+                            padding: EdgeInsets.zero,
+                            shape: const CircleBorder(),
+                          ),
+                          child: isSendingOrUploading
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.send_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                        ),
+                      ],
+                    ),
+                  )
+                : const _ReadOnlyAnnouncementBar(),
           ),
         ],
       ),
@@ -1357,6 +1387,7 @@ class _ChatScreenState extends State<ChatScreen> {
         messageType: messageType,
         previewText: previewText,
         studentName: _resolvedStudentName,
+        audience: isAnnouncementThread ? 'course' : null,
       );
     } catch (error) {
       debugPrint('Push notification send failed: $error');
@@ -1605,6 +1636,40 @@ class _RecordingComposerPill extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReadOnlyAnnouncementBar extends StatelessWidget {
+  const _ReadOnlyAnnouncementBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.campaign_rounded, color: AppColors.primary, size: 20),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Announcements are read-only. Reply in your private teacher chat.',
+              style: TextStyle(
+                color: AppColors.primaryDark,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
             ),
           ),
         ],

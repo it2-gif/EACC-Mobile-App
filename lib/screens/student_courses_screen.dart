@@ -8,7 +8,7 @@ import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/course_card.dart';
 import '../widgets/screen_header.dart';
-import 'chat_screen.dart';
+import 'student_course_chats_screen.dart';
 
 class StudentCoursesScreen extends StatelessWidget {
   final AuthSession session;
@@ -101,13 +101,9 @@ class _StudentCourseCardState extends State<_StudentCourseCard> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ChatScreen(
-          title: widget.course.name,
-          currentUserRole: 'student',
-          courseId: widget.course.id,
-          threadId: widget.session.lmsUser.lmsUserId,
-          senderName: widget.session.appUser.name,
-          threadStudentName: widget.session.appUser.name,
+        builder: (_) => StudentCourseChatsScreen(
+          session: widget.session,
+          course: widget.course,
         ),
       ),
     );

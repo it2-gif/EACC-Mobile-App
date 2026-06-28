@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
@@ -13,6 +12,7 @@ class ChatUploadException implements Exception {
 }
 
 class FirestoreChatService {
+  static const String announcementThreadId = 'announcements';
   static const int maxImageSizeBytes = 5 * 1024 * 1024;
   static const int maxVoiceSizeBytes = 10 * 1024 * 1024;
   static const int maxVideoSizeBytes = 50 * 1024 * 1024;
@@ -106,6 +106,12 @@ class FirestoreChatService {
     });
   }
 
+  static Stream<DocumentSnapshot<Map<String, dynamic>>> getAnnouncementThread({
+    required String courseId,
+  }) {
+    return getThread(courseId: courseId, threadId: announcementThreadId);
+  }
+
   static Future<void> createOrUpdateThread({
     required String courseId,
     required String threadId,
@@ -120,6 +126,20 @@ class FirestoreChatService {
     }, SetOptions(merge: true));
   }
 
+  static Future<void> createOrUpdateAnnouncementThread({
+    required String courseId,
+  }) async {
+    await _threadsRef(courseId: courseId).doc(announcementThreadId).set({
+      'thread_id': announcementThreadId,
+      'title': 'Announcement chat',
+      'is_announcement': true,
+      'pinned': true,
+      'student_unread_count': 0,
+      'teacher_unread_count': 0,
+      'updated_at': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
   static Future<void> sendTextMessage({
     required String courseId,
     required String threadId,
@@ -128,13 +148,20 @@ class FirestoreChatService {
     required String text,
     String? studentName,
   }) async {
-    final threadData = _threadUpdateData(
-      threadId: threadId,
-      senderName: senderName,
-      senderRole: senderRole,
-      lastMessage: text,
-      studentName: studentName,
-    );
+    final isAnnouncement = threadId == announcementThreadId;
+    final threadData = isAnnouncement
+        ? _announcementThreadUpdateData(
+            senderName: senderName,
+            senderRole: senderRole,
+            lastMessage: text,
+          )
+        : _threadUpdateData(
+            threadId: threadId,
+            senderName: senderName,
+            senderRole: senderRole,
+            lastMessage: text,
+            studentName: studentName,
+          );
 
     await _commitMessage(
       courseId: courseId,
@@ -304,13 +331,20 @@ class FirestoreChatService {
     }
     final mediaUrl = await uploadResult.ref.getDownloadURL();
 
-    final threadData = _threadUpdateData(
-      threadId: threadId,
-      senderName: senderName,
-      senderRole: senderRole,
-      lastMessage: lastMessage,
-      studentName: studentName,
-    );
+    final isAnnouncement = threadId == announcementThreadId;
+    final threadData = isAnnouncement
+        ? _announcementThreadUpdateData(
+            senderName: senderName,
+            senderRole: senderRole,
+            lastMessage: lastMessage,
+          )
+        : _threadUpdateData(
+            threadId: threadId,
+            senderName: senderName,
+            senderRole: senderRole,
+            lastMessage: lastMessage,
+            studentName: studentName,
+          );
 
     final messageData = <String, dynamic>{
       'type': type,
@@ -488,6 +522,24 @@ class FirestoreChatService {
     }
 
     return data;
+  }
+
+  static Map<String, dynamic> _announcementThreadUpdateData({
+    required String senderName,
+    required String senderRole,
+    required String lastMessage,
+  }) {
+    return {
+      'thread_id': announcementThreadId,
+      'title': 'Announcement chat',
+      'is_announcement': true,
+      'pinned': true,
+      'last_message': lastMessage,
+      'last_sender_name': senderName,
+      'last_sender_role': senderRole,
+      'last_message_at': FieldValue.serverTimestamp(),
+      'updated_at': FieldValue.serverTimestamp(),
+    };
   }
 
   static String _guessImageContentType(String fileName) {
