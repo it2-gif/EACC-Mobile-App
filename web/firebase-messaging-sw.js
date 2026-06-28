@@ -26,7 +26,7 @@ function appUrl(query) {
 
 messaging.onBackgroundMessage((payload) => {
   const base = appBasePath();
-  const title = payload.notification?.title || payload.data?.senderName || 'EACC Chat';
+  const title = payload.notification?.title || payload.data?.senderName || 'EACC Connection';
   const body =
     payload.notification?.body || payload.data?.previewText || 'New message';
 

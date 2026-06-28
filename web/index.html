@@ -26,13 +26,13 @@
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="EACC Chat">
+  <meta name="apple-mobile-web-app-title" content="EACC Connection">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>EACC Chat</title>
+  <title>EACC Connection</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js"></script>
@@ -103,7 +103,7 @@
   <div id="app-loader" role="status" aria-live="polite">
     <div>
       <div class="loader-mark" aria-hidden="true"></div>
-      <h1>Opening EACC Chat</h1>
+      <h1>Opening EACC Connection</h1>
       <p id="app-loader-message">Preparing your secure course messages...</p>
     </div>
   </div>
@@ -130,19 +130,19 @@
       }
 
       appLoader.classList.add('failed');
-      appLoader.querySelector('h1').textContent = 'EACC Chat could not start';
+      appLoader.querySelector('h1').textContent = 'EACC Connection could not start';
       loaderMessage.textContent = message;
     }
 
     window.addEventListener('error', (event) => {
-      console.error('EACC Chat startup error:', event.error || event.message);
+      console.error('EACC Connection startup error:', event.error || event.message);
       showStartupError(
         'The app encountered a startup error. Refresh the page and try again.'
       );
     });
 
     window.addEventListener('unhandledrejection', (event) => {
-      console.error('EACC Chat startup rejection:', event.reason);
+      console.error('EACC Connection startup rejection:', event.reason);
       showStartupError(
         'A required service did not initialize. Refresh the page and try again.'
       );
@@ -251,7 +251,7 @@
             scope: scopeUrl,
           }));
 
-        await registration.showNotification(title || 'EACC Chat', {
+        await registration.showNotification(title || 'EACC Connection', {
           body: body || 'New message',
           data: {
             courseId: courseId || '',

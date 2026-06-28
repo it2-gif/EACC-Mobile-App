@@ -59,7 +59,7 @@ class EaccChatApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'EACC Chat',
+      title: 'EACC Connection',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       navigatorKey: PushNotificationService.instance.navigatorKey,
@@ -128,7 +128,7 @@ class _StartupScreen extends StatelessWidget {
             ),
             SizedBox(height: 16),
             Text(
-              'Opening EACC Chat...',
+                'Opening EACC Connection...',
               style: TextStyle(
                 color: AppColors.muted,
                 fontWeight: FontWeight.w600,
@@ -162,7 +162,7 @@ class _StartupErrorScreen extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               const Text(
-                'EACC Chat could not start',
+                'EACC Connection could not start',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: AppColors.danger,

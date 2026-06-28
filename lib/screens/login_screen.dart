@@ -198,7 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         SizedBox(height: compact ? 14 : 18),
                         const Text(
-                          'EACC Chat',
+                          'EACC Connection',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 26,

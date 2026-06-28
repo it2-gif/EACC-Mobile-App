@@ -1,11 +1,11 @@
 {
-    "name": "chatt_eacc",
-    "short_name": "chatt_eacc",
+    "name": "EACC Connection",
+    "short_name": "EACC Connect",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F5F7FB",
+    "theme_color": "#0B2F78",
+    "description": "Secure EACC course messaging for students and teachers.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

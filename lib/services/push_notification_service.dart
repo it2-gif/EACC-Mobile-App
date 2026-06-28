@@ -289,7 +289,8 @@ class PushNotificationService {
 
     final course = _findCourse(session, courseId);
     final studentName = message.data['studentName']?.toString();
-    final senderName = message.data['senderName']?.toString() ?? 'EACC Chat';
+    final senderName =
+        message.data['senderName']?.toString() ?? 'EACC Connection';
 
     _openChatFromRoute(
       session: session,
@@ -630,7 +631,7 @@ class _BannerCard extends StatelessWidget {
                         Row(
                           children: [
                             const Text(
-                              'EACC Chat',
+                              'EACC Connection',
                               style: TextStyle(
                                 color: Color(0xFF7FA8D4),
                                 fontSize: 11,
