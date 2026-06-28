@@ -1,6 +1,6 @@
 {
     "name": "EACC Connection",
-    "short_name": "EACC Connect",
+    "short_name": "EACC Connection",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#F5F7FB",

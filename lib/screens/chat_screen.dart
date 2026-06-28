@@ -1220,8 +1220,8 @@ class _ChatScreenState extends State<ChatScreen> {
                           onPressed: isRecordingVoice
                               ? cancelVoiceRecording
                               : isBusy
-                                  ? null
-                                  : showAttachmentOptions,
+                              ? null
+                              : showAttachmentOptions,
                           style: IconButton.styleFrom(
                             foregroundColor: isRecordingVoice
                                 ? AppColors.danger
@@ -1246,9 +1246,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   decoration: BoxDecoration(
                                     color: AppColors.background,
                                     borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: AppColors.border,
-                                    ),
+                                    border: Border.all(color: AppColors.border),
                                   ),
                                   child: TextField(
                                     controller: messageController,
@@ -1291,8 +1289,8 @@ class _ChatScreenState extends State<ChatScreen> {
                           onPressed: isSendingOrUploading
                               ? null
                               : isRecordingVoice
-                                  ? stopAndSendVoiceMessage
-                                  : sendMessage,
+                              ? stopAndSendVoiceMessage
+                              : sendMessage,
                           style: FilledButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
@@ -1664,7 +1662,7 @@ class _ReadOnlyAnnouncementBar extends StatelessWidget {
           SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Announcements are read-only. Reply in your private teacher chat.',
+              'Announcements are read-only. Reply in your teacher chat.',
               style: TextStyle(
                 color: AppColors.primaryDark,
                 fontWeight: FontWeight.w700,

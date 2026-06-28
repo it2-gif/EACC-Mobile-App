@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Chatt Eacc</string>
+	<string>EACC Connection</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>chatt_eacc</string>
+	<string>EACC Connection</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -27,11 +27,11 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>EACC Chat uses the camera to capture photos and videos for course conversations.</string>
+	<string>EACC Connection uses the camera to capture photos and videos for course conversations.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>EACC Chat uses the microphone to record voice messages and videos.</string>
+	<string>EACC Connection uses the microphone to record voice messages and videos.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>EACC Chat uses the photo library to attach photos and videos to course conversations.</string>
+	<string>EACC Connection uses the photo library to attach photos and videos to course conversations.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

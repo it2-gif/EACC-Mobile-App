@@ -21,6 +21,7 @@ class StudentCourseChatsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final studentThreadId = session.lmsUser.lmsUserId;
+    final teacherDisplayName = _teacherDisplayName(course);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -62,23 +63,23 @@ class StudentCourseChatsScreen extends StatelessWidget {
                         (data?['student_unread_count'] as num?)?.toInt() ?? 0;
                     final lastMessage =
                         data?['last_message']?.toString() ??
-                        'Private chat with your teacher';
+                        'Chat directly with $teacherDisplayName';
                     final lastTime = formatThreadTime(
                       data?['last_message_at'] ?? data?['updated_at'],
                     );
 
                     return _ChatChoiceCard(
-                      title: 'Private teacher chat',
+                      title: '$teacherDisplayName chat',
                       subtitle: lastMessage,
                       time: lastTime,
-                      icon: Icons.person_rounded,
+                      icon: Icons.support_agent_rounded,
                       color: AppColors.primary,
                       badge: unread > 0 ? '$unread' : null,
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => ChatScreen(
-                            title: course.teacherName ?? course.name,
+                            title: teacherDisplayName,
                             currentUserRole: 'student',
                             courseId: course.id,
                             threadId: studentThreadId,
@@ -97,6 +98,12 @@ class StudentCourseChatsScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+String _teacherDisplayName(Course course) {
+  final name = course.teacherName?.trim();
+  if (name != null && name.isNotEmpty) return name;
+  return 'Teacher';
 }
 
 class _AnnouncementChatTile extends StatelessWidget {

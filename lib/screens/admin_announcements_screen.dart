@@ -105,7 +105,9 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
 
   Future<void> sendCourseAnnouncements() async {
     final text = courseMessageController.text.trim();
-    if (text.isEmpty || selectedCourseIds.isEmpty || sendingCourseAnnouncement) {
+    if (text.isEmpty ||
+        selectedCourseIds.isEmpty ||
+        sendingCourseAnnouncement) {
       return;
     }
 
@@ -145,9 +147,9 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Announcement failed: $error')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Announcement failed: $error')));
       }
     } finally {
       if (mounted) setState(() => sendingCourseAnnouncement = false);
@@ -156,7 +158,9 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
 
   Future<void> sendPrivateBroadcasts() async {
     final text = privateMessageController.text.trim();
-    if (text.isEmpty || selectedStudentKeys.isEmpty || sendingPrivateBroadcast) {
+    if (text.isEmpty ||
+        selectedStudentKeys.isEmpty ||
+        sendingPrivateBroadcast) {
       return;
     }
 
@@ -367,16 +371,17 @@ class _PrivateBroadcastPanel extends StatelessWidget {
                 itemCount: targets.length,
                 itemBuilder: (context, index) {
                   final target = targets[index];
-                  return CheckboxListTile(
-                    value: selectedStudentKeys.contains(target.key),
-                    dense: true,
-                    title: Text(target.studentName),
-                    subtitle: Text('${target.courseName} - ${target.courseId}'),
-                    onChanged: (value) {
-                      if (value == true) {
-                        selectedStudentKeys.add(target.key);
-                      } else {
+                  final selected = selectedStudentKeys.contains(target.key);
+                  return _StudentTargetSelectionTile(
+                    name: target.studentName,
+                    subtitle:
+                        '${target.courseName} - Course ${target.courseId}',
+                    selected: selected,
+                    onTap: () {
+                      if (selected) {
                         selectedStudentKeys.remove(target.key);
+                      } else {
+                        selectedStudentKeys.add(target.key);
                       }
                       onChanged();
                     },
@@ -447,10 +452,7 @@ class _PanelTitle extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 3),
-              Text(
-                subtitle,
-                style: const TextStyle(color: AppColors.muted),
-              ),
+              Text(subtitle, style: const TextStyle(color: AppColors.muted)),
             ],
           ),
         ),
@@ -506,4 +508,117 @@ class _StudentTarget {
   });
 
   String get key => '$courseId:$studentId';
+}
+
+class _StudentTargetSelectionTile extends StatelessWidget {
+  final String name;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _StudentTargetSelectionTile({
+    required this.name,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : 'S';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: selected
+            ? AppColors.admin.withValues(alpha: 0.08)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected
+                    ? AppColors.admin.withValues(alpha: 0.5)
+                    : AppColors.border,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AppColors.admin
+                        : AppColors.student.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    initial,
+                    style: TextStyle(
+                      color: selected ? Colors.white : AppColors.student,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.ink,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.admin : Colors.transparent,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: selected ? AppColors.admin : AppColors.border,
+                      width: 2,
+                    ),
+                  ),
+                  child: selected
+                      ? const Icon(
+                          Icons.check_rounded,
+                          size: 18,
+                          color: Colors.white,
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

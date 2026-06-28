@@ -75,10 +75,10 @@ export class NotificationsService {
       });
     }
 
-    // Determine which course members to notify based on who sent the message.
-    // - Student sends  → notify all teachers of the course.
-    // - Teacher sends  → notify the specific student (threadId = student lmsUserId).
-    // - Admin sends    → notify both the specific student AND all teachers.
+    // Determine which course members to notify based on the message audience.
+    // - Course announcement: notify active students in the course.
+    // - Student private reply: notify active teachers in the course.
+    // - Teacher/admin private message: notify only the selected student thread.
     const isCourseAudience = input.audience === 'course';
 
     if (isCourseAudience && senderRole === 'student') {
@@ -93,9 +93,7 @@ export class NotificationsService {
         ? [UserRole.STUDENT]
         : senderRole === 'student'
           ? [UserRole.TEACHER]
-          : senderRole === 'teacher'
-            ? [UserRole.STUDENT]
-            : [UserRole.STUDENT, UserRole.TEACHER]; // admin notifies both
+          : [UserRole.STUDENT];
 
     const targetMemberships = await this.prisma.courseMembership.findMany({
       where: {
@@ -115,8 +113,8 @@ export class NotificationsService {
       },
     });
 
-    // When notifying the student side (teacher or admin sent), filter to the
-    // specific student whose thread this is.
+    // For targeted teacher/admin messages, keep the recipient list scoped to
+    // the selected student thread so one message creates one notification fan-out.
     const recipients =
       isCourseAudience
         ? targetMemberships
@@ -124,9 +122,8 @@ export class NotificationsService {
           ? targetMemberships // all teachers
           : targetMemberships.filter(
               (m) =>
-                m.role === UserRole.TEACHER ||
-                (m.role === UserRole.STUDENT &&
-                  m.user.lmsUserId === input.threadId),
+                m.role === UserRole.STUDENT &&
+                m.user.lmsUserId === input.threadId,
             );
 
     const recipientTokens = recipients

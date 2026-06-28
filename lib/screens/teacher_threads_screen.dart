@@ -390,8 +390,7 @@ class TeacherThreadsScreen extends StatelessWidget {
                             child: const Text('Select all'),
                           ),
                           TextButton(
-                            onPressed: () =>
-                                setSheetState(selectedIds.clear),
+                            onPressed: () => setSheetState(selectedIds.clear),
                             child: const Text('Clear'),
                           ),
                           const Spacer(),
@@ -411,17 +410,16 @@ class TeacherThreadsScreen extends StatelessWidget {
                           itemBuilder: (context, index) {
                             final student = students[index];
                             final selected = selectedIds.contains(student.id);
-                            return CheckboxListTile(
-                              value: selected,
-                              dense: true,
-                              title: Text(student.name),
-                              subtitle: Text('Student ${student.id}'),
-                              onChanged: (value) {
+                            return _StudentSelectionTile(
+                              name: student.name,
+                              subtitle: 'Student ${student.id}',
+                              selected: selected,
+                              onTap: () {
                                 setSheetState(() {
-                                  if (value == true) {
-                                    selectedIds.add(student.id);
-                                  } else {
+                                  if (selected) {
                                     selectedIds.remove(student.id);
+                                  } else {
+                                    selectedIds.add(student.id);
                                   }
                                 });
                               },
@@ -545,10 +543,7 @@ class _AnnouncementThreadCard extends StatelessWidget {
   final String courseId;
   final VoidCallback onTap;
 
-  const _AnnouncementThreadCard({
-    required this.courseId,
-    required this.onTap,
-  });
+  const _AnnouncementThreadCard({required this.courseId, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -647,6 +642,119 @@ class _AnnouncementThreadCard extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _StudentSelectionTile extends StatelessWidget {
+  final String name;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _StudentSelectionTile({
+    required this.name,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : 'S';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: selected
+            ? AppColors.primary.withValues(alpha: 0.08)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected
+                    ? AppColors.primary.withValues(alpha: 0.45)
+                    : AppColors.border,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AppColors.primary
+                        : AppColors.student.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    initial,
+                    style: TextStyle(
+                      color: selected ? Colors.white : AppColors.student,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.ink,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.primary : Colors.transparent,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: selected ? AppColors.primary : AppColors.border,
+                      width: 2,
+                    ),
+                  ),
+                  child: selected
+                      ? const Icon(
+                          Icons.check_rounded,
+                          size: 18,
+                          color: Colors.white,
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
