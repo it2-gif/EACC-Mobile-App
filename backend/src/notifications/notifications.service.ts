@@ -129,9 +129,24 @@ export class NotificationsService {
     const recipientDeviceTokens = recipients
       .flatMap((membership) => membership.user.deviceTokens)
       .filter((token) => token.userId !== senderAppUserId);
+    const latestRecipientTokenByUser = new Map<
+      string,
+      (typeof recipientDeviceTokens)[number]
+    >();
+
+    for (const deviceToken of recipientDeviceTokens) {
+      const existingToken = latestRecipientTokenByUser.get(deviceToken.userId);
+      if (
+        existingToken === undefined ||
+        deviceToken.lastSeenAt > existingToken.lastSeenAt
+      ) {
+        latestRecipientTokenByUser.set(deviceToken.userId, deviceToken);
+      }
+    }
+
     const uniqueRecipientDeviceTokens = [
       ...new Map(
-        recipientDeviceTokens.map((deviceToken) => [
+        [...latestRecipientTokenByUser.values()].map((deviceToken) => [
           deviceToken.token,
           deviceToken,
         ]),
