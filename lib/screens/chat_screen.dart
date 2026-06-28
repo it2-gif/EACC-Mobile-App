@@ -456,7 +456,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
-      await FirestoreChatService.sendTextMessage(
+      final messageId = await FirestoreChatService.sendTextMessage(
         courseId: widget.courseId,
         threadId: widget.threadId,
         senderName: widget.senderName,
@@ -464,7 +464,13 @@ class _ChatScreenState extends State<ChatScreen> {
         text: text,
         studentName: _resolvedStudentName,
       );
-      unawaited(_sendPushNotification(messageType: 'text', previewText: text));
+      unawaited(
+        _sendPushNotification(
+          messageId: messageId,
+          messageType: 'text',
+          previewText: text,
+        ),
+      );
     } catch (error) {
       shouldScrollAfterSending = false;
       await _logFirestoreSendDebug(error);
@@ -713,7 +719,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }) async {
     _beginMediaUpload(retrying ? 'Retrying photo...' : 'Uploading photo...');
     try {
-      await FirestoreChatService.sendImageMessage(
+      final messageId = await FirestoreChatService.sendImageMessage(
         courseId: widget.courseId,
         threadId: widget.threadId,
         senderName: widget.senderName,
@@ -725,7 +731,11 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       shouldScrollAfterSending = true;
       unawaited(
-        _sendPushNotification(messageType: 'image', previewText: 'Photo'),
+        _sendPushNotification(
+          messageId: messageId,
+          messageType: 'image',
+          previewText: 'Photo',
+        ),
       );
       _clearMediaUploadState();
     } catch (error) {
@@ -747,7 +757,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }) async {
     _beginMediaUpload(retrying ? 'Retrying video...' : 'Uploading video...');
     try {
-      await FirestoreChatService.sendVideoMessage(
+      final messageId = await FirestoreChatService.sendVideoMessage(
         courseId: widget.courseId,
         threadId: widget.threadId,
         senderName: widget.senderName,
@@ -759,7 +769,11 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       shouldScrollAfterSending = true;
       unawaited(
-        _sendPushNotification(messageType: 'video', previewText: 'Video'),
+        _sendPushNotification(
+          messageId: messageId,
+          messageType: 'video',
+          previewText: 'Video',
+        ),
       );
       _clearMediaUploadState();
     } catch (error) {
@@ -784,7 +798,7 @@ class _ChatScreenState extends State<ChatScreen> {
       retrying ? 'Retrying voice message...' : 'Uploading voice message...',
     );
     try {
-      await FirestoreChatService.sendVoiceMessage(
+      final messageId = await FirestoreChatService.sendVoiceMessage(
         courseId: widget.courseId,
         threadId: widget.threadId,
         senderName: widget.senderName,
@@ -798,6 +812,7 @@ class _ChatScreenState extends State<ChatScreen> {
       shouldScrollAfterSending = true;
       unawaited(
         _sendPushNotification(
+          messageId: messageId,
           messageType: 'voice',
           previewText: 'Voice message',
         ),
@@ -1367,6 +1382,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _sendPushNotification({
+    required String messageId,
     required String messageType,
     required String previewText,
   }) async {
@@ -1383,6 +1399,7 @@ class _ChatScreenState extends State<ChatScreen> {
         senderRole: widget.currentUserRole,
         senderName: widget.senderName,
         messageType: messageType,
+        messageId: messageId,
         previewText: previewText,
         studentName: _resolvedStudentName,
         audience: isAnnouncementThread ? 'course' : null,

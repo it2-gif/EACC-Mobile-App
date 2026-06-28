@@ -23,6 +23,11 @@ export class SendChatNotificationDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
+  messageId?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(500)
   previewText?: string;
 

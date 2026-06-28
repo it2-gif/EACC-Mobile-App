@@ -140,7 +140,7 @@ class FirestoreChatService {
     }, SetOptions(merge: true));
   }
 
-  static Future<void> sendTextMessage({
+  static Future<String> sendTextMessage({
     required String courseId,
     required String threadId,
     required String senderName,
@@ -163,7 +163,7 @@ class FirestoreChatService {
             studentName: studentName,
           );
 
-    await _commitMessage(
+    return _commitMessage(
       courseId: courseId,
       threadId: threadId,
       threadData: threadData,
@@ -209,7 +209,7 @@ class FirestoreChatService {
     });
   }
 
-  static Future<void> sendImageMessage({
+  static Future<String> sendImageMessage({
     required String courseId,
     required String threadId,
     required String senderName,
@@ -220,7 +220,7 @@ class FirestoreChatService {
     String? studentName,
   }) async {
     validateImageUpload(fileName: fileName, fileSize: imageBytes.length);
-    await _sendMediaMessage(
+    return _sendMediaMessage(
       courseId: courseId,
       threadId: threadId,
       senderName: senderName,
@@ -235,7 +235,7 @@ class FirestoreChatService {
     );
   }
 
-  static Future<void> sendVideoMessage({
+  static Future<String> sendVideoMessage({
     required String courseId,
     required String threadId,
     required String senderName,
@@ -247,7 +247,7 @@ class FirestoreChatService {
     String? studentName,
   }) async {
     validateVideoUpload(fileName: fileName, fileSize: videoBytes.length);
-    await _sendMediaMessage(
+    return _sendMediaMessage(
       courseId: courseId,
       threadId: threadId,
       senderName: senderName,
@@ -263,7 +263,7 @@ class FirestoreChatService {
     );
   }
 
-  static Future<void> sendVoiceMessage({
+  static Future<String> sendVoiceMessage({
     required String courseId,
     required String threadId,
     required String senderName,
@@ -275,7 +275,7 @@ class FirestoreChatService {
     String? studentName,
   }) async {
     validateVoiceUpload(fileName: fileName, fileSize: voiceBytes.length);
-    await _sendMediaMessage(
+    return _sendMediaMessage(
       courseId: courseId,
       threadId: threadId,
       senderName: senderName,
@@ -291,7 +291,7 @@ class FirestoreChatService {
     );
   }
 
-  static Future<void> _sendMediaMessage({
+  static Future<String> _sendMediaMessage({
     required String courseId,
     required String threadId,
     required String senderName,
@@ -358,7 +358,7 @@ class FirestoreChatService {
     };
     if (durationMs != null) messageData['duration_ms'] = durationMs;
 
-    await _commitMessage(
+    return _commitMessage(
       courseId: courseId,
       threadId: threadId,
       threadData: threadData,
@@ -447,7 +447,7 @@ class FirestoreChatService {
     }
   }
 
-  static Future<void> _commitMessage({
+  static Future<String> _commitMessage({
     required String courseId,
     required String threadId,
     required Map<String, dynamic> threadData,
@@ -464,6 +464,7 @@ class FirestoreChatService {
     batch.set(messageRef, messageData);
 
     await batch.commit();
+    return messageRef.id;
   }
 
   static Future<void> markThreadRead({

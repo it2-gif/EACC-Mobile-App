@@ -17,6 +17,9 @@ import { SendChatNotificationDto } from './dto/send-chat-notification.dto';
 
 @Injectable()
 export class NotificationsService {
+  private readonly recentNotificationKeys = new Map<string, number>();
+  private static readonly notificationDedupeTtlMs = 5 * 60 * 1000;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly firebaseAuth: FirebaseAuthService,
@@ -86,6 +89,15 @@ export class NotificationsService {
         code: 'ANNOUNCEMENT_ACCESS_DENIED',
         message: 'Students cannot send course announcements.',
       });
+    }
+
+    const dedupeKey = this.notificationDedupeKey(input);
+    if (dedupeKey !== null && !this.reserveNotificationKey(dedupeKey)) {
+      return {
+        status: 'skipped_duplicate' as const,
+        deliveredTo: 0,
+        failed: 0,
+      };
     }
 
     const rolesForQuery: UserRole[] =
@@ -163,6 +175,7 @@ export class NotificationsService {
       type: 'chat_message',
       courseId: input.courseId,
       threadId: input.threadId,
+      messageId: input.messageId ?? '',
       senderRole: input.senderRole,
       senderName: input.senderName,
       studentName: input.studentName ?? '',
@@ -180,6 +193,7 @@ export class NotificationsService {
     const invalidTokens: string[] = [];
     let successCount = 0;
     let failureCount = 0;
+    const collapseKey = this.collapseKey(input);
 
     if (webTokens.length > 0) {
       const webResponse = await this.firebaseAuth
@@ -215,6 +229,7 @@ export class NotificationsService {
           },
           data,
           android: {
+            collapseKey: collapseKey ?? undefined,
             priority: 'high',
             notification: {
               channelId: 'chat_messages',
@@ -223,6 +238,7 @@ export class NotificationsService {
           apns: {
             headers: {
               'apns-priority': '10',
+              ...(collapseKey ? { 'apns-collapse-id': collapseKey } : {}),
             },
             payload: {
               aps: {
@@ -336,5 +352,49 @@ export class NotificationsService {
     }
 
     return input.senderName;
+  }
+
+  private notificationDedupeKey(input: SendChatNotificationDto): string | null {
+    const messageId = input.messageId?.trim();
+    if (!messageId) {
+      return null;
+    }
+
+    return [input.courseId, input.threadId, messageId].join(':');
+  }
+
+  private reserveNotificationKey(key: string): boolean {
+    const now = Date.now();
+    this.pruneRecentNotificationKeys(now);
+
+    const lastSentAt = this.recentNotificationKeys.get(key);
+    const hasRecentlySent =
+      lastSentAt !== undefined &&
+      now - lastSentAt < NotificationsService.notificationDedupeTtlMs;
+    if (hasRecentlySent) {
+      return false;
+    }
+
+    this.recentNotificationKeys.set(key, now);
+    return true;
+  }
+
+  private pruneRecentNotificationKeys(now: number): void {
+    const cutoff = now - NotificationsService.notificationDedupeTtlMs;
+    for (const [key, sentAt] of this.recentNotificationKeys.entries()) {
+      if (sentAt < cutoff) {
+        this.recentNotificationKeys.delete(key);
+      }
+    }
+  }
+
+  private collapseKey(input: SendChatNotificationDto): string | null {
+    const messageId = input.messageId?.trim();
+    if (!messageId) {
+      return null;
+    }
+
+    const rawKey = [input.courseId, input.threadId, messageId].join('-');
+    return rawKey.replace(/[^a-zA-Z0-9_-]/g, '-').substring(0, 64);
   }
 }

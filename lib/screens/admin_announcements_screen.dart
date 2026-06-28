@@ -117,7 +117,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
         (course) => selectedCourseIds.contains(course.id),
       );
       for (final course in selectedCourses) {
-        await FirestoreChatService.sendTextMessage(
+        final messageId = await FirestoreChatService.sendTextMessage(
           courseId: course.id,
           threadId: FirestoreChatService.announcementThreadId,
           senderName: widget.session.appUser.name,
@@ -130,6 +130,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
           senderRole: 'admin',
           senderName: widget.session.appUser.name,
           messageType: 'text',
+          messageId: messageId,
           previewText: text,
           audience: 'course',
         );
@@ -171,7 +172,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
       );
       var sentCount = 0;
       for (final target in selectedTargets) {
-        await FirestoreChatService.sendTextMessage(
+        final messageId = await FirestoreChatService.sendTextMessage(
           courseId: target.courseId,
           threadId: target.studentId,
           senderName: widget.session.appUser.name,
@@ -185,6 +186,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
           senderRole: 'admin',
           senderName: widget.session.appUser.name,
           messageType: 'text',
+          messageId: messageId,
           previewText: text,
           studentName: target.studentName,
         );

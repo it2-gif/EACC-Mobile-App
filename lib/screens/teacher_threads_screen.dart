@@ -288,7 +288,7 @@ class TeacherThreadsScreen extends StatelessWidget {
                   (student) => selectedIds.contains(student.id),
                 );
                 for (final student in selectedStudents) {
-                  await FirestoreChatService.sendTextMessage(
+                  final messageId = await FirestoreChatService.sendTextMessage(
                     courseId: courseId,
                     threadId: student.id,
                     senderName: senderName,
@@ -302,6 +302,7 @@ class TeacherThreadsScreen extends StatelessWidget {
                     senderRole: viewerRole,
                     senderName: senderName,
                     messageType: 'text',
+                    messageId: messageId,
                     previewText: text,
                     studentName: student.name,
                   );
