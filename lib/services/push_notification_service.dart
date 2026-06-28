@@ -12,7 +12,6 @@ import '../screens/chat_screen.dart';
 import '../utils/notification_sound.dart';
 import 'auth_session_manager.dart';
 import 'notification_api.dart';
-import 'web_browser_notification.dart';
 import 'web_fcm_token.dart';
 
 @pragma('vm:entry-point')
@@ -209,27 +208,18 @@ class PushNotificationService {
     final data = message.data;
     final notification = message.notification;
     final title =
-        notification?.title ?? data['senderName']?.toString() ?? 'New message';
+        data['title']?.toString() ??
+        notification?.title ??
+        data['senderName']?.toString() ??
+        'New message';
     final body =
+        data['body']?.toString() ??
         notification?.body ??
         data['previewText']?.toString() ??
         'You received a new chat message';
 
     if (title.trim().isEmpty && body.trim().isEmpty) {
       return;
-    }
-
-    if (kIsWeb) {
-      unawaited(
-        showWebBrowserNotification(
-          title: title,
-          body: body,
-          courseId: data['courseId']?.toString() ?? '',
-          threadId: data['threadId']?.toString() ?? '',
-          studentName: data['studentName']?.toString() ?? '',
-          senderName: data['senderName']?.toString() ?? title,
-        ),
-      );
     }
 
     showInAppNotification(

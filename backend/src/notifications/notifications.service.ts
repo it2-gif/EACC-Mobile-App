@@ -126,71 +126,118 @@ export class NotificationsService {
                 m.user.lmsUserId === input.threadId,
             );
 
-    const recipientTokens = recipients
+    const recipientDeviceTokens = recipients
       .flatMap((membership) => membership.user.deviceTokens)
-      .filter((token) => token.userId !== senderAppUserId)
-      .map((token) => token.token);
-    const uniqueRecipientTokens = [...new Set(recipientTokens)];
+      .filter((token) => token.userId !== senderAppUserId);
+    const uniqueRecipientDeviceTokens = [
+      ...new Map(
+        recipientDeviceTokens.map((deviceToken) => [
+          deviceToken.token,
+          deviceToken,
+        ]),
+      ).values(),
+    ];
 
-    if (uniqueRecipientTokens.length === 0) {
+    if (uniqueRecipientDeviceTokens.length === 0) {
       return { status: 'skipped' as const, deliveredTo: 0 };
     }
 
-    const response = await this.firebaseAuth.messaging().sendEachForMulticast({
-      tokens: uniqueRecipientTokens,
-      notification: {
-        title: this.notificationTitle(input),
-        body: this.messageBody(input),
-      },
-      data: {
-        type: 'chat_message',
-        courseId: input.courseId,
-        threadId: input.threadId,
-        senderRole: input.senderRole,
-        senderName: input.senderName,
-        studentName: input.studentName ?? '',
-        previewText: this.messageBody(input),
-      },
-      webpush: {
-        notification: {
-          title: this.notificationTitle(input),
-          body: this.messageBody(input),
-        },
-      },
-      android: {
-        priority: 'high',
-        notification: {
-          channelId: 'chat_messages',
-        },
-      },
-      apns: {
-        headers: {
-          'apns-priority': '10',
-        },
-        payload: {
-          aps: {
-            sound: 'default',
-          },
-        },
-      },
-    });
+    const title = this.notificationTitle(input);
+    const body = this.messageBody(input);
+    const data = {
+      type: 'chat_message',
+      courseId: input.courseId,
+      threadId: input.threadId,
+      senderRole: input.senderRole,
+      senderName: input.senderName,
+      studentName: input.studentName ?? '',
+      previewText: body,
+      title,
+      body,
+    };
+    const webTokens = uniqueRecipientDeviceTokens
+      .filter((deviceToken) => deviceToken.platform === DevicePlatform.WEB)
+      .map((deviceToken) => deviceToken.token);
+    const nativeTokens = uniqueRecipientDeviceTokens
+      .filter((deviceToken) => deviceToken.platform !== DevicePlatform.WEB)
+      .map((deviceToken) => deviceToken.token);
 
-    const invalidTokens = response.responses
-      .map((item, index) => ({ item, token: uniqueRecipientTokens[index] }))
-      .filter(({ item }) => !item.success)
-      .map(({ token }) => token);
+    const invalidTokens: string[] = [];
+    let successCount = 0;
+    let failureCount = 0;
+
+    if (webTokens.length > 0) {
+      const webResponse = await this.firebaseAuth
+        .messaging()
+        .sendEachForMulticast({
+          tokens: webTokens,
+          data,
+          webpush: {
+            headers: {
+              Urgency: 'high',
+            },
+          },
+        });
+
+      successCount += webResponse.successCount;
+      failureCount += webResponse.failureCount;
+      invalidTokens.push(
+        ...webResponse.responses
+          .map((item, index) => ({ item, token: webTokens[index] }))
+          .filter(({ item }) => !item.success)
+          .map(({ token }) => token),
+      );
+    }
+
+    if (nativeTokens.length > 0) {
+      const nativeResponse = await this.firebaseAuth
+        .messaging()
+        .sendEachForMulticast({
+          tokens: nativeTokens,
+          notification: {
+            title,
+            body,
+          },
+          data,
+          android: {
+            priority: 'high',
+            notification: {
+              channelId: 'chat_messages',
+            },
+          },
+          apns: {
+            headers: {
+              'apns-priority': '10',
+            },
+            payload: {
+              aps: {
+                sound: 'default',
+              },
+            },
+          },
+        });
+
+      successCount += nativeResponse.successCount;
+      failureCount += nativeResponse.failureCount;
+      invalidTokens.push(
+        ...nativeResponse.responses
+          .map((item, index) => ({ item, token: nativeTokens[index] }))
+          .filter(({ item }) => !item.success)
+          .map(({ token }) => token),
+      );
+    }
 
     if (invalidTokens.length > 0) {
       await this.prisma.deviceToken.updateMany({
-        where: { token: { in: invalidTokens } },
+        where: { token: { in: [...new Set(invalidTokens)] } },
         data: { active: false },
       });
     }
 
     return {
       status: 'sent' as const,
-      deliveredTo: response.successCount,
-      failed: response.failureCount,
+      deliveredTo: successCount,
+      failed: failureCount,
     };
   }
 

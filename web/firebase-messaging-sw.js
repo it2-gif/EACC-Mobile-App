@@ -25,10 +25,13 @@ function appUrl(query) {
 }
 
 messaging.onBackgroundMessage((payload) => {
+  if (payload.notification) {
+    return;
+  }
+
   const base = appBasePath();
-  const title = payload.notification?.title || payload.data?.senderName || 'EACC Connection';
-  const body =
-    payload.notification?.body || payload.data?.previewText || 'New message';
+  const title = payload.data?.title || payload.data?.senderName || 'EACC Connection';
+  const body = payload.data?.body || payload.data?.previewText || 'New message';
 
   self.registration.showNotification(title, {
     body,
