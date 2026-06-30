@@ -128,7 +128,7 @@ class _StartupScreen extends StatelessWidget {
             ),
             SizedBox(height: 16),
             Text(
-                'Opening EACC Connection...',
+              'Opening EACC Connection...',
               style: TextStyle(
                 color: AppColors.muted,
                 fontWeight: FontWeight.w600,

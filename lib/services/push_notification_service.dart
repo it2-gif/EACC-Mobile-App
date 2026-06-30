@@ -11,6 +11,7 @@ import '../models/course.dart';
 import '../screens/chat_screen.dart';
 import '../utils/notification_sound.dart';
 import 'auth_session_manager.dart';
+import 'firestore_chat_service.dart';
 import 'notification_api.dart';
 import 'web_fcm_token.dart';
 
@@ -334,22 +335,40 @@ class PushNotificationService {
     final resolvedCourse = course ?? _findCourse(session, courseId);
     final resolvedStudentName = studentName?.trim();
     final resolvedSenderName = senderName?.trim();
+    final isAnnouncementThread =
+        threadId == FirestoreChatService.announcementThreadId;
+    final isAdminTeacherThread =
+        threadId == FirestoreChatService.adminTeacherThreadId;
+    final role = session.appUser.role;
 
-    final title = session.appUser.role == 'teacher'
-        ? (resolvedStudentName != null && resolvedStudentName.isNotEmpty
-              ? resolvedStudentName
-              : (resolvedSenderName != null && resolvedSenderName.isNotEmpty
-                    ? resolvedSenderName
-                    : 'Student Chat'))
-        : (resolvedCourse?.name ?? 'Course Chat');
+    late final String title;
+    late final String effectiveThreadId;
+    String? threadStudentName;
 
-    final effectiveThreadId = session.appUser.role == 'teacher'
-        ? threadId
-        : session.lmsUser.lmsUserId;
-
-    final threadStudentName = session.appUser.role == 'teacher'
-        ? resolvedStudentName ?? resolvedSenderName
-        : session.appUser.name;
+    if (isAnnouncementThread) {
+      title = 'Announcement chat';
+      effectiveThreadId = threadId;
+    } else if (isAdminTeacherThread) {
+      title = role == 'admin'
+          ? (resolvedCourse?.teacherName ?? 'Teacher chat')
+          : 'EACC Admin';
+      effectiveThreadId = threadId;
+    } else if (role == 'teacher' || role == 'admin') {
+      title = resolvedStudentName != null && resolvedStudentName.isNotEmpty
+          ? resolvedStudentName
+          : (resolvedSenderName != null && resolvedSenderName.isNotEmpty
+                ? resolvedSenderName
+                : 'Student Chat');
+      effectiveThreadId = threadId;
+      threadStudentName = resolvedStudentName ?? resolvedSenderName;
+    } else {
+      final teacherName = resolvedCourse?.teacherName?.trim();
+      title = teacherName != null && teacherName.isNotEmpty
+          ? '$teacherName chat'
+          : (resolvedCourse?.name ?? 'Course Chat');
+      effectiveThreadId = session.lmsUser.lmsUserId;
+      threadStudentName = session.appUser.name;
+    }
 
     navigatorKey.currentState?.push(
       MaterialPageRoute(

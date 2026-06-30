@@ -81,7 +81,7 @@ class TeacherThreadsScreen extends StatelessWidget {
 
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: items.length + 1,
+                  itemCount: items.length + 2,
                   itemBuilder: (context, index) {
                     if (index == 0) {
                       return _AnnouncementThreadCard(
@@ -90,7 +90,14 @@ class TeacherThreadsScreen extends StatelessWidget {
                       );
                     }
 
-                    final item = items[index - 1];
+                    if (index == 1) {
+                      return _AdminTeacherThreadCard(
+                        courseId: courseId,
+                        onTap: () => _openAdminChat(context),
+                      );
+                    }
+
+                    final item = items[index - 2];
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -258,6 +265,21 @@ class TeacherThreadsScreen extends StatelessWidget {
           currentUserRole: viewerRole,
           courseId: courseId,
           threadId: FirestoreChatService.announcementThreadId,
+          senderName: senderName,
+        ),
+      ),
+    );
+  }
+
+  void _openAdminChat(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          title: 'EACC Admin',
+          currentUserRole: viewerRole,
+          courseId: courseId,
+          threadId: FirestoreChatService.adminTeacherThreadId,
           senderName: senderName,
         ),
       ),
@@ -470,6 +492,7 @@ class TeacherThreadsScreen extends StatelessWidget {
       final data = doc.data();
       final threadId = doc.id;
       if (threadId == FirestoreChatService.announcementThreadId) continue;
+      if (threadId == FirestoreChatService.adminTeacherThreadId) continue;
 
       final rosterStudent = rosterById[threadId];
       final studentName =
@@ -605,6 +628,132 @@ class _AnnouncementThreadCard extends StatelessWidget {
                               size: 16,
                               color: AppColors.admin,
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          lastMessage,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            height: 1.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (lastTime.isNotEmpty)
+                        Text(
+                          lastTime,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.muted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      const SizedBox(height: 8),
+                      const Icon(Icons.chevron_right, color: AppColors.muted),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AdminTeacherThreadCard extends StatelessWidget {
+  final String courseId;
+  final VoidCallback onTap;
+
+  const _AdminTeacherThreadCard({required this.courseId, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirestoreChatService.getThread(
+        courseId: courseId,
+        threadId: FirestoreChatService.adminTeacherThreadId,
+      ),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data();
+        final unread = (data?['teacher_unread_count'] as num?)?.toInt() ?? 0;
+        final lastMessage =
+            data?['last_message']?.toString() ??
+            'Talk directly with EACC Admin';
+        final lastTime = formatThreadTime(
+          data?['last_message_at'] ?? data?['updated_at'],
+        );
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 14),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppColors.teacher.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.teacher.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.admin_panel_settings_rounded,
+                      color: AppColors.teacher,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'EACC Admin',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 15.5,
+                                ),
+                              ),
+                            ),
+                            if (unread > 0)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.teacher,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  unread > 99 ? '99+' : '$unread',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                         const SizedBox(height: 5),

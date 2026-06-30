@@ -68,6 +68,9 @@ class _ChatScreenState extends State<ChatScreen> {
   bool get isAnnouncementThread =>
       widget.threadId == FirestoreChatService.announcementThreadId;
 
+  bool get isAdminTeacherThread =>
+      widget.threadId == FirestoreChatService.adminTeacherThreadId;
+
   bool get canSendInThread =>
       !isAnnouncementThread || widget.currentUserRole != 'student';
 
@@ -1537,11 +1540,20 @@ class _ChatScreenState extends State<ChatScreen> {
         messageId: messageId,
         previewText: previewText,
         studentName: _resolvedStudentName,
-        audience: isAnnouncementThread ? 'course' : null,
+        audience: _notificationAudience,
       );
     } catch (error) {
       debugPrint('Push notification send failed: $error');
     }
+  }
+
+  String? get _notificationAudience {
+    if (isAnnouncementThread) return 'course';
+    if (!isAdminTeacherThread) return null;
+
+    if (widget.currentUserRole == 'admin') return 'teachers';
+    if (widget.currentUserRole == 'teacher') return 'admins';
+    return null;
   }
 
   void _beginMediaUpload(String label) {

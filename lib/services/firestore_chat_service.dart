@@ -39,6 +39,7 @@ class MessageReply {
 
 class FirestoreChatService {
   static const String announcementThreadId = 'announcements';
+  static const String adminTeacherThreadId = 'admin_teacher';
   static const int maxImageSizeBytes = 5 * 1024 * 1024;
   static const int maxVoiceSizeBytes = 10 * 1024 * 1024;
   static const int maxVideoSizeBytes = 50 * 1024 * 1024;
@@ -175,20 +176,13 @@ class FirestoreChatService {
     String? studentName,
     MessageReply? reply,
   }) async {
-    final isAnnouncement = threadId == announcementThreadId;
-    final threadData = isAnnouncement
-        ? _announcementThreadUpdateData(
-            senderName: senderName,
-            senderRole: senderRole,
-            lastMessage: text,
-          )
-        : _threadUpdateData(
-            threadId: threadId,
-            senderName: senderName,
-            senderRole: senderRole,
-            lastMessage: text,
-            studentName: studentName,
-          );
+    final threadData = _messageThreadUpdateData(
+      threadId: threadId,
+      senderName: senderName,
+      senderRole: senderRole,
+      lastMessage: text,
+      studentName: studentName,
+    );
 
     final messageData = <String, dynamic>{
       'type': 'text',
@@ -368,20 +362,13 @@ class FirestoreChatService {
     }
     final mediaUrl = await uploadResult.ref.getDownloadURL();
 
-    final isAnnouncement = threadId == announcementThreadId;
-    final threadData = isAnnouncement
-        ? _announcementThreadUpdateData(
-            senderName: senderName,
-            senderRole: senderRole,
-            lastMessage: lastMessage,
-          )
-        : _threadUpdateData(
-            threadId: threadId,
-            senderName: senderName,
-            senderRole: senderRole,
-            lastMessage: lastMessage,
-            studentName: studentName,
-          );
+    final threadData = _messageThreadUpdateData(
+      threadId: threadId,
+      senderName: senderName,
+      senderRole: senderRole,
+      lastMessage: lastMessage,
+      studentName: studentName,
+    );
 
     final messageData = <String, dynamic>{
       'type': type,
@@ -563,6 +550,38 @@ class FirestoreChatService {
     return data;
   }
 
+  static Map<String, dynamic> _messageThreadUpdateData({
+    required String threadId,
+    required String senderName,
+    required String senderRole,
+    required String lastMessage,
+    String? studentName,
+  }) {
+    if (threadId == announcementThreadId) {
+      return _announcementThreadUpdateData(
+        senderName: senderName,
+        senderRole: senderRole,
+        lastMessage: lastMessage,
+      );
+    }
+
+    if (threadId == adminTeacherThreadId) {
+      return _adminTeacherThreadUpdateData(
+        senderName: senderName,
+        senderRole: senderRole,
+        lastMessage: lastMessage,
+      );
+    }
+
+    return _threadUpdateData(
+      threadId: threadId,
+      senderName: senderName,
+      senderRole: senderRole,
+      lastMessage: lastMessage,
+      studentName: studentName,
+    );
+  }
+
   static Map<String, dynamic> _announcementThreadUpdateData({
     required String senderName,
     required String senderRole,
@@ -579,6 +598,35 @@ class FirestoreChatService {
       'last_message_at': FieldValue.serverTimestamp(),
       'updated_at': FieldValue.serverTimestamp(),
     };
+  }
+
+  static Map<String, dynamic> _adminTeacherThreadUpdateData({
+    required String senderName,
+    required String senderRole,
+    required String lastMessage,
+  }) {
+    final data = <String, dynamic>{
+      'thread_id': adminTeacherThreadId,
+      'title': 'EACC Admin',
+      'is_admin_teacher': true,
+      'pinned': true,
+      'last_message': lastMessage,
+      'last_sender_name': senderName,
+      'last_sender_role': senderRole,
+      'last_message_at': FieldValue.serverTimestamp(),
+      'updated_at': FieldValue.serverTimestamp(),
+    };
+
+    if (senderRole == 'admin') {
+      data['admin_unread_count'] = 0;
+      data['teacher_unread_count'] = FieldValue.increment(1);
+    } else if (senderRole == 'teacher') {
+      data['teacher_unread_count'] = 0;
+      data['teacher_last_read_at'] = FieldValue.serverTimestamp();
+      data['admin_unread_count'] = FieldValue.increment(1);
+    }
+
+    return data;
   }
 
   static String _guessImageContentType(String fileName) {

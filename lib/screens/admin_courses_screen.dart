@@ -100,6 +100,7 @@ class _CourseCard extends StatelessWidget {
             builder: (_) => AdminThreadsScreen(
               courseId: course.id,
               courseName: course.name,
+              teacherName: course.teacherName,
               students: course.students,
               session: session,
             ),

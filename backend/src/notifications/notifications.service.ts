@@ -78,16 +78,33 @@ export class NotificationsService {
       });
     }
 
-    // Determine which course members to notify based on the message audience.
+    // Determine recipients based on the message audience.
     // - Course announcement: notify active students in the course.
+    // - Admin teacher chat: admin notifies teachers, teachers notify admins.
     // - Student private reply: notify active teachers in the course.
     // - Teacher/admin private message: notify only the selected student thread.
     const isCourseAudience = input.audience === 'course';
+    const isTeachersAudience = input.audience === 'teachers';
+    const isAdminsAudience = input.audience === 'admins';
 
     if (isCourseAudience && senderRole === 'student') {
       throw new UnauthorizedException({
         code: 'ANNOUNCEMENT_ACCESS_DENIED',
         message: 'Students cannot send course announcements.',
+      });
+    }
+
+    if (isTeachersAudience && senderRole !== 'admin') {
+      throw new UnauthorizedException({
+        code: 'TEACHER_AUDIENCE_DENIED',
+        message: 'Only admins can notify course teachers directly.',
+      });
+    }
+
+    if (isAdminsAudience && senderRole !== 'teacher') {
+      throw new UnauthorizedException({
+        code: 'ADMIN_AUDIENCE_DENIED',
+        message: 'Only teachers can notify admins directly.',
       });
     }
 
@@ -100,47 +117,72 @@ export class NotificationsService {
       };
     }
 
-    const rolesForQuery: UserRole[] =
-      isCourseAudience
-        ? [UserRole.STUDENT]
-        : senderRole === 'student'
-          ? [UserRole.TEACHER]
-          : [UserRole.STUDENT];
+    let recipientDeviceTokens: {
+      userId: string;
+      token: string;
+      platform: DevicePlatform;
+      lastSeenAt: Date;
+    }[] = [];
 
-    const targetMemberships = await this.prisma.courseMembership.findMany({
-      where: {
-        course: { lmsCourseId: input.courseId },
-        role: { in: rolesForQuery },
-        status: MembershipStatus.ACTIVE,
-        user: { status: UserStatus.ACTIVE },
-      },
-      include: {
-        user: {
-          include: {
-            deviceTokens: {
-              where: { active: true },
+    if (isAdminsAudience) {
+      const adminUsers = await this.prisma.user.findMany({
+        where: {
+          role: UserRole.ADMIN,
+          status: UserStatus.ACTIVE,
+        },
+        include: {
+          deviceTokens: {
+            where: { active: true },
+          },
+        },
+      });
+
+      recipientDeviceTokens = adminUsers
+        .flatMap((user) => user.deviceTokens)
+        .filter((token) => token.userId !== senderAppUserId);
+    } else {
+      const rolesForQuery: UserRole[] =
+        isCourseAudience
+          ? [UserRole.STUDENT]
+          : isTeachersAudience || senderRole === 'student'
+            ? [UserRole.TEACHER]
+            : [UserRole.STUDENT];
+
+      const targetMemberships = await this.prisma.courseMembership.findMany({
+        where: {
+          course: { lmsCourseId: input.courseId },
+          role: { in: rolesForQuery },
+          status: MembershipStatus.ACTIVE,
+          user: { status: UserStatus.ACTIVE },
+        },
+        include: {
+          user: {
+            include: {
+              deviceTokens: {
+                where: { active: true },
+              },
             },
           },
         },
-      },
-    });
+      });
 
-    // For targeted teacher/admin messages, keep the recipient list scoped to
-    // the selected student thread so one message creates one notification fan-out.
-    const recipients =
-      isCourseAudience
-        ? targetMemberships
-        : senderRole === 'student'
-          ? targetMemberships // all teachers
-          : targetMemberships.filter(
-              (m) =>
-                m.role === UserRole.STUDENT &&
-                m.user.lmsUserId === input.threadId,
-            );
+      // For targeted teacher/admin messages, keep the recipient list scoped to
+      // the selected student thread so one message creates one notification fan-out.
+      const recipients =
+        isCourseAudience || isTeachersAudience
+          ? targetMemberships
+          : senderRole === 'student'
+            ? targetMemberships // all teachers
+            : targetMemberships.filter(
+                (m) =>
+                  m.role === UserRole.STUDENT &&
+                  m.user.lmsUserId === input.threadId,
+              );
 
-    const recipientDeviceTokens = recipients
-      .flatMap((membership) => membership.user.deviceTokens)
-      .filter((token) => token.userId !== senderAppUserId);
+      recipientDeviceTokens = recipients
+        .flatMap((membership) => membership.user.deviceTokens)
+        .filter((token) => token.userId !== senderAppUserId);
+    }
     const latestRecipientTokenByUser = new Map<
       string,
       (typeof recipientDeviceTokens)[number]
@@ -349,6 +391,14 @@ export class NotificationsService {
   private notificationTitle(input: SendChatNotificationDto): string {
     if (input.audience === 'course') {
       return `Announcement from ${input.senderName}`;
+    }
+
+    if (input.audience === 'teachers') {
+      return 'EACC Admin';
+    }
+
+    if (input.audience === 'admins') {
+      return `${input.senderName} - Teacher`;
     }
 
     return input.senderName;

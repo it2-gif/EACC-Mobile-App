@@ -9,6 +9,7 @@ import 'chat_screen.dart';
 class AdminThreadsScreen extends StatelessWidget {
   final String courseId;
   final String courseName;
+  final String? teacherName;
   final AuthSession session;
   final List<CourseStudent> students;
 
@@ -16,6 +17,7 @@ class AdminThreadsScreen extends StatelessWidget {
     super.key,
     required this.courseId,
     required this.courseName,
+    this.teacherName,
     required this.session,
     this.students = const [],
   });
@@ -51,7 +53,7 @@ class AdminThreadsScreen extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 760),
             child: ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              itemCount: items.length + 1,
+              itemCount: items.length + 2,
               itemBuilder: (context, index) {
                 if (index == 0) {
                   return _AdminThreadTile(
@@ -79,7 +81,39 @@ class AdminThreadsScreen extends StatelessWidget {
                   );
                 }
 
-                final student = items[index - 1];
+                if (index == 1) {
+                  final displayTeacher = teacherName?.trim();
+                  final teacherTitle =
+                      displayTeacher != null && displayTeacher.isNotEmpty
+                      ? '$displayTeacher chat'
+                      : 'Teacher chat';
+
+                  return _AdminThreadTile(
+                    title: teacherTitle,
+                    subtitle: 'Talk directly with the course teacher.',
+                    icon: Icons.admin_panel_settings_rounded,
+                    color: AppColors.teacher,
+                    badge: const Icon(
+                      Icons.push_pin_rounded,
+                      size: 16,
+                      color: AppColors.teacher,
+                    ),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatScreen(
+                          title: teacherTitle,
+                          currentUserRole: 'admin',
+                          courseId: courseId,
+                          threadId: FirestoreChatService.adminTeacherThreadId,
+                          senderName: session.appUser.name,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                final student = items[index - 2];
                 return _AdminThreadTile(
                   title: student.name,
                   subtitle: 'Open the conversation for this student.',
@@ -152,16 +186,16 @@ class _AdminThreadTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 10,
+        ),
         leading: CircleAvatar(
           backgroundColor: color.withValues(alpha: 0.1),
           child: icon == null
               ? Text(
                   iconLabel ?? '?',
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(color: color, fontWeight: FontWeight.w700),
                 )
               : Icon(icon, color: color),
         ),

@@ -38,6 +38,6 @@ export class SendChatNotificationDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['thread', 'course'])
-  audience?: 'thread' | 'course';
+  @IsIn(['thread', 'course', 'teachers', 'admins'])
+  audience?: 'thread' | 'course' | 'teachers' | 'admins';
 }
