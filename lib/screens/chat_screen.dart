@@ -63,6 +63,7 @@ class _ChatScreenState extends State<ChatScreen> {
   double? mediaUploadProgress;
   String? mediaUploadLabel;
   _PendingAttachment? failedAttachment;
+  MessageReply? selectedReply;
 
   bool get isAnnouncementThread =>
       widget.threadId == FirestoreChatService.announcementThreadId;
@@ -449,10 +450,12 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     messageController.clear();
+    final reply = selectedReply;
 
     setState(() {
       isSending = true;
       shouldScrollAfterSending = true;
+      selectedReply = null;
     });
 
     try {
@@ -463,6 +466,7 @@ class _ChatScreenState extends State<ChatScreen> {
         senderRole: widget.currentUserRole,
         text: text,
         studentName: _resolvedStudentName,
+        reply: reply,
       );
       unawaited(
         _sendPushNotification(
@@ -473,6 +477,11 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     } catch (error) {
       shouldScrollAfterSending = false;
+      if (mounted) {
+        setState(() {
+          selectedReply = reply;
+        });
+      }
       await _logFirestoreSendDebug(error);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -583,6 +592,28 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void replyToMessage({
+    required String messageId,
+    required Map<String, dynamic> data,
+  }) {
+    if (!canSendInThread || data['deleted_at'] != null) return;
+
+    setState(() {
+      selectedReply = MessageReply(
+        messageId: messageId,
+        senderName: data['sender_name']?.toString() ?? 'Message',
+        senderRole: data['sender_role']?.toString() ?? '',
+        type: data['type']?.toString() ?? 'text',
+        preview: _messagePreview(data),
+      );
+    });
+  }
+
+  void cancelReply() {
+    if (selectedReply == null) return;
+    setState(() => selectedReply = null);
+  }
+
   Future<void> pickAndSendImage(ImageSource source) async {
     if (isUploadingMedia || isSending || isRecordingVoice) return;
 
@@ -691,6 +722,7 @@ class _ChatScreenState extends State<ChatScreen> {
         await _sendImageAttachment(
           imageBytes: attachment.bytes,
           fileName: attachment.fileName,
+          reply: attachment.reply,
           retrying: true,
         );
         break;
@@ -698,6 +730,7 @@ class _ChatScreenState extends State<ChatScreen> {
         await _sendVideoAttachment(
           videoBytes: attachment.bytes,
           fileName: attachment.fileName,
+          reply: attachment.reply,
           retrying: true,
         );
         break;
@@ -706,6 +739,7 @@ class _ChatScreenState extends State<ChatScreen> {
           voiceBytes: attachment.bytes,
           fileName: attachment.fileName,
           durationMs: attachment.durationMs ?? 0,
+          reply: attachment.reply,
           retrying: true,
         );
         break;
@@ -715,8 +749,10 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendImageAttachment({
     required Uint8List imageBytes,
     required String fileName,
+    MessageReply? reply,
     bool retrying = false,
   }) async {
+    final effectiveReply = reply ?? selectedReply;
     _beginMediaUpload(retrying ? 'Retrying photo...' : 'Uploading photo...');
     try {
       final messageId = await FirestoreChatService.sendImageMessage(
@@ -727,8 +763,10 @@ class _ChatScreenState extends State<ChatScreen> {
         imageBytes: imageBytes,
         fileName: fileName,
         studentName: _resolvedStudentName,
+        reply: effectiveReply,
         onProgress: _updateMediaUploadProgress,
       );
+      if (mounted) setState(() => selectedReply = null);
       shouldScrollAfterSending = true;
       unawaited(
         _sendPushNotification(
@@ -744,6 +782,7 @@ class _ChatScreenState extends State<ChatScreen> {
           kind: _AttachmentKind.image,
           fileName: fileName,
           bytes: imageBytes,
+          reply: effectiveReply,
         ),
       );
       _showUploadFailure(error, 'Failed to upload image');
@@ -753,8 +792,10 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendVideoAttachment({
     required Uint8List videoBytes,
     required String fileName,
+    MessageReply? reply,
     bool retrying = false,
   }) async {
+    final effectiveReply = reply ?? selectedReply;
     _beginMediaUpload(retrying ? 'Retrying video...' : 'Uploading video...');
     try {
       final messageId = await FirestoreChatService.sendVideoMessage(
@@ -765,8 +806,10 @@ class _ChatScreenState extends State<ChatScreen> {
         videoBytes: videoBytes,
         fileName: fileName,
         studentName: _resolvedStudentName,
+        reply: effectiveReply,
         onProgress: _updateMediaUploadProgress,
       );
+      if (mounted) setState(() => selectedReply = null);
       shouldScrollAfterSending = true;
       unawaited(
         _sendPushNotification(
@@ -782,6 +825,7 @@ class _ChatScreenState extends State<ChatScreen> {
           kind: _AttachmentKind.video,
           fileName: fileName,
           bytes: videoBytes,
+          reply: effectiveReply,
         ),
       );
       _showUploadFailure(error, 'Failed to upload video');
@@ -792,8 +836,10 @@ class _ChatScreenState extends State<ChatScreen> {
     required Uint8List voiceBytes,
     required String fileName,
     required int durationMs,
+    MessageReply? reply,
     bool retrying = false,
   }) async {
+    final effectiveReply = reply ?? selectedReply;
     _beginMediaUpload(
       retrying ? 'Retrying voice message...' : 'Uploading voice message...',
     );
@@ -807,8 +853,10 @@ class _ChatScreenState extends State<ChatScreen> {
         fileName: fileName,
         durationMs: durationMs,
         studentName: _resolvedStudentName,
+        reply: effectiveReply,
         onProgress: _updateMediaUploadProgress,
       );
+      if (mounted) setState(() => selectedReply = null);
       shouldScrollAfterSending = true;
       unawaited(
         _sendPushNotification(
@@ -825,6 +873,7 @@ class _ChatScreenState extends State<ChatScreen> {
           fileName: fileName,
           bytes: voiceBytes,
           durationMs: durationMs,
+          reply: effectiveReply,
         ),
       );
       _showUploadFailure(error, 'Failed to send voice message');
@@ -1143,6 +1192,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
                                 final message = visibleDocs[index];
                                 final data = message.data();
+                                final threadData = threadSnapshot.data?.data();
                                 final canManageMessage = _canManageMessage(
                                   senderRole:
                                       data['sender_role']?.toString() ?? '',
@@ -1162,6 +1212,25 @@ class _ChatScreenState extends State<ChatScreen> {
                                   createdAt: data['created_at'],
                                   editedAt: data['edited_at'],
                                   deletedAt: data['deleted_at'],
+                                  replySenderName: data['reply_to_sender_name']
+                                      ?.toString(),
+                                  replySenderRole: data['reply_to_sender_role']
+                                      ?.toString(),
+                                  replyPreview: data['reply_to_preview']
+                                      ?.toString(),
+                                  replyType: data['reply_to_type']?.toString(),
+                                  deliveryStatus: _messageDeliveryStatus(
+                                    data: data,
+                                    threadData: threadData,
+                                    hasPendingWrites:
+                                        message.metadata.hasPendingWrites,
+                                  ),
+                                  onReply: canSendInThread
+                                      ? () => replyToMessage(
+                                          messageId: message.id,
+                                          data: data,
+                                        )
+                                      : null,
                                   onEdit:
                                       canManageMessage &&
                                           data['type'] == 'text' &&
@@ -1228,105 +1297,119 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ],
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        IconButton.filledTonal(
-                          onPressed: isRecordingVoice
-                              ? cancelVoiceRecording
-                              : isBusy
-                              ? null
-                              : showAttachmentOptions,
-                          style: IconButton.styleFrom(
-                            foregroundColor: isRecordingVoice
-                                ? AppColors.danger
-                                : null,
+                        if (selectedReply != null && !isRecordingVoice) ...[
+                          _ReplyComposerPreview(
+                            reply: selectedReply!,
+                            onCancel: cancelReply,
                           ),
-                          icon: Icon(
-                            isRecordingVoice
-                                ? Icons.delete_outline_rounded
-                                : Icons.add,
-                          ),
-                          tooltip: isRecordingVoice
-                              ? 'Cancel recording'
-                              : 'Add attachment',
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: isRecordingVoice
-                              ? _RecordingComposerPill(
-                                  duration: _formatRecordingDuration(),
-                                )
-                              : Container(
-                                  decoration: BoxDecoration(
-                                    color: AppColors.background,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: AppColors.border),
-                                  ),
-                                  child: TextField(
-                                    controller: messageController,
-                                    enabled: !isBusy,
-                                    maxLines: 5,
-                                    minLines: 1,
-                                    textCapitalization:
-                                        TextCapitalization.sentences,
-                                    decoration: InputDecoration(
-                                      hintText: isUploadingMedia
-                                          ? 'Uploading media...'
-                                          : 'Write a message',
-                                      filled: false,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 14,
-                                          ),
-                                      border: InputBorder.none,
-                                    ),
-                                    onSubmitted: (_) => sendMessage(),
-                                  ),
-                                ),
-                        ),
-                        const SizedBox(width: 8),
-                        if (!isRecordingVoice) ...[
-                          IconButton.filledTonal(
-                            onPressed: isSendingOrUploading
-                                ? null
-                                : toggleVoiceRecording,
-                            style: IconButton.styleFrom(
-                              foregroundColor: AppColors.primary,
-                            ),
-                            icon: const Icon(Icons.mic_none),
-                            tooltip: 'Record voice message',
-                          ),
-                          const SizedBox(width: 8),
+                          const SizedBox(height: 10),
                         ],
-                        FilledButton(
-                          onPressed: isSendingOrUploading
-                              ? null
-                              : isRecordingVoice
-                              ? stopAndSendVoiceMessage
-                              : sendMessage,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size.square(48),
-                            padding: EdgeInsets.zero,
-                            shape: const CircleBorder(),
-                          ),
-                          child: isSendingOrUploading
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.send_rounded,
-                                  color: Colors.white,
-                                  size: 20,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            IconButton.filledTonal(
+                              onPressed: isRecordingVoice
+                                  ? cancelVoiceRecording
+                                  : isBusy
+                                  ? null
+                                  : showAttachmentOptions,
+                              style: IconButton.styleFrom(
+                                foregroundColor: isRecordingVoice
+                                    ? AppColors.danger
+                                    : null,
+                              ),
+                              icon: Icon(
+                                isRecordingVoice
+                                    ? Icons.delete_outline_rounded
+                                    : Icons.add,
+                              ),
+                              tooltip: isRecordingVoice
+                                  ? 'Cancel recording'
+                                  : 'Add attachment',
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: isRecordingVoice
+                                  ? _RecordingComposerPill(
+                                      duration: _formatRecordingDuration(),
+                                    )
+                                  : Container(
+                                      decoration: BoxDecoration(
+                                        color: AppColors.background,
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: AppColors.border,
+                                        ),
+                                      ),
+                                      child: TextField(
+                                        controller: messageController,
+                                        enabled: !isBusy,
+                                        maxLines: 5,
+                                        minLines: 1,
+                                        textCapitalization:
+                                            TextCapitalization.sentences,
+                                        decoration: InputDecoration(
+                                          hintText: isUploadingMedia
+                                              ? 'Uploading media...'
+                                              : 'Write a message',
+                                          filled: false,
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                horizontal: 16,
+                                                vertical: 14,
+                                              ),
+                                          border: InputBorder.none,
+                                        ),
+                                        onSubmitted: (_) => sendMessage(),
+                                      ),
+                                    ),
+                            ),
+                            const SizedBox(width: 8),
+                            if (!isRecordingVoice) ...[
+                              IconButton.filledTonal(
+                                onPressed: isSendingOrUploading
+                                    ? null
+                                    : toggleVoiceRecording,
+                                style: IconButton.styleFrom(
+                                  foregroundColor: AppColors.primary,
                                 ),
+                                icon: const Icon(Icons.mic_none),
+                                tooltip: 'Record voice message',
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            FilledButton(
+                              onPressed: isSendingOrUploading
+                                  ? null
+                                  : isRecordingVoice
+                                  ? stopAndSendVoiceMessage
+                                  : sendMessage,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size.square(48),
+                                padding: EdgeInsets.zero,
+                                shape: const CircleBorder(),
+                              ),
+                              child: isSendingOrUploading
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.send_rounded,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -1379,6 +1462,58 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return senderRole == widget.currentUserRole &&
         senderName == widget.senderName;
+  }
+
+  MessageDeliveryStatus? _messageDeliveryStatus({
+    required Map<String, dynamic> data,
+    required Map<String, dynamic>? threadData,
+    required bool hasPendingWrites,
+  }) {
+    final senderRole = data['sender_role']?.toString();
+    final senderName = data['sender_name']?.toString();
+    final isOwnMessage =
+        senderRole == widget.currentUserRole && senderName == widget.senderName;
+
+    if (!isOwnMessage || data['deleted_at'] != null) return null;
+    if (hasPendingWrites) return MessageDeliveryStatus.sending;
+
+    final createdAt = data['created_at'];
+    if (createdAt is! Timestamp) return MessageDeliveryStatus.sending;
+
+    if (isAnnouncementThread || widget.currentUserRole == 'admin') {
+      return MessageDeliveryStatus.sent;
+    }
+
+    final otherReadAt = threadData == null
+        ? null
+        : widget.currentUserRole == 'student'
+        ? threadData['teacher_last_read_at']
+        : threadData['student_last_read_at'];
+
+    if (otherReadAt is Timestamp && otherReadAt.compareTo(createdAt) >= 0) {
+      return MessageDeliveryStatus.seen;
+    }
+
+    return MessageDeliveryStatus.delivered;
+  }
+
+  String _messagePreview(Map<String, dynamic> data) {
+    if (data['deleted_at'] != null) return 'Deleted message';
+
+    final type = data['type']?.toString() ?? 'text';
+    final text = data['text']?.toString().trim() ?? '';
+    if (text.isNotEmpty) return text;
+
+    switch (type) {
+      case 'image':
+        return 'Photo';
+      case 'video':
+        return 'Video';
+      case 'voice':
+        return 'Voice message';
+      default:
+        return 'Message';
+    }
   }
 
   Future<void> _sendPushNotification({
@@ -1593,6 +1728,82 @@ class _ReadReceiptBar extends StatelessWidget {
   }
 }
 
+class _ReplyComposerPreview extends StatelessWidget {
+  final MessageReply reply;
+  final VoidCallback onCancel;
+
+  const _ReplyComposerPreview({required this.reply, required this.onCancel});
+
+  @override
+  Widget build(BuildContext context) {
+    final sender = reply.senderRole == 'admin'
+        ? 'EACC Admin'
+        : reply.senderName.trim().isEmpty
+        ? 'Message'
+        : reply.senderName.trim();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 4,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Replying to $sender',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.primaryDark,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  reply.preview,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 12.5,
+                    height: 1.25,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onCancel,
+            tooltip: 'Cancel reply',
+            icon: const Icon(Icons.close_rounded, size: 20),
+            color: AppColors.muted,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _RecordingComposerPill extends StatelessWidget {
   final String duration;
 
@@ -1774,11 +1985,13 @@ class _PendingAttachment {
   final String fileName;
   final Uint8List bytes;
   final int? durationMs;
+  final MessageReply? reply;
 
   const _PendingAttachment({
     required this.kind,
     required this.fileName,
     required this.bytes,
     this.durationMs,
+    this.reply,
   });
 }

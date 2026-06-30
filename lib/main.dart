@@ -59,7 +59,7 @@ class EaccChatApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'EACC Connection',
+      title: 'EACC Connect',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       navigatorKey: PushNotificationService.instance.navigatorKey,

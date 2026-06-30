@@ -11,6 +11,32 @@ class ChatUploadException implements Exception {
   String toString() => message;
 }
 
+class MessageReply {
+  final String messageId;
+  final String senderName;
+  final String senderRole;
+  final String type;
+  final String preview;
+
+  const MessageReply({
+    required this.messageId,
+    required this.senderName,
+    required this.senderRole,
+    required this.type,
+    required this.preview,
+  });
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'reply_to_message_id': messageId,
+      'reply_to_sender_name': senderName,
+      'reply_to_sender_role': senderRole,
+      'reply_to_type': type,
+      'reply_to_preview': preview,
+    };
+  }
+}
+
 class FirestoreChatService {
   static const String announcementThreadId = 'announcements';
   static const int maxImageSizeBytes = 5 * 1024 * 1024;
@@ -147,6 +173,7 @@ class FirestoreChatService {
     required String senderRole,
     required String text,
     String? studentName,
+    MessageReply? reply,
   }) async {
     final isAnnouncement = threadId == announcementThreadId;
     final threadData = isAnnouncement
@@ -163,17 +190,20 @@ class FirestoreChatService {
             studentName: studentName,
           );
 
+    final messageData = <String, dynamic>{
+      'type': 'text',
+      'text': text,
+      'sender_name': senderName,
+      'sender_role': senderRole,
+      'created_at': FieldValue.serverTimestamp(),
+    };
+    if (reply != null) messageData.addAll(reply.toFirestore());
+
     return _commitMessage(
       courseId: courseId,
       threadId: threadId,
       threadData: threadData,
-      messageData: {
-        'type': 'text',
-        'text': text,
-        'sender_name': senderName,
-        'sender_role': senderRole,
-        'created_at': FieldValue.serverTimestamp(),
-      },
+      messageData: messageData,
     );
   }
 
@@ -218,6 +248,7 @@ class FirestoreChatService {
     required String fileName,
     void Function(double progress)? onProgress,
     String? studentName,
+    MessageReply? reply,
   }) async {
     validateImageUpload(fileName: fileName, fileSize: imageBytes.length);
     return _sendMediaMessage(
@@ -232,6 +263,7 @@ class FirestoreChatService {
       lastMessage: 'Photo',
       onProgress: onProgress,
       studentName: studentName,
+      reply: reply,
     );
   }
 
@@ -245,6 +277,7 @@ class FirestoreChatService {
     int? durationMs,
     void Function(double progress)? onProgress,
     String? studentName,
+    MessageReply? reply,
   }) async {
     validateVideoUpload(fileName: fileName, fileSize: videoBytes.length);
     return _sendMediaMessage(
@@ -260,6 +293,7 @@ class FirestoreChatService {
       onProgress: onProgress,
       durationMs: durationMs,
       studentName: studentName,
+      reply: reply,
     );
   }
 
@@ -273,6 +307,7 @@ class FirestoreChatService {
     required int durationMs,
     void Function(double progress)? onProgress,
     String? studentName,
+    MessageReply? reply,
   }) async {
     validateVoiceUpload(fileName: fileName, fileSize: voiceBytes.length);
     return _sendMediaMessage(
@@ -288,6 +323,7 @@ class FirestoreChatService {
       onProgress: onProgress,
       durationMs: durationMs,
       studentName: studentName,
+      reply: reply,
     );
   }
 
@@ -304,6 +340,7 @@ class FirestoreChatService {
     void Function(double progress)? onProgress,
     int? durationMs,
     String? studentName,
+    MessageReply? reply,
   }) async {
     final safeFileName = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
     final storagePath =
@@ -357,6 +394,7 @@ class FirestoreChatService {
       'created_at': FieldValue.serverTimestamp(),
     };
     if (durationMs != null) messageData['duration_ms'] = durationMs;
+    if (reply != null) messageData.addAll(reply.toFirestore());
 
     return _commitMessage(
       courseId: courseId,

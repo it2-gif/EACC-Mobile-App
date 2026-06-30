@@ -5,6 +5,8 @@ import '../utils/time_format.dart';
 import 'video_message_player.dart';
 import 'voice_message_player.dart';
 
+enum MessageDeliveryStatus { sending, sent, delivered, seen, failed }
+
 class MessageBubble extends StatelessWidget {
   final String type;
   final String text;
@@ -17,6 +19,12 @@ class MessageBubble extends StatelessWidget {
   final dynamic createdAt;
   final dynamic editedAt;
   final dynamic deletedAt;
+  final String? replySenderName;
+  final String? replySenderRole;
+  final String? replyPreview;
+  final String? replyType;
+  final MessageDeliveryStatus? deliveryStatus;
+  final VoidCallback? onReply;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
@@ -33,6 +41,12 @@ class MessageBubble extends StatelessWidget {
     required this.createdAt,
     required this.editedAt,
     required this.deletedAt,
+    this.replySenderName,
+    this.replySenderRole,
+    this.replyPreview,
+    this.replyType,
+    this.deliveryStatus,
+    this.onReply,
     this.onEdit,
     this.onDelete,
   });
@@ -92,9 +106,82 @@ class MessageBubble extends StatelessWidget {
 
   bool get canShowActions => onEdit != null || onDelete != null;
 
+  bool get canReply => onReply != null && !isDeleted;
+
   bool get canEdit => onEdit != null && type == 'text' && !isDeleted;
 
   bool get canDelete => onDelete != null && !isDeleted;
+
+  bool get hasReplyPreview =>
+      replyPreview != null &&
+      replyPreview!.trim().isNotEmpty &&
+      replySenderName != null &&
+      replySenderName!.trim().isNotEmpty;
+
+  String get replyRoleLabel {
+    switch (replySenderRole) {
+      case 'student':
+        return 'Student';
+      case 'teacher':
+        return 'Teacher';
+      case 'admin':
+        return 'Admin';
+      default:
+        return '';
+    }
+  }
+
+  String get replySenderLabel {
+    if (replySenderRole == 'admin') return 'EACC Admin';
+    final role = replyRoleLabel;
+    if (role.isEmpty) return replySenderName ?? '';
+    return '${replySenderName ?? ''} - $role';
+  }
+
+  String get deliveryStatusLabel {
+    switch (deliveryStatus) {
+      case MessageDeliveryStatus.sending:
+        return 'Sending';
+      case MessageDeliveryStatus.sent:
+        return 'Sent';
+      case MessageDeliveryStatus.delivered:
+        return 'Delivered';
+      case MessageDeliveryStatus.seen:
+        return 'Seen';
+      case MessageDeliveryStatus.failed:
+        return 'Failed';
+      case null:
+        return '';
+    }
+  }
+
+  IconData get deliveryStatusIcon {
+    switch (deliveryStatus) {
+      case MessageDeliveryStatus.sending:
+        return Icons.schedule_rounded;
+      case MessageDeliveryStatus.sent:
+        return Icons.check_rounded;
+      case MessageDeliveryStatus.delivered:
+        return Icons.done_all_rounded;
+      case MessageDeliveryStatus.seen:
+        return Icons.done_all_rounded;
+      case MessageDeliveryStatus.failed:
+        return Icons.error_outline_rounded;
+      case null:
+        return Icons.check_rounded;
+    }
+  }
+
+  Color get deliveryStatusColor {
+    switch (deliveryStatus) {
+      case MessageDeliveryStatus.seen:
+        return AppColors.primary;
+      case MessageDeliveryStatus.failed:
+        return AppColors.danger;
+      default:
+        return AppColors.muted;
+    }
+  }
 
   void _openImage(BuildContext context) {
     if (mediaUrl == null || mediaUrl!.isEmpty) return;
@@ -208,16 +295,26 @@ class MessageBubble extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (canShowActions)
+                      if (canReply || canShowActions)
                         _MessageActionsMenu(
+                          canReply: canReply,
                           canEdit: canEdit,
                           canDelete: canDelete,
+                          onReply: onReply,
                           onEdit: onEdit,
                           onDelete: onDelete,
                         ),
                     ],
                   ),
                   const SizedBox(height: 8),
+                  if (hasReplyPreview) ...[
+                    _ReplyPreview(
+                      sender: replySenderLabel,
+                      preview: replyPreview!.trim(),
+                      isMine: isMe,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   if (isDeleted)
                     Row(
                       mainAxisSize: MainAxisSize.min,
@@ -339,6 +436,12 @@ class MessageBubble extends StatelessWidget {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
+                          if (deliveryStatus != null)
+                            _DeliveryStatus(
+                              icon: deliveryStatusIcon,
+                              label: deliveryStatusLabel,
+                              color: deliveryStatusColor,
+                            ),
                           Text(
                             time,
                             style: const TextStyle(
@@ -362,21 +465,25 @@ class MessageBubble extends StatelessWidget {
 }
 
 class _MessageActionsMenu extends StatelessWidget {
+  final bool canReply;
   final bool canEdit;
   final bool canDelete;
+  final VoidCallback? onReply;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
   const _MessageActionsMenu({
+    required this.canReply,
     required this.canEdit,
     required this.canDelete,
+    required this.onReply,
     required this.onEdit,
     required this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (!canEdit && !canDelete) {
+    if (!canReply && !canEdit && !canDelete) {
       return const SizedBox.shrink();
     }
 
@@ -389,6 +496,9 @@ class _MessageActionsMenu extends StatelessWidget {
       icon: const Icon(Icons.more_horiz_rounded, color: AppColors.muted),
       onSelected: (action) {
         switch (action) {
+          case _MessageAction.reply:
+            onReply?.call();
+            break;
           case _MessageAction.edit:
             onEdit?.call();
             break;
@@ -398,6 +508,11 @@ class _MessageActionsMenu extends StatelessWidget {
         }
       },
       itemBuilder: (context) => [
+        if (canReply)
+          const PopupMenuItem(
+            value: _MessageAction.reply,
+            child: _MessageActionRow(icon: Icons.reply_rounded, label: 'Reply'),
+          ),
         if (canEdit)
           const PopupMenuItem(
             value: _MessageAction.edit,
@@ -448,7 +563,110 @@ class _MessageActionRow extends StatelessWidget {
   }
 }
 
-enum _MessageAction { edit, delete }
+enum _MessageAction { reply, edit, delete }
+
+class _ReplyPreview extends StatelessWidget {
+  final String sender;
+  final String preview;
+  final bool isMine;
+
+  const _ReplyPreview({
+    required this.sender,
+    required this.preview,
+    required this.isMine,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = isMine ? AppColors.primary : AppColors.teacher;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: isMine ? 0.58 : 0.9),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 3,
+            height: 38,
+            decoration: BoxDecoration(
+              color: accent,
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  sender,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  preview,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 12.5,
+                    height: 1.25,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DeliveryStatus extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _DeliveryStatus({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (label.isEmpty) return const SizedBox.shrink();
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: color),
+        const SizedBox(width: 3),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _MediaFrame extends StatelessWidget {
   final Widget child;
