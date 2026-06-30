@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../theme/app_theme.dart';
 import '../utils/time_format.dart';
@@ -11,6 +14,7 @@ class MessageBubble extends StatelessWidget {
   final String type;
   final String text;
   final String? mediaUrl;
+  final String? fileName;
   final int? durationMs;
   final String senderName;
   final String senderRole;
@@ -23,16 +27,23 @@ class MessageBubble extends StatelessWidget {
   final String? replySenderRole;
   final String? replyPreview;
   final String? replyType;
+  final bool forwarded;
+  final bool pinned;
+  final Map<String, dynamic>? reactions;
   final MessageDeliveryStatus? deliveryStatus;
   final VoidCallback? onReply;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onReact;
+  final VoidCallback? onForward;
+  final VoidCallback? onTogglePin;
 
   const MessageBubble({
     super.key,
     required this.type,
     required this.text,
     required this.mediaUrl,
+    this.fileName,
     this.durationMs,
     required this.senderName,
     required this.senderRole,
@@ -45,10 +56,16 @@ class MessageBubble extends StatelessWidget {
     this.replySenderRole,
     this.replyPreview,
     this.replyType,
+    this.forwarded = false,
+    this.pinned = false,
+    this.reactions,
     this.deliveryStatus,
     this.onReply,
     this.onEdit,
     this.onDelete,
+    this.onReact,
+    this.onForward,
+    this.onTogglePin,
   });
 
   bool get isMe {
@@ -104,7 +121,12 @@ class MessageBubble extends StatelessWidget {
 
   bool get isEdited => editedAt != null && !isDeleted;
 
-  bool get canShowActions => onEdit != null || onDelete != null;
+  bool get canShowActions =>
+      onEdit != null ||
+      onDelete != null ||
+      onReact != null ||
+      onForward != null ||
+      onTogglePin != null;
 
   bool get canReply => onReply != null && !isDeleted;
 
@@ -222,239 +244,300 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
+  void _openMediaExternally() {
+    final url = mediaUrl;
+    if (url == null || url.isEmpty) return;
+
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+
+    unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
+  }
+
   @override
   Widget build(BuildContext context) {
     final time = formatMessageTime(createdAt);
     final isImage = type == 'image' && mediaUrl != null && mediaUrl!.isNotEmpty;
     final isVideo = type == 'video' && mediaUrl != null && mediaUrl!.isNotEmpty;
     final isVoice = type == 'voice' && mediaUrl != null && mediaUrl!.isNotEmpty;
+    final isDocument =
+        type == 'document' && mediaUrl != null && mediaUrl!.isNotEmpty;
     final maxBubbleWidth = MediaQuery.sizeOf(context).width * 0.78;
     final bubbleColor = isMe ? AppColors.bubbleMe : AppColors.bubbleOther;
 
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: maxBubbleWidth.clamp(240, 420).toDouble(),
-        ),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(16),
-              topRight: const Radius.circular(16),
-              bottomLeft: Radius.circular(isMe ? 16 : 6),
-              bottomRight: Radius.circular(isMe ? 6 : 16),
-            ),
-            border: Border.all(
-              color: isMe
-                  ? AppColors.primary.withValues(alpha: 0.14)
-                  : AppColors.border,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onLongPress: canReply ? onReply : null,
+      child: Align(
+        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: maxBubbleWidth.clamp(240, 420).toDouble(),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(16),
-              topRight: const Radius.circular(16),
-              bottomLeft: Radius.circular(isMe ? 16 : 6),
-              bottomRight: Radius.circular(isMe ? 6 : 16),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(16),
+                topRight: const Radius.circular(16),
+                bottomLeft: Radius.circular(isMe ? 16 : 6),
+                bottomRight: Radius.circular(isMe ? 6 : 16),
+              ),
+              border: Border.all(
+                color: isMe
+                    ? AppColors.primary.withValues(alpha: 0.14)
+                    : AppColors.border,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-            child: Container(
-              color: bubbleColor,
-              padding: const EdgeInsets.fromLTRB(13, 11, 13, 11),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 22,
-                        height: 22,
-                        decoration: BoxDecoration(
-                          color: nameColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6),
+            child: ClipRRect(
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(16),
+                topRight: const Radius.circular(16),
+                bottomLeft: Radius.circular(isMe ? 16 : 6),
+                bottomRight: Radius.circular(isMe ? 6 : 16),
+              ),
+              child: Container(
+                color: bubbleColor,
+                padding: const EdgeInsets.fromLTRB(13, 11, 13, 11),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            color: nameColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Icon(roleIcon, size: 13, color: nameColor),
                         ),
-                        child: Icon(roleIcon, size: 13, color: nameColor),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          displaySender,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w800,
-                            color: nameColor,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            displaySender,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                              color: nameColor,
+                            ),
                           ),
                         ),
-                      ),
-                      if (canReply || canShowActions)
-                        _MessageActionsMenu(
-                          canReply: canReply,
-                          canEdit: canEdit,
-                          canDelete: canDelete,
-                          onReply: onReply,
-                          onEdit: onEdit,
-                          onDelete: onDelete,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  if (hasReplyPreview) ...[
-                    _ReplyPreview(
-                      sender: replySenderLabel,
-                      preview: replyPreview!.trim(),
-                      isMine: isMe,
+                        if (canReply || canShowActions)
+                          _MessageActionsMenu(
+                            canReply: canReply,
+                            canEdit: canEdit,
+                            canDelete: canDelete,
+                            canReact: onReact != null && !isDeleted,
+                            canForward: onForward != null && !isDeleted,
+                            canTogglePin: onTogglePin != null && !isDeleted,
+                            isPinned: pinned,
+                            onReply: onReply,
+                            onEdit: onEdit,
+                            onDelete: onDelete,
+                            onReact: onReact,
+                            onForward: onForward,
+                            onTogglePin: onTogglePin,
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 8),
-                  ],
-                  if (isDeleted)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(
-                          Icons.block_rounded,
-                          size: 16,
-                          color: AppColors.muted,
-                        ),
-                        SizedBox(width: 7),
-                        Flexible(
-                          child: Text(
-                            'This message was deleted',
+                    if (hasReplyPreview) ...[
+                      _ReplyPreview(
+                        sender: replySenderLabel,
+                        preview: replyPreview!.trim(),
+                        isMine: isMe,
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    if (forwarded && !isDeleted) ...[
+                      const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.shortcut_rounded,
+                            size: 14,
+                            color: AppColors.muted,
+                          ),
+                          SizedBox(width: 5),
+                          Text(
+                            'Forwarded',
                             style: TextStyle(
-                              fontSize: 14,
-                              height: 1.4,
                               color: AppColors.muted,
-                              fontStyle: FontStyle.italic,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        ),
-                      ],
-                    )
-                  else if (isImage)
-                    GestureDetector(
-                      onTap: () => _openImage(context),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Stack(
-                          children: [
-                            Image.network(
-                              mediaUrl!,
-                              width: double.infinity,
-                              height: 200,
-                              fit: BoxFit.cover,
-                              loadingBuilder:
-                                  (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-
-                                    return Container(
-                                      height: 200,
-                                      alignment: Alignment.center,
-                                      color: AppColors.background,
-                                      child: const CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    );
-                                  },
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  height: 120,
-                                  alignment: Alignment.center,
-                                  color: AppColors.background,
-                                  child: const Text('Could not load image'),
-                                );
-                              },
+                        ],
+                      ),
+                      const SizedBox(height: 7),
+                    ],
+                    if (isDeleted)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(
+                            Icons.block_rounded,
+                            size: 16,
+                            color: AppColors.muted,
+                          ),
+                          SizedBox(width: 7),
+                          Flexible(
+                            child: Text(
+                              'This message was deleted',
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 1.4,
+                                color: AppColors.muted,
+                                fontStyle: FontStyle.italic,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                            Positioned(
-                              left: 10,
-                              bottom: 10,
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.48),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: const Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 5,
+                          ),
+                        ],
+                      )
+                    else if (isImage)
+                      GestureDetector(
+                        onTap: () => _openImage(context),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Stack(
+                            children: [
+                              Image.network(
+                                mediaUrl!,
+                                width: double.infinity,
+                                height: 200,
+                                fit: BoxFit.cover,
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+
+                                      return Container(
+                                        height: 200,
+                                        alignment: Alignment.center,
+                                        color: AppColors.background,
+                                        child: const CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      );
+                                    },
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    height: 120,
+                                    alignment: Alignment.center,
+                                    color: AppColors.background,
+                                    child: const Text('Could not load image'),
+                                  );
+                                },
+                              ),
+                              Positioned(
+                                left: 10,
+                                bottom: 10,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.48),
+                                    borderRadius: BorderRadius.circular(999),
                                   ),
-                                  child: Text(
-                                    'Tap to open',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 5,
+                                    ),
+                                    child: Text(
+                                      'Tap to open',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                        ),
+                      )
+                    else if (isVideo)
+                      GestureDetector(
+                        onTap: _openMediaExternally,
+                        child: _MediaFrame(
+                          child: VideoMessagePlayer(url: mediaUrl!),
+                        ),
+                      )
+                    else if (isVoice)
+                      _MediaFrame(
+                        child: VoiceMessagePlayer(
+                          url: mediaUrl!,
+                          durationMs: durationMs,
+                        ),
+                      )
+                    else if (isDocument)
+                      _DocumentMessageCard(
+                        fileName: fileName?.trim().isNotEmpty == true
+                            ? fileName!.trim()
+                            : 'Document',
+                        onOpen: _openMediaExternally,
+                      )
+                    else
+                      SelectableText(
+                        text,
+                        style: const TextStyle(
+                          fontSize: 15.25,
+                          height: 1.45,
+                          color: AppColors.ink,
                         ),
                       ),
-                    )
-                  else if (isVideo)
-                    _MediaFrame(child: VideoMessagePlayer(url: mediaUrl!))
-                  else if (isVoice)
-                    _MediaFrame(
-                      child: VoiceMessagePlayer(
-                        url: mediaUrl!,
-                        durationMs: durationMs,
-                      ),
-                    )
-                  else
-                    SelectableText(
-                      text,
-                      style: const TextStyle(
-                        fontSize: 15.25,
-                        height: 1.45,
-                        color: AppColors.ink,
-                      ),
-                    ),
-                  if (time.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.bottomRight,
-                      child: Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 6,
-                        children: [
-                          if (isEdited)
-                            const Text(
-                              'Edited',
-                              style: TextStyle(
+                    if (time.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      if (_reactionCounts.isNotEmpty) ...[
+                        _ReactionStrip(reactions: _reactionCounts),
+                        const SizedBox(height: 7),
+                      ],
+                      Align(
+                        alignment: Alignment.bottomRight,
+                        child: Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 6,
+                          children: [
+                            if (isEdited)
+                              const Text(
+                                'Edited',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.muted,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            if (deliveryStatus != null)
+                              _DeliveryStatus(
+                                icon: deliveryStatusIcon,
+                                label: deliveryStatusLabel,
+                                color: deliveryStatusColor,
+                              ),
+                            Text(
+                              time,
+                              style: const TextStyle(
                                 fontSize: 11,
                                 color: AppColors.muted,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                          if (deliveryStatus != null)
-                            _DeliveryStatus(
-                              icon: deliveryStatusIcon,
-                              label: deliveryStatusLabel,
-                              color: deliveryStatusColor,
-                            ),
-                          Text(
-                            time,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.muted,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),
@@ -462,28 +545,61 @@ class MessageBubble extends StatelessWidget {
       ),
     );
   }
+
+  Map<String, int> get _reactionCounts {
+    final input = reactions;
+    if (input == null || input.isEmpty) return const {};
+
+    final counts = <String, int>{};
+    for (final entry in input.entries) {
+      final value = entry.value;
+      if (value is List && value.isNotEmpty) {
+        counts[entry.key] = value.length;
+      }
+    }
+    return counts;
+  }
 }
 
 class _MessageActionsMenu extends StatelessWidget {
   final bool canReply;
   final bool canEdit;
   final bool canDelete;
+  final bool canReact;
+  final bool canForward;
+  final bool canTogglePin;
+  final bool isPinned;
   final VoidCallback? onReply;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onReact;
+  final VoidCallback? onForward;
+  final VoidCallback? onTogglePin;
 
   const _MessageActionsMenu({
     required this.canReply,
     required this.canEdit,
     required this.canDelete,
+    required this.canReact,
+    required this.canForward,
+    required this.canTogglePin,
+    required this.isPinned,
     required this.onReply,
     required this.onEdit,
     required this.onDelete,
+    required this.onReact,
+    required this.onForward,
+    required this.onTogglePin,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (!canReply && !canEdit && !canDelete) {
+    if (!canReply &&
+        !canEdit &&
+        !canDelete &&
+        !canReact &&
+        !canForward &&
+        !canTogglePin) {
       return const SizedBox.shrink();
     }
 
@@ -499,6 +615,15 @@ class _MessageActionsMenu extends StatelessWidget {
           case _MessageAction.reply:
             onReply?.call();
             break;
+          case _MessageAction.react:
+            onReact?.call();
+            break;
+          case _MessageAction.forward:
+            onForward?.call();
+            break;
+          case _MessageAction.pin:
+            onTogglePin?.call();
+            break;
           case _MessageAction.edit:
             onEdit?.call();
             break;
@@ -512,6 +637,30 @@ class _MessageActionsMenu extends StatelessWidget {
           const PopupMenuItem(
             value: _MessageAction.reply,
             child: _MessageActionRow(icon: Icons.reply_rounded, label: 'Reply'),
+          ),
+        if (canReact)
+          const PopupMenuItem(
+            value: _MessageAction.react,
+            child: _MessageActionRow(
+              icon: Icons.add_reaction_outlined,
+              label: 'React',
+            ),
+          ),
+        if (canForward)
+          const PopupMenuItem(
+            value: _MessageAction.forward,
+            child: _MessageActionRow(
+              icon: Icons.shortcut_rounded,
+              label: 'Forward',
+            ),
+          ),
+        if (canTogglePin)
+          PopupMenuItem(
+            value: _MessageAction.pin,
+            child: _MessageActionRow(
+              icon: isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+              label: isPinned ? 'Unpin message' : 'Pin message',
+            ),
           ),
         if (canEdit)
           const PopupMenuItem(
@@ -563,7 +712,119 @@ class _MessageActionRow extends StatelessWidget {
   }
 }
 
-enum _MessageAction { reply, edit, delete }
+enum _MessageAction { reply, react, forward, pin, edit, delete }
+
+class _ReactionStrip extends StatelessWidget {
+  final Map<String, int> reactions;
+
+  const _ReactionStrip({required this.reactions});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 5,
+      runSpacing: 5,
+      children: reactions.entries
+          .map(
+            (entry) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Text(
+                '${entry.key} ${entry.value}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.ink,
+                ),
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class _DocumentMessageCard extends StatelessWidget {
+  final String fileName;
+  final VoidCallback onOpen;
+
+  const _DocumentMessageCard({required this.fileName, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.62),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: const Icon(
+                  Icons.description_rounded,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      fileName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 13.5,
+                        height: 1.25,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    const Text(
+                      'Tap to open document',
+                      style: TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.open_in_new_rounded,
+                color: AppColors.muted,
+                size: 18,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _ReplyPreview extends StatelessWidget {
   final String sender;

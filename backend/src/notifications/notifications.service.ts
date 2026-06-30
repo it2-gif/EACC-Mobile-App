@@ -380,6 +380,8 @@ export class NotificationsService {
         return 'Sent a video';
       case 'voice':
         return 'Sent a voice message';
+      case 'document':
+        return 'Sent a document';
       default:
         const previewText = input.previewText?.trim();
         return previewText && previewText.length > 0

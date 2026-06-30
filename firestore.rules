@@ -122,6 +122,32 @@ service cloud.firestore {
         && request.resource.data.deleted_by_name == request.auth.token.displayName;
     }
 
+    function isMessageReactionUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'reactions'
+        ])
+        && request.resource.data.reactions is map;
+    }
+
+    function isMessagePinUpdate() {
+      return request.auth.token.role in ['teacher', 'admin']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'pinned',
+          'pinned_at',
+          'pinned_by_role',
+          'pinned_by_name'
+        ])
+        && request.resource.data.pinned is bool
+        && (
+          request.resource.data.pinned == false
+          || (
+            request.resource.data.pinned_at == request.time
+            && request.resource.data.pinned_by_role == request.auth.token.role
+            && request.resource.data.pinned_by_name == request.auth.token.displayName
+          )
+        );
+    }
+
     match /courses/{courseId} {
       allow read: if isAdmin() || hasCourse(courseId);
       allow write: if false;
@@ -144,17 +170,23 @@ service cloud.firestore {
           allow read: if isAdmin() || canAccessThread(courseId, threadId);
           allow create: if isAdmin()
               ? hasValidSender()
-                && request.resource.data.type in ['text', 'image', 'video', 'voice']
+                && request.resource.data.type in ['text', 'image', 'video', 'voice', 'document']
                 && request.resource.data.created_at == request.time
               : canWriteThread(courseId, threadId)
                 && hasValidSender()
-                && request.resource.data.type in ['text', 'image', 'video', 'voice']
+                && request.resource.data.type in ['text', 'image', 'video', 'voice', 'document']
                 && request.resource.data.created_at == request.time;
           allow update: if isAdmin()
-              ? (isTextMessageEdit() || isSoftMessageDelete())
+              ? (isTextMessageEdit() || isSoftMessageDelete() || isMessageReactionUpdate() || isMessagePinUpdate())
               : canAccessThread(courseId, threadId)
-                && isMessageOwner()
-                && (isTextMessageEdit() || isSoftMessageDelete());
+                && (
+                  (
+                    isMessageOwner()
+                    && (isTextMessageEdit() || isSoftMessageDelete())
+                  )
+                  || isMessageReactionUpdate()
+                  || isMessagePinUpdate()
+                );
           allow delete: if false;
         }
       }

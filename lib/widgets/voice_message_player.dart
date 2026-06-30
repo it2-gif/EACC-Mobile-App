@@ -22,6 +22,7 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
   Duration duration = Duration.zero;
   PlayerState state = PlayerState.stopped;
   bool hasError = false;
+  double playbackRate = 1.0;
 
   @override
   void initState() {
@@ -67,7 +68,23 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
         await player.resume();
       } else {
         await player.play(UrlSource(widget.url));
+        await player.setPlaybackRate(playbackRate);
       }
+    } catch (_) {
+      if (mounted) setState(() => hasError = true);
+    }
+  }
+
+  Future<void> cyclePlaybackRate() async {
+    final nextRate = switch (playbackRate) {
+      1.0 => 1.5,
+      1.5 => 2.0,
+      _ => 1.0,
+    };
+
+    try {
+      await player.setPlaybackRate(nextRate);
+      if (mounted) setState(() => playbackRate = nextRate);
     } catch (_) {
       if (mounted) setState(() => hasError = true);
     }
@@ -111,14 +128,7 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 5,
-                    backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                  ),
-                ),
+                _VoiceProgressWave(progress: progress),
                 const SizedBox(height: 6),
                 Text(
                   '${_formatDuration(position)} / ${_formatDuration(duration)}',
@@ -131,6 +141,24 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
               ],
             ),
           ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: cyclePlaybackRate,
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              foregroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            child: Text(
+              '${playbackRate.toStringAsFixed(playbackRate == 1.0 ? 0 : 1)}x',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+            ),
+          ),
         ],
       ),
     );
@@ -140,5 +168,44 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
     final minutes = value.inMinutes;
     final seconds = value.inSeconds.remainder(60);
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+}
+
+class _VoiceProgressWave extends StatelessWidget {
+  final double progress;
+
+  const _VoiceProgressWave({required this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const barCount = 28;
+        final activeBars = (barCount * progress).round();
+
+        return Row(
+          children: List.generate(barCount, (index) {
+            final height = 4.0 + ((index % 5) * 2.4);
+            final isActive = index <= activeBars;
+
+            return Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 1),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 120),
+                  height: height,
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? AppColors.primary
+                        : AppColors.primary.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+            );
+          }),
+        );
+      },
+    );
   }
 }

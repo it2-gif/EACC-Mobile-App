@@ -45,6 +45,8 @@ dependencies:
   record: ^7.1.0
   audioplayers: ^6.7.1
   video_player: ^2.11.1
+  file_picker: ^10.3.3
+  url_launcher: ^6.3.2
 
 dependency_overrides:
   # Upstream 5.2.1 still applies kotlin-android, which AGP 9 rejects.

@@ -42,6 +42,7 @@ class FirestoreChatService {
   static const String adminTeacherThreadId = 'admin_teacher';
   static const int maxImageSizeBytes = 5 * 1024 * 1024;
   static const int maxVoiceSizeBytes = 10 * 1024 * 1024;
+  static const int maxDocumentSizeBytes = 25 * 1024 * 1024;
   static const int maxVideoSizeBytes = 50 * 1024 * 1024;
   static const Set<String> supportedImageExtensions = {
     'jpg',
@@ -64,6 +65,17 @@ class FirestoreChatService {
     'opus',
     'wav',
     'webm',
+  };
+  static const Set<String> supportedDocumentExtensions = {
+    'pdf',
+    'doc',
+    'docx',
+    'ppt',
+    'pptx',
+    'xls',
+    'xlsx',
+    'txt',
+    'csv',
   };
 
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -233,6 +245,58 @@ class FirestoreChatService {
     });
   }
 
+  static Future<void> setMessagePinned({
+    required String courseId,
+    required String threadId,
+    required String messageId,
+    required bool pinned,
+    required String pinnedByRole,
+    required String pinnedByName,
+  }) async {
+    final update = <String, dynamic>{
+      'pinned': pinned,
+      'pinned_at': pinned ? FieldValue.serverTimestamp() : FieldValue.delete(),
+      'pinned_by_role': pinned ? pinnedByRole : FieldValue.delete(),
+      'pinned_by_name': pinned ? pinnedByName : FieldValue.delete(),
+    };
+
+    await _messagesRef(
+      courseId: courseId,
+      threadId: threadId,
+    ).doc(messageId).update(update);
+  }
+
+  static Future<void> toggleReaction({
+    required String courseId,
+    required String threadId,
+    required String messageId,
+    required String emoji,
+    required String reactorRole,
+    required String reactorName,
+  }) async {
+    final reactorKey = '$reactorRole:$reactorName';
+    final messageRef = _messagesRef(
+      courseId: courseId,
+      threadId: threadId,
+    ).doc(messageId);
+
+    await _db.runTransaction((transaction) async {
+      final snapshot = await transaction.get(messageRef);
+      final data = snapshot.data();
+      final reactions = data?['reactions'];
+      final existing = reactions is Map
+          ? List<String>.from(reactions[emoji] as List? ?? const [])
+          : <String>[];
+      final hasReacted = existing.contains(reactorKey);
+
+      transaction.update(messageRef, {
+        'reactions.$emoji': hasReacted
+            ? FieldValue.arrayRemove([reactorKey])
+            : FieldValue.arrayUnion([reactorKey]),
+      });
+    });
+  }
+
   static Future<String> sendImageMessage({
     required String courseId,
     required String threadId,
@@ -318,6 +382,75 @@ class FirestoreChatService {
       durationMs: durationMs,
       studentName: studentName,
       reply: reply,
+    );
+  }
+
+  static Future<String> sendDocumentMessage({
+    required String courseId,
+    required String threadId,
+    required String senderName,
+    required String senderRole,
+    required Uint8List documentBytes,
+    required String fileName,
+    void Function(double progress)? onProgress,
+    String? studentName,
+    MessageReply? reply,
+  }) async {
+    validateDocumentUpload(fileName: fileName, fileSize: documentBytes.length);
+    return _sendMediaMessage(
+      courseId: courseId,
+      threadId: threadId,
+      senderName: senderName,
+      senderRole: senderRole,
+      bytes: documentBytes,
+      fileName: fileName,
+      type: 'document',
+      contentType: _guessDocumentContentType(fileName),
+      lastMessage: 'Document',
+      onProgress: onProgress,
+      studentName: studentName,
+      reply: reply,
+    );
+  }
+
+  static Future<String> forwardMessage({
+    required String courseId,
+    required String targetThreadId,
+    required String senderName,
+    required String senderRole,
+    required Map<String, dynamic> sourceData,
+    String? studentName,
+  }) async {
+    final type = sourceData['type']?.toString() ?? 'text';
+    final preview = _forwardPreview(sourceData);
+    final threadData = _messageThreadUpdateData(
+      threadId: targetThreadId,
+      senderName: senderName,
+      senderRole: senderRole,
+      lastMessage: preview,
+      studentName: studentName,
+    );
+
+    final messageData = <String, dynamic>{
+      'type': type,
+      'text': sourceData['text']?.toString() ?? '',
+      'sender_name': senderName,
+      'sender_role': senderRole,
+      'created_at': FieldValue.serverTimestamp(),
+      'forwarded': true,
+      'forwarded_from_sender_name': sourceData['sender_name']?.toString() ?? '',
+      'forwarded_from_sender_role': sourceData['sender_role']?.toString() ?? '',
+    };
+
+    for (final key in ['media_url', 'file_name', 'duration_ms']) {
+      if (sourceData[key] != null) messageData[key] = sourceData[key];
+    }
+
+    return _commitMessage(
+      courseId: courseId,
+      threadId: targetThreadId,
+      threadData: threadData,
+      messageData: messageData,
     );
   }
 
@@ -443,6 +576,21 @@ class FirestoreChatService {
       mediaName: 'voice recording',
       formats: 'AAC, M4A, MP3, OGG, OPUS, WAV, or WEBM',
       maxSizeLabel: '10 MB',
+    );
+  }
+
+  static void validateDocumentUpload({
+    required String fileName,
+    required int fileSize,
+  }) {
+    _validateMediaUpload(
+      fileName: fileName,
+      fileSize: fileSize,
+      supportedExtensions: supportedDocumentExtensions,
+      maxSizeBytes: maxDocumentSizeBytes,
+      mediaName: 'document',
+      formats: 'PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, TXT, or CSV',
+      maxSizeLabel: '25 MB',
     );
   }
 
@@ -667,6 +815,53 @@ class FirestoreChatService {
         return 'audio/webm';
       default:
         return 'audio/wav';
+    }
+  }
+
+  static String _guessDocumentContentType(String fileName) {
+    switch (_fileExtension(fileName)) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'doc':
+        return 'application/msword';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'ppt':
+        return 'application/vnd.ms-powerpoint';
+      case 'pptx':
+        return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+      case 'xls':
+        return 'application/vnd.ms-excel';
+      case 'xlsx':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'csv':
+        return 'text/csv';
+      case 'txt':
+        return 'text/plain';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  static String _forwardPreview(Map<String, dynamic> data) {
+    final type = data['type']?.toString() ?? 'text';
+    final text = data['text']?.toString().trim() ?? '';
+    if (text.isNotEmpty) return text;
+
+    switch (type) {
+      case 'image':
+        return 'Forwarded photo';
+      case 'video':
+        return 'Forwarded video';
+      case 'voice':
+        return 'Forwarded voice message';
+      case 'document':
+        final fileName = data['file_name']?.toString().trim() ?? '';
+        return fileName.isNotEmpty
+            ? 'Forwarded $fileName'
+            : 'Forwarded document';
+      default:
+        return 'Forwarded message';
     }
   }
 

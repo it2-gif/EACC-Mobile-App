@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -39,6 +40,7 @@ class _ChatScreenState extends State<ChatScreen> {
   static final NotificationApi _notificationApi = NotificationApi();
 
   final messageController = TextEditingController();
+  final searchController = TextEditingController();
   final scrollController = ScrollController();
   final audioRecorder = AudioRecorder();
   final voiceChunks = <Uint8List>[];
@@ -46,6 +48,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool isSending = false;
   bool isUploadingMedia = false;
   bool isRecordingVoice = false;
+  bool isVoiceRecordingPaused = false;
   bool isLoadingOlderMessages = false;
   bool isOlderPositionRestoreScheduled = false;
   bool shouldScrollAfterSending = false;
@@ -64,6 +67,8 @@ class _ChatScreenState extends State<ChatScreen> {
   String? mediaUploadLabel;
   _PendingAttachment? failedAttachment;
   MessageReply? selectedReply;
+  bool isSearchingMessages = false;
+  String messageSearchQuery = '';
 
   bool get isAnnouncementThread =>
       widget.threadId == FirestoreChatService.announcementThreadId;
@@ -80,6 +85,7 @@ class _ChatScreenState extends State<ChatScreen> {
     recordingSubscription?.cancel();
     audioRecorder.dispose();
     messageController.dispose();
+    searchController.dispose();
     scrollController.dispose();
     super.dispose();
   }
@@ -226,18 +232,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 ListTile(
                   leading: CircleAvatar(
                     backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                    child: const Icon(Icons.image, color: AppColors.primary),
-                  ),
-                  title: const Text('Image'),
-                  subtitle: const Text('Choose an existing photo'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    pickAndSendImage(ImageSource.gallery);
-                  },
-                ),
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: AppColors.primary.withValues(alpha: 0.12),
                     child: const Icon(
                       Icons.photo_camera,
                       color: AppColors.primary,
@@ -253,13 +247,40 @@ class _ChatScreenState extends State<ChatScreen> {
                 ListTile(
                   leading: CircleAvatar(
                     backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+                    child: const Icon(Icons.videocam, color: AppColors.primary),
+                  ),
+                  title: const Text('Take video'),
+                  subtitle: const Text('Record and send immediately'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    pickAndSendVideo(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.12),
                     child: const Icon(
-                      Icons.video_library,
+                      Icons.photo_library_rounded,
                       color: AppColors.primary,
                     ),
                   ),
-                  title: const Text('Video'),
-                  subtitle: const Text('Choose an existing video'),
+                  title: const Text('Choose existing image'),
+                  subtitle: const Text('Select a photo from your device'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    pickAndSendImage(ImageSource.gallery);
+                  },
+                ),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+                    child: const Icon(
+                      Icons.video_library_rounded,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  title: const Text('Choose existing video'),
+                  subtitle: const Text('Select a video from your device'),
                   onTap: () {
                     Navigator.pop(context);
                     pickAndSendVideo(ImageSource.gallery);
@@ -268,13 +289,18 @@ class _ChatScreenState extends State<ChatScreen> {
                 ListTile(
                   leading: CircleAvatar(
                     backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                    child: const Icon(Icons.videocam, color: AppColors.primary),
+                    child: const Icon(
+                      Icons.description_rounded,
+                      color: AppColors.primary,
+                    ),
                   ),
-                  title: const Text('Record video'),
-                  subtitle: const Text('Capture and send immediately'),
+                  title: const Text('Upload document'),
+                  subtitle: const Text(
+                    'PDF, Word, PowerPoint, Excel, TXT, CSV',
+                  ),
                   onTap: () {
                     Navigator.pop(context);
-                    pickAndSendVideo(ImageSource.camera);
+                    pickAndSendDocument();
                   },
                 ),
               ],
@@ -322,6 +348,7 @@ class _ChatScreenState extends State<ChatScreen> {
       recordingSubscription = stream.listen(voiceChunks.add);
       recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
         if (!mounted) return;
+        if (isVoiceRecordingPaused) return;
         setState(() {
           recordingDuration += const Duration(seconds: 1);
         });
@@ -334,6 +361,7 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() {
           recordingDuration = Duration.zero;
           isRecordingVoice = true;
+          isVoiceRecordingPaused = false;
         });
       }
     } catch (error) {
@@ -365,6 +393,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (mounted) {
       setState(() {
         isRecordingVoice = false;
+        isVoiceRecordingPaused = false;
         isUploadingMedia = true;
       });
     }
@@ -419,8 +448,30 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() {
           isUploadingMedia = false;
           recordingDuration = Duration.zero;
+          isVoiceRecordingPaused = false;
         });
       }
+    }
+  }
+
+  Future<void> toggleVoiceRecordingPause() async {
+    if (!isRecordingVoice) return;
+
+    try {
+      if (isVoiceRecordingPaused) {
+        await audioRecorder.resume();
+      } else {
+        await audioRecorder.pause();
+      }
+
+      if (mounted) {
+        setState(() => isVoiceRecordingPaused = !isVoiceRecordingPaused);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update recording: $error')),
+      );
     }
   }
 
@@ -435,6 +486,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         setState(() {
           isRecordingVoice = false;
+          isVoiceRecordingPaused = false;
           recordingDuration = Duration.zero;
         });
       }
@@ -617,6 +669,213 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => selectedReply = null);
   }
 
+  bool get canForwardMessages =>
+      widget.currentUserRole == 'teacher' || widget.currentUserRole == 'admin';
+
+  bool get canPinMessages =>
+      widget.currentUserRole == 'teacher' || widget.currentUserRole == 'admin';
+
+  void toggleMessageSearch() {
+    setState(() {
+      isSearchingMessages = !isSearchingMessages;
+      if (!isSearchingMessages) {
+        messageSearchQuery = '';
+        searchController.clear();
+      }
+    });
+  }
+
+  Future<void> reactToMessage(String messageId) async {
+    const emojis = ['👍', '❤️', '✅', '👏', '🙏'];
+
+    final emoji = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            alignment: WrapAlignment.center,
+            children: emojis
+                .map(
+                  (emoji) => InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => Navigator.pop(context, emoji),
+                    child: Container(
+                      width: 56,
+                      height: 52,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Text(emoji, style: const TextStyle(fontSize: 25)),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+      ),
+    );
+
+    if (emoji == null) return;
+
+    try {
+      await FirestoreChatService.toggleReaction(
+        courseId: widget.courseId,
+        threadId: widget.threadId,
+        messageId: messageId,
+        emoji: emoji,
+        reactorRole: widget.currentUserRole,
+        reactorName: widget.senderName,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to react: $error')));
+    }
+  }
+
+  Future<void> togglePinMessage({
+    required String messageId,
+    required bool currentlyPinned,
+  }) async {
+    if (!canPinMessages) return;
+
+    try {
+      await FirestoreChatService.setMessagePinned(
+        courseId: widget.courseId,
+        threadId: widget.threadId,
+        messageId: messageId,
+        pinned: !currentlyPinned,
+        pinnedByRole: widget.currentUserRole,
+        pinnedByName: widget.senderName,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update pinned message: $error')),
+      );
+    }
+  }
+
+  Future<void> forwardMessage({required Map<String, dynamic> data}) async {
+    if (!canForwardMessages || data['deleted_at'] != null) return;
+
+    final snapshot = await FirestoreChatService.getThreads(
+      courseId: widget.courseId,
+    ).first;
+    if (!mounted) return;
+
+    final destinations = snapshot.docs
+        .where((doc) => doc.id != widget.threadId)
+        .map((doc) {
+          final data = doc.data();
+          return _ForwardDestination(
+            threadId: doc.id,
+            title: data['title']?.toString().trim().isNotEmpty == true
+                ? data['title'].toString().trim()
+                : data['student_name']?.toString().trim().isNotEmpty == true
+                ? data['student_name'].toString().trim()
+                : doc.id,
+            studentName: data['student_name']?.toString(),
+          );
+        })
+        .toList();
+
+    if (destinations.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No other chats available to forward to.'),
+        ),
+      );
+      return;
+    }
+
+    final destination = await showModalBottomSheet<_ForwardDestination>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ListView.separated(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 18),
+          itemCount: destinations.length + 1,
+          separatorBuilder: (_, _) => const Divider(height: 1),
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return const Padding(
+                padding: EdgeInsets.fromLTRB(4, 4, 4, 14),
+                child: Text(
+                  'Forward to',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+              );
+            }
+
+            final destination = destinations[index - 1];
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: CircleAvatar(
+                backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+                child: const Icon(
+                  Icons.shortcut_rounded,
+                  color: AppColors.primary,
+                ),
+              ),
+              title: Text(
+                destination.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              subtitle: Text('Course ${widget.courseId}'),
+              onTap: () => Navigator.pop(context, destination),
+            );
+          },
+        ),
+      ),
+    );
+
+    if (destination == null) return;
+
+    try {
+      final messageId = await FirestoreChatService.forwardMessage(
+        courseId: widget.courseId,
+        targetThreadId: destination.threadId,
+        senderName: widget.senderName,
+        senderRole: widget.currentUserRole,
+        sourceData: data,
+        studentName: destination.studentName,
+      );
+      unawaited(
+        _notificationApi.notifyChatMessage(
+          courseId: widget.courseId,
+          threadId: destination.threadId,
+          senderRole: widget.currentUserRole,
+          senderName: widget.senderName,
+          messageType: data['type']?.toString() ?? 'text',
+          messageId: messageId,
+          previewText: _messagePreview(data),
+          studentName: destination.studentName,
+        ),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Forwarded to ${destination.title}')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to forward message: $error')),
+      );
+    }
+  }
+
   Future<void> pickAndSendImage(ImageSource source) async {
     if (isUploadingMedia || isSending || isRecordingVoice) return;
 
@@ -712,6 +971,55 @@ class _ChatScreenState extends State<ChatScreen> {
     if (mounted) setState(() => isUploadingMedia = false);
   }
 
+  Future<void> pickAndSendDocument() async {
+    if (isUploadingMedia || isSending || isRecordingVoice) return;
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions:
+          FirestoreChatService.supportedDocumentExtensions.toList()..sort(),
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) return;
+
+    final file = result.files.single;
+    final documentBytes = file.bytes;
+    if (documentBytes == null || documentBytes.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not read this document.')),
+      );
+      return;
+    }
+
+    try {
+      FirestoreChatService.validateDocumentUpload(
+        fileName: file.name,
+        fileSize: documentBytes.length,
+      );
+      shouldScrollAfterSending = true;
+      await _sendDocumentAttachment(
+        documentBytes: documentBytes,
+        fileName: file.name,
+      );
+    } on ChatUploadException catch (error) {
+      shouldScrollAfterSending = false;
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } catch (error) {
+      shouldScrollAfterSending = false;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to upload document: $error')),
+        );
+      }
+    }
+  }
+
   Future<void> retryLastAttachment() async {
     final attachment = failedAttachment;
     if (attachment == null) return;
@@ -742,6 +1050,14 @@ class _ChatScreenState extends State<ChatScreen> {
           voiceBytes: attachment.bytes,
           fileName: attachment.fileName,
           durationMs: attachment.durationMs ?? 0,
+          reply: attachment.reply,
+          retrying: true,
+        );
+        break;
+      case _AttachmentKind.document:
+        await _sendDocumentAttachment(
+          documentBytes: attachment.bytes,
+          fileName: attachment.fileName,
           reply: attachment.reply,
           retrying: true,
         );
@@ -883,6 +1199,51 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _sendDocumentAttachment({
+    required Uint8List documentBytes,
+    required String fileName,
+    MessageReply? reply,
+    bool retrying = false,
+  }) async {
+    final effectiveReply = reply ?? selectedReply;
+    _beginMediaUpload(
+      retrying ? 'Retrying document...' : 'Uploading document...',
+    );
+    try {
+      final messageId = await FirestoreChatService.sendDocumentMessage(
+        courseId: widget.courseId,
+        threadId: widget.threadId,
+        senderName: widget.senderName,
+        senderRole: widget.currentUserRole,
+        documentBytes: documentBytes,
+        fileName: fileName,
+        studentName: _resolvedStudentName,
+        reply: effectiveReply,
+        onProgress: _updateMediaUploadProgress,
+      );
+      if (mounted) setState(() => selectedReply = null);
+      shouldScrollAfterSending = true;
+      unawaited(
+        _sendPushNotification(
+          messageId: messageId,
+          messageType: 'document',
+          previewText: fileName,
+        ),
+      );
+      _clearMediaUploadState();
+    } catch (error) {
+      _failMediaUpload(
+        _PendingAttachment(
+          kind: _AttachmentKind.document,
+          fileName: fileName,
+          bytes: documentBytes,
+          reply: effectiveReply,
+        ),
+      );
+      _showUploadFailure(error, 'Failed to upload document');
+    }
+  }
+
   List<QueryDocumentSnapshot<Map<String, dynamic>>> sortMessages(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) {
@@ -972,9 +1333,44 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            tooltip: isSearchingMessages ? 'Close search' : 'Search messages',
+            onPressed: toggleMessageSearch,
+            icon: Icon(
+              isSearchingMessages ? Icons.close_rounded : Icons.search_rounded,
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [
+          if (isSearchingMessages)
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: TextField(
+                controller: searchController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Search messages and files',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: messageSearchQuery.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Clear search',
+                          onPressed: () {
+                            searchController.clear();
+                            setState(() => messageSearchQuery = '');
+                          },
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                ),
+                onChanged: (value) => setState(() {
+                  messageSearchQuery = value.trim();
+                }),
+              ),
+            ),
           if (isUploadingMedia)
             Container(
               width: double.infinity,
@@ -1062,11 +1458,34 @@ class _ChatScreenState extends State<ChatScreen> {
                     }
 
                     final docs = sortMessages(snapshot.data?.docs ?? []);
-                    final visibleDocs = docs.reversed.toList();
+                    final allVisibleDocs = docs.reversed.toList();
+                    final query = messageSearchQuery.toLowerCase();
+                    final visibleDocs = query.isEmpty
+                        ? allVisibleDocs
+                        : allVisibleDocs.where((message) {
+                            final data = message.data();
+                            return _messagePreview(
+                                  data,
+                                ).toLowerCase().contains(query) ||
+                                (data['file_name']?.toString().toLowerCase() ??
+                                        '')
+                                    .contains(query) ||
+                                (data['sender_name']
+                                            ?.toString()
+                                            .toLowerCase() ??
+                                        '')
+                                    .contains(query);
+                          }).toList();
                     final canLoadOlder = docs.length >= messageLimit;
                     final currentLatestMessageId = docs.isEmpty
                         ? null
                         : docs.last.id;
+                    final pinnedMessages = allVisibleDocs
+                        .where((message) => message.data()['pinned'] == true)
+                        .toList();
+                    final pinnedMessage = pinnedMessages.isEmpty
+                        ? null
+                        : pinnedMessages.last;
 
                     restorePositionAfterLoadingOlderMessages();
 
@@ -1148,126 +1567,219 @@ class _ChatScreenState extends State<ChatScreen> {
                       );
                     }
 
-                    return Stack(
+                    final showLoadOlder =
+                        canLoadOlder && messageSearchQuery.isEmpty;
+
+                    return Column(
                       children: [
-                        AnimatedSlide(
-                          offset: isInitialChatReady
-                              ? Offset.zero
-                              : const Offset(0, 0.015),
-                          duration: const Duration(milliseconds: 240),
-                          curve: Curves.easeOutCubic,
-                          child: AnimatedOpacity(
-                            opacity: isInitialChatReady ? 1 : 0,
-                            duration: const Duration(milliseconds: 180),
-                            curve: Curves.easeOut,
-                            child: ListView.builder(
-                              controller: scrollController,
-                              reverse: true,
-                              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                              itemCount: docs.length + (canLoadOlder ? 1 : 0),
-                              itemBuilder: (context, index) {
-                                if (canLoadOlder &&
-                                    index == visibleDocs.length) {
-                                  return Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(top: 8),
-                                      child: TextButton.icon(
-                                        onPressed: isLoadingOlderMessages
-                                            ? null
-                                            : loadOlderMessages,
-                                        icon: isLoadingOlderMessages
-                                            ? const SizedBox(
-                                                width: 16,
-                                                height: 16,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
+                        if (pinnedMessage != null)
+                          _PinnedMessageBanner(
+                            preview: _messagePreview(pinnedMessage.data()),
+                            onTap: () => _jumpToBottomIfPossible(animate: true),
+                          ),
+                        Expanded(
+                          child: Stack(
+                            children: [
+                              AnimatedSlide(
+                                offset: isInitialChatReady
+                                    ? Offset.zero
+                                    : const Offset(0, 0.015),
+                                duration: const Duration(milliseconds: 240),
+                                curve: Curves.easeOutCubic,
+                                child: AnimatedOpacity(
+                                  opacity: isInitialChatReady ? 1 : 0,
+                                  duration: const Duration(milliseconds: 180),
+                                  curve: Curves.easeOut,
+                                  child: visibleDocs.isEmpty
+                                      ? const Center(
+                                          child: Text(
+                                            'No messages match your search.',
+                                            style: TextStyle(
+                                              color: AppColors.muted,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        )
+                                      : ListView.builder(
+                                          controller: scrollController,
+                                          reverse: true,
+                                          padding: const EdgeInsets.fromLTRB(
+                                            12,
+                                            12,
+                                            12,
+                                            8,
+                                          ),
+                                          itemCount:
+                                              visibleDocs.length +
+                                              (showLoadOlder ? 1 : 0),
+                                          itemBuilder: (context, index) {
+                                            if (showLoadOlder &&
+                                                index == visibleDocs.length) {
+                                              return Center(
+                                                child: Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                        top: 8,
+                                                      ),
+                                                  child: TextButton.icon(
+                                                    onPressed:
+                                                        isLoadingOlderMessages
+                                                        ? null
+                                                        : loadOlderMessages,
+                                                    icon: isLoadingOlderMessages
+                                                        ? const SizedBox(
+                                                            width: 16,
+                                                            height: 16,
+                                                            child:
+                                                                CircularProgressIndicator(
+                                                                  strokeWidth:
+                                                                      2,
+                                                                ),
+                                                          )
+                                                        : const Icon(
+                                                            Icons.history,
+                                                          ),
+                                                    label: const Text(
+                                                      'Load older messages',
                                                     ),
-                                              )
-                                            : const Icon(Icons.history),
-                                        label: const Text(
-                                          'Load older messages',
+                                                  ),
+                                                ),
+                                              );
+                                            }
+
+                                            final message = visibleDocs[index];
+                                            final data = message.data();
+                                            final threadData = threadSnapshot
+                                                .data
+                                                ?.data();
+                                            final canManageMessage =
+                                                _canManageMessage(
+                                                  senderRole:
+                                                      data['sender_role']
+                                                          ?.toString() ??
+                                                      '',
+                                                  senderName:
+                                                      data['sender_name']
+                                                          ?.toString() ??
+                                                      '',
+                                                );
+
+                                            return MessageBubble(
+                                              type: data['type'] ?? 'text',
+                                              text: data['text'] ?? '',
+                                              mediaUrl: data['media_url'],
+                                              fileName: data['file_name']
+                                                  ?.toString(),
+                                              durationMs: data['duration_ms'],
+                                              senderName:
+                                                  data['sender_name'] ?? '',
+                                              senderRole:
+                                                  data['sender_role'] ?? '',
+                                              currentUserRole:
+                                                  widget.currentUserRole,
+                                              currentSenderName:
+                                                  widget.senderName,
+                                              createdAt: data['created_at'],
+                                              editedAt: data['edited_at'],
+                                              deletedAt: data['deleted_at'],
+                                              replySenderName:
+                                                  data['reply_to_sender_name']
+                                                      ?.toString(),
+                                              replySenderRole:
+                                                  data['reply_to_sender_role']
+                                                      ?.toString(),
+                                              replyPreview:
+                                                  data['reply_to_preview']
+                                                      ?.toString(),
+                                              replyType: data['reply_to_type']
+                                                  ?.toString(),
+                                              forwarded:
+                                                  data['forwarded'] == true,
+                                              pinned: data['pinned'] == true,
+                                              reactions:
+                                                  data['reactions'] is Map
+                                                  ? Map<String, dynamic>.from(
+                                                      data['reactions'] as Map,
+                                                    )
+                                                  : null,
+                                              deliveryStatus:
+                                                  _messageDeliveryStatus(
+                                                    data: data,
+                                                    threadData: threadData,
+                                                    hasPendingWrites: message
+                                                        .metadata
+                                                        .hasPendingWrites,
+                                                  ),
+                                              onReply: canSendInThread
+                                                  ? () => replyToMessage(
+                                                      messageId: message.id,
+                                                      data: data,
+                                                    )
+                                                  : null,
+                                              onReact:
+                                                  data['deleted_at'] == null
+                                                  ? () => reactToMessage(
+                                                      message.id,
+                                                    )
+                                                  : null,
+                                              onForward:
+                                                  canForwardMessages &&
+                                                      data['deleted_at'] == null
+                                                  ? () => forwardMessage(
+                                                      data: data,
+                                                    )
+                                                  : null,
+                                              onTogglePin:
+                                                  canPinMessages &&
+                                                      data['deleted_at'] == null
+                                                  ? () => togglePinMessage(
+                                                      messageId: message.id,
+                                                      currentlyPinned:
+                                                          data['pinned'] ==
+                                                          true,
+                                                    )
+                                                  : null,
+                                              onEdit:
+                                                  canManageMessage &&
+                                                      data['type'] == 'text' &&
+                                                      data['deleted_at'] == null
+                                                  ? () => editMessage(
+                                                      messageId: message.id,
+                                                      currentText:
+                                                          data['text']
+                                                              ?.toString() ??
+                                                          '',
+                                                    )
+                                                  : null,
+                                              onDelete:
+                                                  canManageMessage &&
+                                                      data['deleted_at'] == null
+                                                  ? () => deleteMessage(
+                                                      message.id,
+                                                    )
+                                                  : null,
+                                            );
+                                          },
+                                        ),
+                                ),
+                              ),
+                              if (!isInitialChatReady)
+                                const Positioned.fill(
+                                  child: IgnorePointer(
+                                    child: Center(
+                                      child: SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
                                         ),
                                       ),
                                     ),
-                                  );
-                                }
-
-                                final message = visibleDocs[index];
-                                final data = message.data();
-                                final threadData = threadSnapshot.data?.data();
-                                final canManageMessage = _canManageMessage(
-                                  senderRole:
-                                      data['sender_role']?.toString() ?? '',
-                                  senderName:
-                                      data['sender_name']?.toString() ?? '',
-                                );
-
-                                return MessageBubble(
-                                  type: data['type'] ?? 'text',
-                                  text: data['text'] ?? '',
-                                  mediaUrl: data['media_url'],
-                                  durationMs: data['duration_ms'],
-                                  senderName: data['sender_name'] ?? '',
-                                  senderRole: data['sender_role'] ?? '',
-                                  currentUserRole: widget.currentUserRole,
-                                  currentSenderName: widget.senderName,
-                                  createdAt: data['created_at'],
-                                  editedAt: data['edited_at'],
-                                  deletedAt: data['deleted_at'],
-                                  replySenderName: data['reply_to_sender_name']
-                                      ?.toString(),
-                                  replySenderRole: data['reply_to_sender_role']
-                                      ?.toString(),
-                                  replyPreview: data['reply_to_preview']
-                                      ?.toString(),
-                                  replyType: data['reply_to_type']?.toString(),
-                                  deliveryStatus: _messageDeliveryStatus(
-                                    data: data,
-                                    threadData: threadData,
-                                    hasPendingWrites:
-                                        message.metadata.hasPendingWrites,
-                                  ),
-                                  onReply: canSendInThread
-                                      ? () => replyToMessage(
-                                          messageId: message.id,
-                                          data: data,
-                                        )
-                                      : null,
-                                  onEdit:
-                                      canManageMessage &&
-                                          data['type'] == 'text' &&
-                                          data['deleted_at'] == null
-                                      ? () => editMessage(
-                                          messageId: message.id,
-                                          currentText:
-                                              data['text']?.toString() ?? '',
-                                        )
-                                      : null,
-                                  onDelete:
-                                      canManageMessage &&
-                                          data['deleted_at'] == null
-                                      ? () => deleteMessage(message.id)
-                                      : null,
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                        if (!isInitialChatReady)
-                          const Positioned.fill(
-                            child: IgnorePointer(
-                              child: Center(
-                                child: SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
                                   ),
                                 ),
-                              ),
-                            ),
+                            ],
                           ),
+                        ),
                       ],
                     );
                   },
@@ -1338,6 +1850,8 @@ class _ChatScreenState extends State<ChatScreen> {
                               child: isRecordingVoice
                                   ? _RecordingComposerPill(
                                       duration: _formatRecordingDuration(),
+                                      isPaused: isVoiceRecordingPaused,
+                                      onTogglePause: toggleVoiceRecordingPause,
                                     )
                                   : Container(
                                       decoration: BoxDecoration(
@@ -1514,6 +2028,9 @@ class _ChatScreenState extends State<ChatScreen> {
         return 'Video';
       case 'voice':
         return 'Voice message';
+      case 'document':
+        final fileName = data['file_name']?.toString().trim() ?? '';
+        return fileName.isNotEmpty ? fileName : 'Document';
       default:
         return 'Message';
     }
@@ -1614,6 +2131,8 @@ class _ChatScreenState extends State<ChatScreen> {
         return 'Video upload';
       case _AttachmentKind.voice:
         return 'Voice message upload';
+      case _AttachmentKind.document:
+        return 'Document upload';
     }
   }
 
@@ -1740,6 +2259,87 @@ class _ReadReceiptBar extends StatelessWidget {
   }
 }
 
+class _PinnedMessageBanner extends StatelessWidget {
+  final String preview;
+  final VoidCallback onTap;
+
+  const _PinnedMessageBanner({required this.preview, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: AppColors.border)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.push_pin_rounded,
+                  color: AppColors.primary,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Pinned message',
+                      style: TextStyle(
+                        color: AppColors.primaryDark,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      preview,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ForwardDestination {
+  final String threadId;
+  final String title;
+  final String? studentName;
+
+  const _ForwardDestination({
+    required this.threadId,
+    required this.title,
+    this.studentName,
+  });
+}
+
 class _ReplyComposerPreview extends StatelessWidget {
   final MessageReply reply;
   final VoidCallback onCancel;
@@ -1818,8 +2418,14 @@ class _ReplyComposerPreview extends StatelessWidget {
 
 class _RecordingComposerPill extends StatelessWidget {
   final String duration;
+  final bool isPaused;
+  final VoidCallback onTogglePause;
 
-  const _RecordingComposerPill({required this.duration});
+  const _RecordingComposerPill({
+    required this.duration,
+    required this.isPaused,
+    required this.onTogglePause,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1853,27 +2459,41 @@ class _RecordingComposerPill extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Recording $duration',
+                  isPaused ? 'Paused $duration' : 'Recording $duration',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.danger,
+                  style: TextStyle(
+                    color: isPaused ? AppColors.muted : AppColors.danger,
                     fontWeight: FontWeight.w800,
                     fontSize: 13,
                   ),
                 ),
                 const SizedBox(height: 2),
-                const Text(
-                  'Tap send when you are done',
+                Text(
+                  isPaused
+                      ? 'Resume to continue, or send what you recorded'
+                      : 'Tap pause or send when you are done',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: AppColors.muted,
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton.filledTonal(
+            onPressed: onTogglePause,
+            icon: Icon(
+              isPaused ? Icons.mic_rounded : Icons.pause_rounded,
+              size: 19,
+            ),
+            tooltip: isPaused ? 'Resume recording' : 'Pause recording',
+            style: IconButton.styleFrom(
+              foregroundColor: isPaused ? AppColors.primary : AppColors.danger,
             ),
           ),
         ],
@@ -1990,7 +2610,7 @@ class _AttachmentStatusBar extends StatelessWidget {
   }
 }
 
-enum _AttachmentKind { image, video, voice }
+enum _AttachmentKind { image, video, voice, document }
 
 class _PendingAttachment {
   final _AttachmentKind kind;

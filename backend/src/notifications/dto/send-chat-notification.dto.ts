@@ -18,8 +18,8 @@ export class SendChatNotificationDto {
   senderName!: string;
 
   @IsString()
-  @IsIn(['text', 'image', 'video', 'voice'])
-  messageType!: 'text' | 'image' | 'video' | 'voice';
+  @IsIn(['text', 'image', 'video', 'voice', 'document'])
+  messageType!: 'text' | 'image' | 'video' | 'voice' | 'document';
 
   @IsOptional()
   @IsString()
