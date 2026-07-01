@@ -95,6 +95,52 @@ service cloud.firestore {
         && request.resource.data.last_sender_name == request.auth.token.displayName;
     }
 
+    function isAnnouncementPinThreadUpdate(threadId) {
+      return isAnnouncementThread(threadId)
+        && request.auth.token.role in ['teacher', 'admin']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'thread_id',
+          'title',
+          'is_announcement',
+          'pinned',
+          'updated_at'
+        ])
+        && request.resource.data.thread_id == threadId
+        && request.resource.data.is_announcement == true
+        && request.resource.data.pinned is bool
+        && request.resource.data.updated_at == request.time;
+    }
+
+    function isAnnouncementPinThreadCreate(threadId) {
+      return isAnnouncementThread(threadId)
+        && request.auth.token.role in ['teacher', 'admin']
+        && request.resource.data.keys().hasOnly([
+          'thread_id',
+          'title',
+          'is_announcement',
+          'pinned',
+          'updated_at'
+        ])
+        && request.resource.data.thread_id == threadId
+        && request.resource.data.is_announcement == true
+        && request.resource.data.pinned is bool
+        && request.resource.data.updated_at == request.time;
+    }
+
+    function isAnnouncementReadUpdate(threadId) {
+      return isAnnouncementThread(threadId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'thread_id',
+          'is_announcement',
+          'announcement_reads',
+          'updated_at'
+        ])
+        && request.resource.data.thread_id == threadId
+        && request.resource.data.is_announcement == true
+        && request.resource.data.announcement_reads is map
+        && request.resource.data.updated_at == request.time;
+    }
+
     function isMessageOwner() {
       return resource.data.sender_role == request.auth.token.role
         && resource.data.sender_name == request.auth.token.displayName;
@@ -148,6 +194,32 @@ service cloud.firestore {
         );
     }
 
+    function isAdminTeacherReadUpdate(threadId) {
+      return threadId == 'admin_teacher'
+        && request.resource.data.thread_id == threadId
+        && sameField('last_message')
+        && sameField('last_sender_name')
+        && sameField('last_sender_role')
+        && sameField('last_message_at')
+        && (
+          (
+            request.auth.token.role == 'admin'
+            && request.resource.data.admin_unread_count == 0
+            && request.resource.data.admin_last_read_at == request.time
+            && sameField('teacher_unread_count')
+            && sameField('teacher_last_read_at')
+          )
+          ||
+          (
+            request.auth.token.role == 'teacher'
+            && request.resource.data.teacher_unread_count == 0
+            && request.resource.data.teacher_last_read_at == request.time
+            && sameField('admin_unread_count')
+            && sameField('admin_last_read_at')
+          )
+        );
+    }
+
     match /courses/{courseId} {
       allow read: if isAdmin() || hasCourse(courseId);
       allow write: if false;
@@ -156,13 +228,25 @@ service cloud.firestore {
         allow read: if isAdmin() || canAccessThread(courseId, threadId);
         allow create: if isAdmin()
             ? isAdminThreadUpdate(threadId)
-            : canWriteThread(courseId, threadId) && isOutgoingThreadUpdate(threadId);
-        allow update: if isAdmin()
-            ? isAdminThreadUpdate(threadId)
-            : canWriteThread(courseId, threadId)
+            : canAccessThread(courseId, threadId)
               && (
-                isOutgoingThreadUpdate(threadId)
+                (canWriteThread(courseId, threadId) && isOutgoingThreadUpdate(threadId))
+                || isAnnouncementPinThreadCreate(threadId)
+              );
+        allow update: if isAdmin()
+            ? (
+                isAdminThreadUpdate(threadId)
+                || isAdminTeacherReadUpdate(threadId)
+                || isAnnouncementPinThreadUpdate(threadId)
+                || isAnnouncementReadUpdate(threadId)
+              )
+            : canAccessThread(courseId, threadId)
+              && (
+                (canWriteThread(courseId, threadId) && isOutgoingThreadUpdate(threadId))
                 || isReadReceiptUpdate(threadId)
+                || isAdminTeacherReadUpdate(threadId)
+                || isAnnouncementReadUpdate(threadId)
+                || isAnnouncementPinThreadUpdate(threadId)
               );
         allow delete: if false;
 

@@ -23,6 +23,9 @@ class AppScaffold extends StatelessWidget {
     await AuthSessionManager().logout();
     await PushNotificationService.instance.deactivate();
     if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Logged out successfully.')));
 
     Navigator.pushAndRemoveUntil(
       context,

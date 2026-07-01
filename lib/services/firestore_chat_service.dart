@@ -118,6 +118,16 @@ class FirestoreChatService {
     ).orderBy('updated_at', descending: true).snapshots();
   }
 
+  static Stream<QuerySnapshot<Map<String, dynamic>>> getRecentThreads({
+    int limit = 8,
+  }) {
+    return _db
+        .collectionGroup('threads')
+        .orderBy('updated_at', descending: true)
+        .limit(limit)
+        .snapshots();
+  }
+
   static Stream<DocumentSnapshot<Map<String, dynamic>>> getThread({
     required String courseId,
     required String threadId,
@@ -175,6 +185,35 @@ class FirestoreChatService {
       'pinned': true,
       'student_unread_count': 0,
       'teacher_unread_count': 0,
+      'updated_at': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  static Future<void> setAnnouncementPinned({
+    required String courseId,
+    required bool pinned,
+  }) async {
+    await _threadsRef(courseId: courseId).doc(announcementThreadId).set({
+      'thread_id': announcementThreadId,
+      'title': 'Announcement chat',
+      'is_announcement': true,
+      'pinned': pinned,
+      'updated_at': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  static Future<void> markAnnouncementRead({
+    required String courseId,
+    required String readerRole,
+    required String readerName,
+  }) async {
+    final readerKey = _safeMapKey('$readerRole:$readerName');
+    if (readerKey.isEmpty) return;
+
+    await _threadsRef(courseId: courseId).doc(announcementThreadId).set({
+      'thread_id': announcementThreadId,
+      'is_announcement': true,
+      'announcement_reads.$readerKey': FieldValue.serverTimestamp(),
       'updated_at': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
@@ -442,7 +481,13 @@ class FirestoreChatService {
       'forwarded_from_sender_role': sourceData['sender_role']?.toString() ?? '',
     };
 
-    for (final key in ['media_url', 'file_name', 'duration_ms']) {
+    for (final key in [
+      'media_url',
+      'file_name',
+      'duration_ms',
+      'file_size_bytes',
+      'file_type',
+    ]) {
       if (sourceData[key] != null) messageData[key] = sourceData[key];
     }
 
@@ -508,6 +553,8 @@ class FirestoreChatService {
       'text': '',
       'media_url': mediaUrl,
       'file_name': fileName,
+      'file_size_bytes': bytes.length,
+      'file_type': _fileExtension(fileName).toUpperCase(),
       'storage_path': storagePath,
       'sender_name': senderName,
       'sender_role': senderRole,
@@ -875,12 +922,21 @@ class FirestoreChatService {
     return fileName.substring(separatorIndex + 1).toLowerCase();
   }
 
+  static String _safeMapKey(String input) {
+    return input
+        .trim()
+        .replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')
+        .replaceAll(RegExp(r'_+'), '_');
+  }
+
   static String? _participantPrefix(String role) {
     switch (role) {
       case 'student':
         return 'student';
       case 'teacher':
         return 'teacher';
+      case 'admin':
+        return 'admin';
       default:
         return null;
     }

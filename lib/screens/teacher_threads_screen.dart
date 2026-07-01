@@ -577,6 +577,9 @@ class _AnnouncementThreadCard extends StatelessWidget {
         final data = snapshot.data?.data();
         final lastMessage =
             data?['last_message']?.toString() ?? 'Post a course announcement';
+        final reads = data?['announcement_reads'];
+        final readCount = reads is Map ? reads.length : 0;
+        final pinned = data?['pinned'] != false;
         final lastTime = formatThreadTime(
           data?['last_message_at'] ?? data?['updated_at'],
         );
@@ -610,9 +613,9 @@ class _AnnouncementThreadCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
+                        Row(
                           children: [
-                            Expanded(
+                            const Expanded(
                               child: Text(
                                 'Announcement chat',
                                 maxLines: 1,
@@ -623,10 +626,56 @@ class _AnnouncementThreadCard extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            Icon(
-                              Icons.push_pin_rounded,
-                              size: 16,
-                              color: AppColors.admin,
+                            PopupMenuButton<String>(
+                              tooltip: pinned
+                                  ? 'Unpin announcement'
+                                  : 'Pin announcement',
+                              icon: Icon(
+                                pinned
+                                    ? Icons.push_pin_rounded
+                                    : Icons.push_pin_outlined,
+                                size: 18,
+                                color: pinned
+                                    ? AppColors.admin
+                                    : AppColors.muted,
+                              ),
+                              onSelected: (_) async {
+                                await FirestoreChatService.setAnnouncementPinned(
+                                  courseId: courseId,
+                                  pinned: !pinned,
+                                );
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      pinned
+                                          ? 'Announcement chat unpinned.'
+                                          : 'Announcement chat pinned.',
+                                    ),
+                                  ),
+                                );
+                              },
+                              itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  value: pinned ? 'unpin' : 'pin',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        pinned
+                                            ? Icons.push_pin_outlined
+                                            : Icons.push_pin_rounded,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        pinned
+                                            ? 'Unpin announcement'
+                                            : 'Pin announcement',
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -638,6 +687,15 @@ class _AnnouncementThreadCard extends StatelessWidget {
                           style: const TextStyle(
                             color: AppColors.muted,
                             height: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '$readCount read',
+                          style: const TextStyle(
+                            color: AppColors.admin,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ],

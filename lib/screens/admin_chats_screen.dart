@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/auth_session.dart';
 import '../models/course.dart';
+import '../services/firestore_chat_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/screen_header.dart';
@@ -43,12 +44,33 @@ class AdminChatsScreen extends StatelessWidget {
     final items = <_ChatItem>[];
 
     for (final course in courses) {
+      items.add(
+        _ChatItem(
+          courseId: course.id,
+          courseName: course.name,
+          threadId: FirestoreChatService.adminTeacherThreadId,
+          personName: course.teacherName?.trim().isNotEmpty == true
+              ? course.teacherName!.trim()
+              : 'Course Teacher',
+          roleLabel: 'Teacher',
+          subtitle: 'Direct admin-to-teacher chat',
+          icon: Icons.menu_book_rounded,
+          color: AppColors.teacher,
+        ),
+      );
+
       for (final student in course.students) {
         items.add(
           _ChatItem(
             courseId: course.id,
             courseName: course.name,
-            studentId: student.id,
+            threadId: student.id,
+            personName: student.name,
+            roleLabel: 'Student',
+            subtitle:
+                'Open this student thread from the LMS-synced course list.',
+            icon: Icons.school_rounded,
+            color: AppColors.student,
             studentName: student.name,
           ),
         );
@@ -60,7 +82,7 @@ class AdminChatsScreen extends StatelessWidget {
         b.courseName.toLowerCase(),
       );
       if (courseCompare != 0) return courseCompare;
-      return a.studentName.toLowerCase().compareTo(b.studentName.toLowerCase());
+      return a.personName.toLowerCase().compareTo(b.personName.toLowerCase());
     });
 
     return items;
@@ -70,14 +92,24 @@ class AdminChatsScreen extends StatelessWidget {
 class _ChatItem {
   final String courseId;
   final String courseName;
-  final String studentId;
-  final String studentName;
+  final String threadId;
+  final String personName;
+  final String roleLabel;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final String? studentName;
 
   const _ChatItem({
     required this.courseId,
     required this.courseName,
-    required this.studentId,
-    required this.studentName,
+    required this.threadId,
+    required this.personName,
+    required this.roleLabel,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    this.studentName,
   });
 }
 
@@ -97,22 +129,14 @@ class _ChatTile extends StatelessWidget {
           vertical: 10,
         ),
         leading: CircleAvatar(
-          backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-          child: Text(
-            item.studentName.isNotEmpty
-                ? item.studentName[0].toUpperCase()
-                : '?',
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          backgroundColor: item.color.withValues(alpha: 0.1),
+          child: Icon(item.icon, color: item.color, size: 20),
         ),
         title: Row(
           children: [
             Expanded(
               child: Text(
-                item.studentName,
+                item.personName,
                 style: const TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 14,
@@ -124,14 +148,14 @@ class _ChatTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
+                color: item.color.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                item.courseName,
-                style: const TextStyle(
+                item.roleLabel,
+                style: TextStyle(
                   fontSize: 10,
-                  color: AppColors.primary,
+                  color: item.color,
                   fontWeight: FontWeight.w600,
                 ),
                 overflow: TextOverflow.ellipsis,
@@ -139,11 +163,11 @@ class _ChatTile extends StatelessWidget {
             ),
           ],
         ),
-        subtitle: const Text(
-          'Open this student thread from the LMS-synced course list.',
+        subtitle: Text(
+          '${item.subtitle} - ${item.courseName}',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: 12, color: AppColors.muted),
+          style: const TextStyle(fontSize: 12, color: AppColors.muted),
         ),
         trailing: const Icon(
           Icons.chevron_right_rounded,
@@ -153,10 +177,10 @@ class _ChatTile extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (_) => ChatScreen(
-              title: item.studentName,
+              title: item.personName,
               currentUserRole: 'admin',
               courseId: item.courseId,
-              threadId: item.studentId,
+              threadId: item.threadId,
               senderName: session.appUser.name,
               threadStudentName: item.studentName,
             ),

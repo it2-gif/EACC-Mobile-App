@@ -157,7 +157,18 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> markThreadAsRead() async {
-    if (widget.currentUserRole == 'admin' || isAnnouncementThread) return;
+    if (isAnnouncementThread) {
+      try {
+        await FirestoreChatService.markAnnouncementRead(
+          courseId: widget.courseId,
+          readerRole: widget.currentUserRole,
+          readerName: widget.senderName,
+        );
+      } catch (_) {}
+      return;
+    }
+
+    if (widget.currentUserRole == 'admin' && !isAdminTeacherThread) return;
 
     try {
       await FirestoreChatService.markThreadRead(
@@ -880,7 +891,12 @@ class _ChatScreenState extends State<ChatScreen> {
     if (isUploadingMedia || isSending || isRecordingVoice) return;
 
     final picker = ImagePicker();
-    final image = await picker.pickImage(source: source, imageQuality: 85);
+    final image = await picker.pickImage(
+      source: source,
+      imageQuality: 78,
+      maxWidth: 1920,
+      maxHeight: 1920,
+    );
 
     if (image == null) return;
 
@@ -1371,42 +1387,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 }),
               ),
             ),
-          if (isUploadingMedia)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              color: const Color(0xFFFFF3CD),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    'Uploading media...',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF7A4E00),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          if (isUploadingMedia || failedAttachment != null)
-            _AttachmentStatusBar(
-              label:
-                  mediaUploadLabel ??
-                  (failedAttachment != null
-                      ? _attachmentLabel(failedAttachment!.kind)
-                      : 'Uploading media'),
-              progress: mediaUploadProgress,
-              onRetry: failedAttachment == null ? null : retryLastAttachment,
-              canRetry: failedAttachment != null,
-            ),
           Expanded(
             child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
               stream: FirestoreChatService.getThread(
@@ -1514,7 +1494,10 @@ class _ChatScreenState extends State<ChatScreen> {
                       scrollToBottom();
                     }
 
-                    if (docs.isEmpty) {
+                    final hasPendingUpload =
+                        isUploadingMedia || failedAttachment != null;
+
+                    if (docs.isEmpty && !hasPendingUpload) {
                       return Center(
                         child: Padding(
                           padding: const EdgeInsets.all(24),
@@ -1569,6 +1552,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
                     final showLoadOlder =
                         canLoadOlder && messageSearchQuery.isEmpty;
+                    final pendingUploadCount = hasPendingUpload ? 1 : 0;
 
                     return Column(
                       children: [
@@ -1611,10 +1595,35 @@ class _ChatScreenState extends State<ChatScreen> {
                                           ),
                                           itemCount:
                                               visibleDocs.length +
+                                              pendingUploadCount +
                                               (showLoadOlder ? 1 : 0),
                                           itemBuilder: (context, index) {
+                                            if (hasPendingUpload &&
+                                                index == 0) {
+                                              return _AttachmentStatusBar(
+                                                label:
+                                                    mediaUploadLabel ??
+                                                    (failedAttachment != null
+                                                        ? _attachmentLabel(
+                                                            failedAttachment!
+                                                                .kind,
+                                                          )
+                                                        : 'Uploading media'),
+                                                progress: mediaUploadProgress,
+                                                onRetry:
+                                                    failedAttachment == null
+                                                    ? null
+                                                    : retryLastAttachment,
+                                                canRetry:
+                                                    failedAttachment != null,
+                                              );
+                                            }
+
+                                            final messageIndex =
+                                                index - pendingUploadCount;
                                             if (showLoadOlder &&
-                                                index == visibleDocs.length) {
+                                                messageIndex ==
+                                                    visibleDocs.length) {
                                               return Center(
                                                 child: Padding(
                                                   padding:
@@ -1647,7 +1656,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                               );
                                             }
 
-                                            final message = visibleDocs[index];
+                                            final message =
+                                                visibleDocs[messageIndex];
                                             final data = message.data();
                                             final threadData = threadSnapshot
                                                 .data
@@ -1669,6 +1679,12 @@ class _ChatScreenState extends State<ChatScreen> {
                                               text: data['text'] ?? '',
                                               mediaUrl: data['media_url'],
                                               fileName: data['file_name']
+                                                  ?.toString(),
+                                              fileSizeBytes:
+                                                  (data['file_size_bytes']
+                                                          as num?)
+                                                      ?.toInt(),
+                                              fileType: data['file_type']
                                                   ?.toString(),
                                               durationMs: data['duration_ms'],
                                               senderName:
@@ -1819,6 +1835,18 @@ class _ChatScreenState extends State<ChatScreen> {
                           _ReplyComposerPreview(
                             reply: selectedReply!,
                             onCancel: cancelReply,
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                        if (isAnnouncementThread && !isRecordingVoice) ...[
+                          _AnnouncementTemplateRow(
+                            onUseTemplate: (template) {
+                              messageController.text = template;
+                              messageController.selection =
+                                  TextSelection.collapsed(
+                                    offset: messageController.text.length,
+                                  );
+                            },
                           ),
                           const SizedBox(height: 10),
                         ],
@@ -1997,12 +2025,17 @@ class _ChatScreenState extends State<ChatScreen> {
     final createdAt = data['created_at'];
     if (createdAt is! Timestamp) return MessageDeliveryStatus.sending;
 
-    if (isAnnouncementThread || widget.currentUserRole == 'admin') {
+    if (isAnnouncementThread ||
+        (widget.currentUserRole == 'admin' && !isAdminTeacherThread)) {
       return MessageDeliveryStatus.sent;
     }
 
     final otherReadAt = threadData == null
         ? null
+        : isAdminTeacherThread
+        ? widget.currentUserRole == 'admin'
+              ? threadData['teacher_last_read_at']
+              : threadData['admin_last_read_at']
         : widget.currentUserRole == 'student'
         ? threadData['teacher_last_read_at']
         : threadData['student_last_read_at'];
@@ -2536,6 +2569,42 @@ class _ReadOnlyAnnouncementBar extends StatelessWidget {
   }
 }
 
+class _AnnouncementTemplateRow extends StatelessWidget {
+  final ValueChanged<String> onUseTemplate;
+
+  const _AnnouncementTemplateRow({required this.onUseTemplate});
+
+  static const templates = [
+    'Reminder: please check today\'s lesson update.',
+    'Homework has been added. Please review it before next class.',
+    'Schedule update: your teacher will confirm the next session time.',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: templates
+            .map(
+              (template) => ActionChip(
+                avatar: const Icon(Icons.auto_awesome_rounded, size: 16),
+                label: Text(
+                  template.length > 34
+                      ? '${template.substring(0, 34)}...'
+                      : template,
+                ),
+                onPressed: () => onUseTemplate(template),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+}
+
 class _AttachmentStatusBar extends StatelessWidget {
   final String label;
   final double? progress;
@@ -2553,58 +2622,78 @@ class _AttachmentStatusBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final progressValue = progress?.clamp(0.0, 1.0);
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  value: progressValue,
-                ),
+    return Align(
+      alignment: Alignment.centerRight,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(48, 6, 0, 8),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE3F2FD),
+            border: Border.all(color: const Color(0xFFC8DCF7)),
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              if (canRetry && onRetry != null)
-                TextButton.icon(
-                  onPressed: onRetry,
-                  icon: const Icon(Icons.refresh, size: 16),
-                  label: const Text('Retry'),
-                ),
             ],
           ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(value: progressValue, minHeight: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      value: progressValue,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.ink,
+                      ),
+                    ),
+                  ),
+                  if (canRetry && onRetry != null)
+                    TextButton.icon(
+                      onPressed: onRetry,
+                      icon: const Icon(Icons.refresh, size: 16),
+                      label: const Text('Retry'),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: progressValue,
+                  minHeight: 4,
+                  backgroundColor: Colors.white.withValues(alpha: 0.72),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                canRetry ? 'Upload failed' : 'Sending attachment...',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.muted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

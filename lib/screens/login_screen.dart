@@ -71,6 +71,9 @@ class _LoginScreenState extends State<LoginScreen> {
       await PushNotificationService.instance.activate(session);
 
       if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Logged in successfully.')));
 
       Navigator.pushReplacement(
         context,

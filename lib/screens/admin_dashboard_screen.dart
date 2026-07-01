@@ -1,9 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../models/auth_session.dart';
 import '../services/auth_session_manager.dart';
+import '../services/firestore_chat_service.dart';
 import '../services/push_notification_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/time_format.dart';
 import '../widgets/app_scaffold.dart';
 import 'admin_announcements_screen.dart';
 import 'admin_chats_screen.dart';
@@ -20,6 +23,9 @@ class AdminDashboardScreen extends StatelessWidget {
     await AuthSessionManager().logout();
     await PushNotificationService.instance.deactivate();
     if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Logged out successfully.')));
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -41,6 +47,8 @@ class AdminDashboardScreen extends StatelessWidget {
 
           // Live stat cards
           _StatsRow(session: session),
+          const SizedBox(height: 24),
+          const _RecentActivityPanel(),
           const SizedBox(height: 24),
 
           // Navigation tiles
@@ -270,6 +278,142 @@ class _StatCard extends StatelessWidget {
 }
 
 // ─── Navigation tile ─────────────────────────────────────────────────────────
+
+class _RecentActivityPanel extends StatelessWidget {
+  const _RecentActivityPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirestoreChatService.getRecentThreads(limit: 5),
+      builder: (context, snapshot) {
+        final docs = snapshot.data?.docs ?? const [];
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.bolt_rounded, color: AppColors.primary),
+                    SizedBox(width: 8),
+                    Text(
+                      'Recent activity',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  const LinearProgressIndicator(minHeight: 3)
+                else if (docs.isEmpty)
+                  const Text(
+                    'No chat activity yet.',
+                    style: TextStyle(
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  )
+                else
+                  ...docs.map((doc) => _ActivityRow(doc: doc)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ActivityRow extends StatelessWidget {
+  final QueryDocumentSnapshot<Map<String, dynamic>> doc;
+
+  const _ActivityRow({required this.doc});
+
+  @override
+  Widget build(BuildContext context) {
+    final data = doc.data();
+    final courseId = doc.reference.parent.parent?.id ?? 'Course';
+    final title = _threadTitle(data, doc.id);
+    final lastMessage = data['last_message']?.toString().trim();
+    final time = formatThreadTime(
+      data['last_message_at'] ?? data['updated_at'],
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.forum_rounded,
+              color: AppColors.primary,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                Text(
+                  lastMessage?.isNotEmpty == true
+                      ? '$lastMessage - Course $courseId'
+                      : 'Course $courseId',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          if (time.isNotEmpty)
+            Text(
+              time,
+              style: const TextStyle(
+                color: AppColors.muted,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  static String _threadTitle(Map<String, dynamic> data, String threadId) {
+    final studentName = data['student_name']?.toString().trim();
+    if (studentName != null && studentName.isNotEmpty) return studentName;
+
+    final title = data['title']?.toString().trim();
+    if (title != null && title.isNotEmpty) return title;
+
+    if (threadId == FirestoreChatService.announcementThreadId) {
+      return 'Announcement chat';
+    }
+    if (threadId == FirestoreChatService.adminTeacherThreadId) {
+      return 'Admin and teacher';
+    }
+    return 'Thread $threadId';
+  }
+}
 
 class _NavTile extends StatelessWidget {
   final IconData icon;

@@ -15,6 +15,8 @@ class MessageBubble extends StatelessWidget {
   final String text;
   final String? mediaUrl;
   final String? fileName;
+  final int? fileSizeBytes;
+  final String? fileType;
   final int? durationMs;
   final String senderName;
   final String senderRole;
@@ -44,6 +46,8 @@ class MessageBubble extends StatelessWidget {
     required this.text,
     required this.mediaUrl,
     this.fileName,
+    this.fileSizeBytes,
+    this.fileType,
     this.durationMs,
     required this.senderName,
     required this.senderRole,
@@ -238,6 +242,16 @@ class MessageBubble extends StatelessWidget {
                 tooltip: 'Close',
               ),
             ),
+            Positioned(
+              left: 12,
+              right: 72,
+              bottom: 16,
+              child: FilledButton.icon(
+                onPressed: _openMediaExternally,
+                icon: const Icon(Icons.download_rounded),
+                label: const Text('Open or download'),
+              ),
+            ),
           ],
         ),
       ),
@@ -252,6 +266,46 @@ class MessageBubble extends StatelessWidget {
     if (uri == null) return;
 
     unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
+  }
+
+  void _openVideo(BuildContext context) {
+    if (mediaUrl == null || mediaUrl!.isEmpty) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog.fullscreen(
+        backgroundColor: Colors.black,
+        child: Stack(
+          children: [
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: VideoMessagePlayer(url: mediaUrl!),
+              ),
+            ),
+            Positioned(
+              top: 12,
+              right: 12,
+              child: IconButton.filledTonal(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close),
+                tooltip: 'Close',
+              ),
+            ),
+            Positioned(
+              left: 12,
+              right: 72,
+              bottom: 16,
+              child: FilledButton.icon(
+                onPressed: _openMediaExternally,
+                icon: const Icon(Icons.download_rounded),
+                label: const Text('Open or download'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -469,13 +523,23 @@ class MessageBubble extends StatelessWidget {
                       )
                     else if (isVideo)
                       GestureDetector(
-                        onTap: _openMediaExternally,
+                        onTap: () => _openVideo(context),
                         child: _MediaFrame(
+                          footer: _MediaMetaRow(
+                            label: _fileMetaLabel,
+                            onDownload: _openMediaExternally,
+                          ),
                           child: VideoMessagePlayer(url: mediaUrl!),
                         ),
                       )
                     else if (isVoice)
                       _MediaFrame(
+                        footer: _fileMetaLabel.isEmpty
+                            ? null
+                            : _MediaMetaRow(
+                                label: _fileMetaLabel,
+                                onDownload: _openMediaExternally,
+                              ),
                         child: VoiceMessagePlayer(
                           url: mediaUrl!,
                           durationMs: durationMs,
@@ -486,6 +550,7 @@ class MessageBubble extends StatelessWidget {
                         fileName: fileName?.trim().isNotEmpty == true
                             ? fileName!.trim()
                             : 'Document',
+                        metaLabel: _fileMetaLabel,
                         onOpen: _openMediaExternally,
                       )
                     else
@@ -558,6 +623,26 @@ class MessageBubble extends StatelessWidget {
       }
     }
     return counts;
+  }
+
+  String get _fileMetaLabel {
+    final parts = <String>[];
+    final typeLabel = fileType?.trim();
+    if (typeLabel != null && typeLabel.isNotEmpty) parts.add(typeLabel);
+    if (fileSizeBytes != null && fileSizeBytes! > 0) {
+      parts.add(_formatBytes(fileSizeBytes!));
+    }
+    return parts.join(' - ');
+  }
+
+  static String _formatBytes(int bytes) {
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    if (bytes >= 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '$bytes B';
   }
 }
 
@@ -750,9 +835,14 @@ class _ReactionStrip extends StatelessWidget {
 
 class _DocumentMessageCard extends StatelessWidget {
   final String fileName;
+  final String metaLabel;
   final VoidCallback onOpen;
 
-  const _DocumentMessageCard({required this.fileName, required this.onOpen});
+  const _DocumentMessageCard({
+    required this.fileName,
+    required this.metaLabel,
+    required this.onOpen,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -801,9 +891,11 @@ class _DocumentMessageCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 3),
-                    const Text(
-                      'Tap to open document',
-                      style: TextStyle(
+                    Text(
+                      metaLabel.isEmpty
+                          ? 'Tap to open or download'
+                          : '$metaLabel - tap to open or download',
+                      style: const TextStyle(
                         color: AppColors.muted,
                         fontSize: 11.5,
                         fontWeight: FontWeight.w700,
@@ -814,7 +906,7 @@ class _DocumentMessageCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               const Icon(
-                Icons.open_in_new_rounded,
+                Icons.download_rounded,
                 color: AppColors.muted,
                 size: 18,
               ),
@@ -931,8 +1023,9 @@ class _DeliveryStatus extends StatelessWidget {
 
 class _MediaFrame extends StatelessWidget {
   final Widget child;
+  final Widget? footer;
 
-  const _MediaFrame({required this.child});
+  const _MediaFrame({required this.child, this.footer});
 
   @override
   Widget build(BuildContext context) {
@@ -944,7 +1037,47 @@ class _MediaFrame extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
       ),
-      child: child,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          child,
+          if (footer != null) ...[const SizedBox(height: 8), footer!],
+        ],
+      ),
+    );
+  }
+}
+
+class _MediaMetaRow extends StatelessWidget {
+  final String label;
+  final VoidCallback onDownload;
+
+  const _MediaMetaRow({required this.label, required this.onDownload});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label.isEmpty ? 'Media attachment' : label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        IconButton(
+          onPressed: onDownload,
+          icon: const Icon(Icons.download_rounded),
+          iconSize: 18,
+          tooltip: 'Open or download',
+          visualDensity: VisualDensity.compact,
+        ),
+      ],
     );
   }
 }

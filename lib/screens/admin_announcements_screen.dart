@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../models/auth_session.dart';
@@ -25,6 +26,8 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
   final privateMessageController = TextEditingController();
   final selectedCourseIds = <String>{};
   final selectedStudentKeys = <String>{};
+  DateTime? scheduledCourseAnnouncementAt;
+  bool pinCourseAnnouncements = true;
   bool sendingCourseAnnouncement = false;
   bool sendingPrivateBroadcast = false;
 
@@ -85,8 +88,21 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
             courses: courses,
             controller: courseMessageController,
             selectedCourseIds: selectedCourseIds,
+            scheduledAt: scheduledCourseAnnouncementAt,
+            pinAnnouncements: pinCourseAnnouncements,
             isSending: sendingCourseAnnouncement,
             onChanged: () => setState(() {}),
+            onPickSchedule: pickCourseAnnouncementSchedule,
+            onClearSchedule: () =>
+                setState(() => scheduledCourseAnnouncementAt = null),
+            onPinChanged: (value) =>
+                setState(() => pinCourseAnnouncements = value),
+            onUseTemplate: (template) {
+              courseMessageController.text = template;
+              courseMessageController.selection = TextSelection.collapsed(
+                offset: courseMessageController.text.length,
+              );
+            },
             onSend: sendCourseAnnouncements,
           ),
           const SizedBox(height: 16),
@@ -113,28 +129,39 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
 
     setState(() => sendingCourseAnnouncement = true);
     try {
-      final selectedCourses = courses.where(
-        (course) => selectedCourseIds.contains(course.id),
-      );
-      for (final course in selectedCourses) {
-        final messageId = await FirestoreChatService.sendTextMessage(
-          courseId: course.id,
-          threadId: FirestoreChatService.announcementThreadId,
-          senderName: widget.session.appUser.name,
-          senderRole: 'admin',
-          text: text,
-        );
-        await _notificationApi.notifyChatMessage(
-          courseId: course.id,
-          threadId: FirestoreChatService.announcementThreadId,
-          senderRole: 'admin',
-          senderName: widget.session.appUser.name,
-          messageType: 'text',
-          messageId: messageId,
-          previewText: text,
-          audience: 'course',
-        );
+      final scheduledAt = scheduledCourseAnnouncementAt;
+      if (scheduledAt != null && scheduledAt.isAfter(DateTime.now())) {
+        final selectedIds = Set<String>.from(selectedCourseIds);
+        final scheduledText = text;
+        final shouldPin = pinCourseAnnouncements;
+        final delay = scheduledAt.difference(DateTime.now());
+        Future<void>.delayed(delay, () async {
+          await _sendCourseAnnouncementNow(
+            text: scheduledText,
+            selectedCourseIds: selectedIds,
+            pinAnnouncements: shouldPin,
+          );
+        });
+
+        courseMessageController.clear();
+        scheduledCourseAnnouncementAt = null;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Announcement scheduled for ${TimeOfDay.fromDateTime(scheduledAt).format(context)}.',
+              ),
+            ),
+          );
+        }
+        return;
       }
+
+      await _sendCourseAnnouncementNow(
+        text: text,
+        selectedCourseIds: selectedCourseIds,
+        pinAnnouncements: pinCourseAnnouncements,
+      );
 
       courseMessageController.clear();
       if (mounted) {
@@ -155,6 +182,66 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
     } finally {
       if (mounted) setState(() => sendingCourseAnnouncement = false);
     }
+  }
+
+  Future<void> _sendCourseAnnouncementNow({
+    required String text,
+    required Set<String> selectedCourseIds,
+    required bool pinAnnouncements,
+  }) async {
+    final selectedCourses = courses.where(
+      (course) => selectedCourseIds.contains(course.id),
+    );
+    for (final course in selectedCourses) {
+      final messageId = await FirestoreChatService.sendTextMessage(
+        courseId: course.id,
+        threadId: FirestoreChatService.announcementThreadId,
+        senderName: widget.session.appUser.name,
+        senderRole: 'admin',
+        text: text,
+      );
+      await _notificationApi.notifyChatMessage(
+        courseId: course.id,
+        threadId: FirestoreChatService.announcementThreadId,
+        senderRole: 'admin',
+        senderName: widget.session.appUser.name,
+        messageType: 'text',
+        messageId: messageId,
+        previewText: text,
+        audience: 'course',
+      );
+      await FirestoreChatService.setAnnouncementPinned(
+        courseId: course.id,
+        pinned: pinAnnouncements,
+      );
+    }
+  }
+
+  Future<void> pickCourseAnnouncementSchedule() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: scheduledCourseAnnouncementAt ?? now,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 90)),
+    );
+    if (date == null || !mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(scheduledCourseAnnouncementAt ?? now),
+    );
+    if (time == null) return;
+
+    setState(() {
+      scheduledCourseAnnouncementAt = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
+    });
   }
 
   Future<void> sendPrivateBroadcasts() async {
@@ -216,19 +303,37 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
 }
 
 class _CourseAnnouncementPanel extends StatelessWidget {
+  static const templates = [
+    'Reminder: please check your lesson schedule and be ready on time.',
+    'Important update: today\'s session has a new note from EACC.',
+    'Please review the attached materials before the next class.',
+  ];
+
   final List<Course> courses;
   final TextEditingController controller;
   final Set<String> selectedCourseIds;
+  final DateTime? scheduledAt;
+  final bool pinAnnouncements;
   final bool isSending;
   final VoidCallback onChanged;
+  final VoidCallback onPickSchedule;
+  final VoidCallback onClearSchedule;
+  final ValueChanged<bool> onPinChanged;
+  final ValueChanged<String> onUseTemplate;
   final VoidCallback onSend;
 
   const _CourseAnnouncementPanel({
     required this.courses,
     required this.controller,
     required this.selectedCourseIds,
+    required this.scheduledAt,
+    required this.pinAnnouncements,
     required this.isSending,
     required this.onChanged,
+    required this.onPickSchedule,
+    required this.onClearSchedule,
+    required this.onPinChanged,
+    required this.onUseTemplate,
     required this.onSend,
   });
 
@@ -246,6 +351,24 @@ class _CourseAnnouncementPanel extends StatelessWidget {
               subtitle: 'Posts into the pinned announcement chat.',
             ),
             const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: templates
+                  .map(
+                    (template) => ActionChip(
+                      avatar: const Icon(Icons.auto_awesome_rounded, size: 16),
+                      label: Text(
+                        template.length > 34
+                            ? '${template.substring(0, 34)}...'
+                            : template,
+                      ),
+                      onPressed: () => onUseTemplate(template),
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 12),
             TextField(
               controller: controller,
               minLines: 3,
@@ -254,6 +377,42 @@ class _CourseAnnouncementPanel extends StatelessWidget {
                 hintText: 'Write the announcement',
                 prefixIcon: Icon(Icons.edit_note_rounded),
               ),
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              value: pinAnnouncements,
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'Keep announcement chat pinned',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+              subtitle: const Text(
+                'Pinned announcements stay visible at the top of each course.',
+              ),
+              onChanged: onPinChanged,
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onPickSchedule,
+                    icon: const Icon(Icons.event_rounded),
+                    label: Text(
+                      scheduledAt == null
+                          ? 'Schedule'
+                          : 'Scheduled ${TimeOfDay.fromDateTime(scheduledAt!).format(context)}',
+                    ),
+                  ),
+                ),
+                if (scheduledAt != null) ...[
+                  const SizedBox(width: 8),
+                  IconButton.filledTonal(
+                    onPressed: onClearSchedule,
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: 'Clear schedule',
+                  ),
+                ],
+              ],
             ),
             const SizedBox(height: 12),
             _SelectionToolbar(
@@ -271,11 +430,9 @@ class _CourseAnnouncementPanel extends StatelessWidget {
               },
             ),
             ...courses.map(
-              (course) => CheckboxListTile(
-                value: selectedCourseIds.contains(course.id),
-                dense: true,
-                title: Text(course.name),
-                subtitle: Text('Course ${course.id}'),
+              (course) => _CourseSelectionTile(
+                course: course,
+                selected: selectedCourseIds.contains(course.id),
                 onChanged: (value) {
                   if (value == true) {
                     selectedCourseIds.add(course.id);
@@ -307,6 +464,51 @@ class _CourseAnnouncementPanel extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _CourseSelectionTile extends StatelessWidget {
+  final Course course;
+  final bool selected;
+  final ValueChanged<bool?> onChanged;
+
+  const _CourseSelectionTile({
+    required this.course,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirestoreChatService.getAnnouncementThread(courseId: course.id),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data();
+        final reads = data?['announcement_reads'];
+        final readCount = reads is Map ? reads.length : 0;
+        final pinned = data?['pinned'] != false;
+
+        return CheckboxListTile(
+          value: selected,
+          dense: true,
+          title: Text(course.name),
+          subtitle: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              Text('Course ${course.id}'),
+              Text('$readCount read'),
+              Text(pinned ? 'Pinned' : 'Unpinned'),
+            ],
+          ),
+          secondary: Icon(
+            pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+            color: pinned ? AppColors.admin : AppColors.muted,
+          ),
+          onChanged: onChanged,
+        );
+      },
     );
   }
 }
