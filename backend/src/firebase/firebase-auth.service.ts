@@ -22,6 +22,7 @@ export interface FirebaseIdentity {
   displayName: string;
   role: 'student' | 'teacher' | 'admin';
   courseIds: string[];
+  isSuperAdmin?: boolean;
 }
 
 @Injectable()
@@ -39,6 +40,7 @@ export class FirebaseAuthService {
       displayName: identity.displayName,
       role: identity.role,
       courseIds: [...new Set(identity.courseIds)],
+      isSuperAdmin: identity.role === 'admin' && identity.isSuperAdmin === true,
     });
   }
 

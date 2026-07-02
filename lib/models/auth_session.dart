@@ -48,11 +48,13 @@ class LmsUser {
   final String lmsUserId;
   final String role;
   final String name;
+  final bool isSuperAdmin;
 
   const LmsUser({
     required this.lmsUserId,
     required this.role,
     required this.name,
+    this.isSuperAdmin = false,
   });
 
   factory LmsUser.fromJson(Map<String, dynamic> json) {
@@ -60,11 +62,17 @@ class LmsUser {
       lmsUserId: json['lmsUserId'] as String,
       role: json['role'] as String,
       name: json['name'] as String,
+      isSuperAdmin: json['isSuperAdmin'] == true,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {'lmsUserId': lmsUserId, 'role': role, 'name': name};
+    return {
+      'lmsUserId': lmsUserId,
+      'role': role,
+      'name': name,
+      'isSuperAdmin': isSuperAdmin,
+    };
   }
 }
 
@@ -73,12 +81,14 @@ class AppUser {
   final String role;
   final String name;
   final String? email;
+  final bool isSuperAdmin;
 
   const AppUser({
     required this.id,
     required this.role,
     required this.name,
     this.email,
+    this.isSuperAdmin = false,
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json) {
@@ -89,10 +99,17 @@ class AppUser {
       role: json['role'] as String,
       name: json['name'] as String,
       email: email is String && email.isNotEmpty ? email : null,
+      isSuperAdmin: json['isSuperAdmin'] == true,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {'id': id, 'role': role, 'name': name, 'email': email};
+    return {
+      'id': id,
+      'role': role,
+      'name': name,
+      'email': email,
+      'isSuperAdmin': isSuperAdmin,
+    };
   }
 }

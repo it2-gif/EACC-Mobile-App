@@ -45,6 +45,7 @@ describe('AuthService', () => {
     };
     const lmsClient = { authenticate: jest.fn().mockResolvedValue(lmsUser) };
     const authSync = { syncLmsUser: jest.fn().mockResolvedValue(synced) };
+    const prisma = {};
     const firebaseTokens = {
       createCustomToken: jest.fn().mockResolvedValue('firebase-token'),
     };
@@ -54,6 +55,7 @@ describe('AuthService', () => {
     const service = new AuthService(
       lmsClient as never,
       authSync as never,
+      prisma as never,
       firebaseTokens as never,
       config as never,
     );
@@ -70,6 +72,7 @@ describe('AuthService', () => {
       displayName: 'Esam Test',
       role: 'student',
       courseIds: ['2191'],
+      isSuperAdmin: false,
     });
     expect(result.firebase).toEqual({ customToken: 'firebase-token' });
     expect(result.nextStep).toBe('ready');

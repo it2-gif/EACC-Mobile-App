@@ -23,5 +23,6 @@ export interface NormalizedLmsUser {
   role: LmsUserRole;
   name: string;
   email?: string;
+  isSuperAdmin?: boolean;
   courses: NormalizedLmsCourse[];
 }

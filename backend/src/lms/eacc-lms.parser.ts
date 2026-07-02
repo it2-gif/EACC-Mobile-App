@@ -40,6 +40,16 @@ export function parseLmsResponse(
   const name = readRequiredString(data, fields.name);
   const email = readOptionalString(data, fields.email);
   const responseRole = readOptionalString(data, ['role', 'type', 'user_type']);
+  const isSuperAdmin =
+    expectedRole === 'admin'
+      ? readOptionalBoolean(data, [
+          'full_access',
+          'fullAccess',
+          'is_super_admin',
+          'isSuperAdmin',
+          'super_admin',
+        ])
+      : false;
 
   if (responseRole && normalizeRole(responseRole) !== expectedRole) {
     throw new InvalidLmsResponseError();
@@ -50,6 +60,7 @@ export function parseLmsResponse(
     role: expectedRole,
     name,
     email,
+    isSuperAdmin,
     courses: readCourses(data.courses ?? root.courses),
   };
 }
@@ -100,6 +111,24 @@ function readOptionalString(
   }
 
   return undefined;
+}
+
+function readOptionalBoolean(data: JsonObject, keys: string[]): boolean {
+  for (const key of keys) {
+    const value = data[key];
+
+    if (typeof value === 'boolean') return value;
+
+    if (typeof value === 'number') return value === 1;
+
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (['1', 'true', 'yes', 'y'].includes(normalized)) return true;
+      if (['0', 'false', 'no', 'n'].includes(normalized)) return false;
+    }
+  }
+
+  return false;
 }
 
 function normalizeRole(value: string): LmsUserRole | undefined {

@@ -39,22 +39,26 @@ export class AuthService {
       const courseIds = synced.courses.map((course) => course.lmsCourseId);
       const adminCourses =
         lmsUser.role === 'admin' ? await this.loadAdminCourses() : null;
+      const isSuperAdmin =
+        lmsUser.role === 'admin' && lmsUser.isSuperAdmin === true;
       const firebaseCustomToken = await this.firebaseTokens.createCustomToken({
         appUserId: synced.user.id,
         lmsUserId: lmsUser.lmsUserId,
         displayName: synced.user.name,
         role: lmsUser.role,
         courseIds,
+        isSuperAdmin,
       });
 
       return {
         status: 'authenticated',
-        user: lmsUser,
+        user: { ...lmsUser, isSuperAdmin },
         appUser: {
           id: synced.user.id,
           role: synced.user.role.toLowerCase(),
           name: synced.user.name,
           email: synced.user.email,
+          isSuperAdmin,
         },
         courses:
           adminCourses ??

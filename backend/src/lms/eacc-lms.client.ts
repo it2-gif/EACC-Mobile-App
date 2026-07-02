@@ -177,7 +177,7 @@ export class EaccLmsClient implements LmsClient {
     }
 
     if (role === 'admin') {
-      return parseAdminIdentity(credentials!.username);
+      return parseAdminIdentity(credentials!.username, html);
     }
 
     throw new LmsUnavailableError();
@@ -226,7 +226,7 @@ function tryParseJson(value: string): { value: unknown } | undefined {
  * acts as the stable LMS user ID. The display name is capitalised from
  * the username for a clean presentation in chat.
  */
-function parseAdminIdentity(username: string): NormalizedLmsUser {
+function parseAdminIdentity(username: string, html: string): NormalizedLmsUser {
   const trimmed = username.trim().toLowerCase();
   const displayName = trimmed
     .split(/[._\-\s]+/)
@@ -237,8 +237,20 @@ function parseAdminIdentity(username: string): NormalizedLmsUser {
     lmsUserId: trimmed,
     role: 'admin',
     name: displayName || trimmed,
+    isSuperAdmin: hasAdminFullAccess(html),
     courses: [],
   };
+}
+
+function hasAdminFullAccess(html: string): boolean {
+  const normalized = html.toLowerCase();
+
+  return [
+    /full[_-]?access['"\s:=]+1/,
+    /full[_-]?access['"\s:=]+true/,
+    /name=["']full[_-]?access["'][^>]*value=["']1["']/,
+    /name=["']full[_-]?access["'][^>]*value=["']true["']/,
+  ].some((pattern) => pattern.test(normalized));
 }
 
 function extractSessionCookie(headers: Headers): string | undefined {

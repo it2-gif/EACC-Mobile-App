@@ -42,7 +42,10 @@ class AdminDashboardScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
           // Welcome header
-          _WelcomeHeader(name: session.appUser.name),
+          _WelcomeHeader(
+            name: session.appUser.name,
+            isSuperAdmin: session.appUser.isSuperAdmin,
+          ),
           const SizedBox(height: 20),
 
           // Live stat cards
@@ -131,8 +134,9 @@ class AdminDashboardScreen extends StatelessWidget {
 
 class _WelcomeHeader extends StatelessWidget {
   final String name;
+  final bool isSuperAdmin;
 
-  const _WelcomeHeader({required this.name});
+  const _WelcomeHeader({required this.name, required this.isSuperAdmin});
 
   @override
   Widget build(BuildContext context) {
@@ -181,6 +185,43 @@ class _WelcomeHeader extends StatelessWidget {
                     color: Colors.white70,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.22),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isSuperAdmin
+                            ? Icons.verified_user_rounded
+                            : Icons.admin_panel_settings_outlined,
+                        size: 15,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isSuperAdmin
+                            ? 'Super admin moderation enabled'
+                            : 'Standard admin access',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

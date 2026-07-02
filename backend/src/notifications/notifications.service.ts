@@ -141,12 +141,11 @@ export class NotificationsService {
         .flatMap((user) => user.deviceTokens)
         .filter((token) => token.userId !== senderAppUserId);
     } else {
-      const rolesForQuery: UserRole[] =
-        isCourseAudience
-          ? [UserRole.STUDENT]
-          : isTeachersAudience || senderRole === 'student'
-            ? [UserRole.TEACHER]
-            : [UserRole.STUDENT];
+      const rolesForQuery: UserRole[] = isCourseAudience
+        ? [UserRole.STUDENT]
+        : isTeachersAudience || senderRole === 'student'
+          ? [UserRole.TEACHER]
+          : [UserRole.STUDENT];
 
       const targetMemberships = await this.prisma.courseMembership.findMany({
         where: {

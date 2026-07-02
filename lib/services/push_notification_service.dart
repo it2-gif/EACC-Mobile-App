@@ -379,6 +379,7 @@ class PushNotificationService {
           threadId: effectiveThreadId,
           senderName: session.appUser.name,
           threadStudentName: threadStudentName,
+          isSuperAdmin: session.appUser.isSuperAdmin,
         ),
       ),
     );

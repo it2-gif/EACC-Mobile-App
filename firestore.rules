@@ -11,6 +11,11 @@ service cloud.firestore {
         && request.auth.token.role == 'admin';
     }
 
+    function isSuperAdmin() {
+      return isAdmin()
+        && request.auth.token.isSuperAdmin == true;
+    }
+
     function isSupportedRole() {
       return isSignedIn()
         && request.auth.token.role in ['student', 'teacher'];
@@ -261,7 +266,14 @@ service cloud.firestore {
                 && request.resource.data.type in ['text', 'image', 'video', 'voice', 'document']
                 && request.resource.data.created_at == request.time;
           allow update: if isAdmin()
-              ? (isTextMessageEdit() || isSoftMessageDelete() || isMessageReactionUpdate() || isMessagePinUpdate())
+              ? (
+                (
+                  (isSuperAdmin() || isMessageOwner())
+                  && (isTextMessageEdit() || isSoftMessageDelete())
+                )
+                || isMessageReactionUpdate()
+                || isMessagePinUpdate()
+              )
               : canAccessThread(courseId, threadId)
                 && (
                   (
