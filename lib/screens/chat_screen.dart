@@ -11,6 +11,7 @@ import 'package:record/record.dart';
 import '../services/firestore_chat_service.dart';
 import '../services/notification_api.dart';
 import '../theme/app_theme.dart';
+import '../utils/time_format.dart';
 import '../widgets/message_bubble.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -71,6 +72,8 @@ class _ChatScreenState extends State<ChatScreen> {
   MessageReply? selectedReply;
   bool isSearchingMessages = false;
   String messageSearchQuery = '';
+  Timer? typingStopTimer;
+  bool typingStateSent = false;
 
   bool get isAnnouncementThread =>
       widget.threadId == FirestoreChatService.announcementThreadId;
@@ -83,6 +86,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    typingStopTimer?.cancel();
+    messageController.removeListener(handleTypingChanged);
+    if (typingStateSent) {
+      unawaited(setTypingState(false));
+    }
     recordingTimer?.cancel();
     recordingSubscription?.cancel();
     audioRecorder.dispose();
@@ -95,9 +103,62 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    messageController.addListener(handleTypingChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(markThreadAsRead());
     });
+  }
+
+  void handleTypingChanged() {
+    if (!canSendInThread || isRecordingVoice) return;
+
+    final isTyping = messageController.text.trim().isNotEmpty;
+    if (isTyping && !typingStateSent) {
+      typingStateSent = true;
+      unawaited(setTypingState(true));
+    }
+
+    typingStopTimer?.cancel();
+    if (isTyping) {
+      typingStopTimer = Timer(const Duration(seconds: 2), () {
+        if (!mounted) return;
+        typingStateSent = false;
+        unawaited(setTypingState(false));
+      });
+    } else if (typingStateSent) {
+      typingStateSent = false;
+      unawaited(setTypingState(false));
+    }
+  }
+
+  Future<void> setTypingState(bool isTyping) {
+    return FirestoreChatService.setTypingState(
+      courseId: widget.courseId,
+      threadId: widget.threadId,
+      senderRole: widget.currentUserRole,
+      senderName: widget.senderName,
+      isTyping: isTyping,
+    ).catchError((_) {});
+  }
+
+  Future<void> logAuditEvent({
+    required String action,
+    required String resourceType,
+    required String resourceId,
+    Map<String, dynamic>? metadata,
+  }) {
+    return FirestoreChatService.logAuditEvent(
+      actorRole: widget.currentUserRole,
+      actorName: widget.senderName,
+      action: action,
+      resourceType: resourceType,
+      resourceId: resourceId,
+      metadata: {
+        'course_id': widget.courseId,
+        'thread_id': widget.threadId,
+        ...?metadata,
+      },
+    ).catchError((_) {});
   }
 
   void scrollToBottom() {
@@ -518,6 +579,9 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     messageController.clear();
+    typingStopTimer?.cancel();
+    typingStateSent = false;
+    unawaited(setTypingState(false));
     final reply = selectedReply;
 
     setState(() {
@@ -607,6 +671,13 @@ class _ChatScreenState extends State<ChatScreen> {
         messageId: messageId,
         text: updatedText,
       );
+      unawaited(
+        logAuditEvent(
+          action: 'message_edited',
+          resourceType: 'message',
+          resourceId: messageId,
+        ),
+      );
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -650,6 +721,13 @@ class _ChatScreenState extends State<ChatScreen> {
         messageId: messageId,
         deletedByRole: widget.currentUserRole,
         deletedByName: widget.senderName,
+      );
+      unawaited(
+        logAuditEvent(
+          action: 'message_deleted',
+          resourceType: 'message',
+          resourceId: messageId,
+        ),
       );
     } catch (error) {
       if (mounted) {
@@ -768,6 +846,13 @@ class _ChatScreenState extends State<ChatScreen> {
         pinned: !currentlyPinned,
         pinnedByRole: widget.currentUserRole,
         pinnedByName: widget.senderName,
+      );
+      unawaited(
+        logAuditEvent(
+          action: currentlyPinned ? 'message_unpinned' : 'message_pinned',
+          resourceType: 'message',
+          resourceId: messageId,
+        ),
       );
     } catch (error) {
       if (!mounted) return;
@@ -1439,6 +1524,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       return const Center(child: CircularProgressIndicator());
                     }
 
+                    final threadData = threadSnapshot.data?.data();
+                    final typingLabel = _typingLabel(threadData);
                     final docs = sortMessages(snapshot.data?.docs ?? []);
                     final allVisibleDocs = docs.reversed.toList();
                     final query = messageSearchQuery.toLowerCase();
@@ -1563,6 +1650,13 @@ class _ChatScreenState extends State<ChatScreen> {
                             preview: _messagePreview(pinnedMessage.data()),
                             onTap: () => _jumpToBottomIfPossible(animate: true),
                           ),
+                        if (isAnnouncementThread)
+                          _AnnouncementReadReceiptsBar(
+                            reads: _announcementReads(threadData),
+                            canOpenDetails: widget.currentUserRole != 'student',
+                          ),
+                        if (typingLabel != null)
+                          _TypingIndicatorBar(label: typingLabel),
                         Expanded(
                           child: Stack(
                             children: [
@@ -1661,9 +1755,6 @@ class _ChatScreenState extends State<ChatScreen> {
                                             final message =
                                                 visibleDocs[messageIndex];
                                             final data = message.data();
-                                            final threadData = threadSnapshot
-                                                .data
-                                                ?.data();
                                             final canManageMessage =
                                                 _canManageMessage(
                                                   senderRole:
@@ -2049,6 +2140,71 @@ class _ChatScreenState extends State<ChatScreen> {
     return MessageDeliveryStatus.delivered;
   }
 
+  String? _typingLabel(Map<String, dynamic>? threadData) {
+    if (threadData == null || threadData['typing_active'] != true) {
+      return null;
+    }
+
+    final typingRole = threadData['typing_role']?.toString() ?? '';
+    final typingName = threadData['typing_name']?.toString() ?? '';
+    final typingAt = threadData['typing_at'];
+    final typedAt = typingAt is Timestamp ? typingAt.toDate() : null;
+
+    if (typedAt == null ||
+        DateTime.now().difference(typedAt) > const Duration(seconds: 8)) {
+      return null;
+    }
+
+    if (typingRole == widget.currentUserRole &&
+        typingName == widget.senderName) {
+      return null;
+    }
+
+    final roleLabel = switch (typingRole) {
+      'teacher' => 'Teacher',
+      'student' => 'Student',
+      'admin' => 'EACC Admin',
+      _ => 'Someone',
+    };
+
+    return typingName.isEmpty
+        ? '$roleLabel is typing...'
+        : '$typingName is typing...';
+  }
+
+  List<_AnnouncementRead> _announcementReads(Map<String, dynamic>? threadData) {
+    final reads = threadData?['announcement_reads'];
+    if (reads is! Map) return const [];
+
+    final entries = reads.entries.map((entry) {
+      final key = entry.key.toString();
+      final rawTime = entry.value;
+      final readAt = rawTime is Timestamp ? rawTime.toDate() : null;
+      final parts = key.split('_');
+      final role = parts.isNotEmpty ? parts.first : 'reader';
+      final displayName = parts.length > 1
+          ? parts.skip(1).join(' ')
+          : key.replaceAll('_', ' ');
+
+      return _AnnouncementRead(
+        role: role,
+        displayName: displayName.trim().isEmpty ? key : displayName.trim(),
+        readAt: readAt,
+      );
+    }).toList();
+
+    entries.sort((a, b) {
+      final aTime = a.readAt;
+      final bTime = b.readAt;
+      if (aTime == null && bTime == null) return 0;
+      if (aTime == null) return 1;
+      if (bTime == null) return -1;
+      return bTime.compareTo(aTime);
+    });
+
+    return entries;
+  }
+
   String _messagePreview(Map<String, dynamic> data) {
     if (data['deleted_at'] != null) return 'Deleted message';
 
@@ -2236,6 +2392,207 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     return false;
+  }
+}
+
+class _AnnouncementRead {
+  final String role;
+  final String displayName;
+  final DateTime? readAt;
+
+  const _AnnouncementRead({
+    required this.role,
+    required this.displayName,
+    required this.readAt,
+  });
+}
+
+class _TypingIndicatorBar extends StatelessWidget {
+  final String label;
+
+  const _TypingIndicatorBar({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 7, 16, 7),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.primaryDark,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnnouncementReadReceiptsBar extends StatelessWidget {
+  final List<_AnnouncementRead> reads;
+  final bool canOpenDetails;
+
+  const _AnnouncementReadReceiptsBar({
+    required this.reads,
+    required this.canOpenDetails,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final count = reads.length;
+    return Material(
+      color: Colors.white,
+      child: InkWell(
+        onTap: canOpenDetails ? () => _showDetails(context) : null,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: AppColors.border)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.fact_check_rounded,
+                  color: AppColors.success,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  count == 1 ? 'Read by 1 person' : 'Read by $count people',
+                  style: const TextStyle(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (canOpenDetails)
+                const Icon(
+                  Icons.keyboard_arrow_up_rounded,
+                  color: AppColors.muted,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDetails(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Announcement read receipts',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  reads.isEmpty
+                      ? 'No readers yet.'
+                      : '${reads.length} reader${reads.length == 1 ? '' : 's'} confirmed',
+                  style: const TextStyle(color: AppColors.muted),
+                ),
+                const SizedBox(height: 14),
+                if (reads.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: Text(
+                        'Students will appear here after opening the announcement.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.muted),
+                      ),
+                    ),
+                  )
+                else
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: reads.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final read = reads[index];
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            backgroundColor: AppColors.primary.withValues(
+                              alpha: 0.1,
+                            ),
+                            child: Text(
+                              read.displayName.trim().isEmpty
+                                  ? '?'
+                                  : read.displayName.trim()[0].toUpperCase(),
+                              style: const TextStyle(
+                                color: AppColors.primaryDark,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            read.displayName,
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          subtitle: Text(_roleLabel(read.role)),
+                          trailing: Text(
+                            read.readAt == null
+                                ? ''
+                                : formatClockTime(read.readAt!),
+                            style: const TextStyle(
+                              color: AppColors.muted,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  String _roleLabel(String role) {
+    return switch (role) {
+      'student' => 'Student',
+      'teacher' => 'Teacher',
+      'admin' => 'Admin',
+      _ => 'Reader',
+    };
   }
 }
 

@@ -9,8 +9,10 @@ import '../theme/app_theme.dart';
 import '../utils/time_format.dart';
 import '../widgets/app_scaffold.dart';
 import 'admin_announcements_screen.dart';
+import 'admin_audit_screen.dart';
 import 'admin_chats_screen.dart';
 import 'admin_courses_screen.dart';
+import 'admin_moderation_screen.dart';
 import 'admin_users_screen.dart';
 import 'login_screen.dart';
 
@@ -113,6 +115,34 @@ class AdminDashboardScreen extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (_) => AdminAnnouncementsScreen(session: session),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          _NavTile(
+            icon: Icons.admin_panel_settings_rounded,
+            title: 'Bulk Moderation',
+            subtitle: session.appUser.isSuperAdmin
+                ? 'Search and soft-delete selected messages'
+                : 'Review recent messages with super-admin controls locked',
+            color: AppColors.danger,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AdminModerationScreen(session: session),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          _NavTile(
+            icon: Icons.history_edu_rounded,
+            title: 'Audit Trail',
+            subtitle: 'Review message edits, deletes, pins, and moderation',
+            color: AppColors.primaryDark,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AdminAuditScreen(session: session),
               ),
             ),
           ),

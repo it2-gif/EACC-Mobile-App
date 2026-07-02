@@ -146,6 +146,21 @@ service cloud.firestore {
         && request.resource.data.updated_at == request.time;
     }
 
+    function isTypingUpdate(threadId) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'thread_id',
+          'typing_active',
+          'typing_role',
+          'typing_name',
+          'typing_at'
+        ])
+        && request.resource.data.thread_id == threadId
+        && request.resource.data.typing_active is bool
+        && request.resource.data.typing_role == request.auth.token.role
+        && request.resource.data.typing_name == request.auth.token.displayName
+        && request.resource.data.typing_at == request.time;
+    }
+
     function isMessageOwner() {
       return resource.data.sender_role == request.auth.token.role
         && resource.data.sender_name == request.auth.token.displayName;
@@ -244,6 +259,7 @@ service cloud.firestore {
                 || isAdminTeacherReadUpdate(threadId)
                 || isAnnouncementPinThreadUpdate(threadId)
                 || isAnnouncementReadUpdate(threadId)
+                || isTypingUpdate(threadId)
               )
             : canAccessThread(courseId, threadId)
               && (
@@ -252,6 +268,7 @@ service cloud.firestore {
                 || isAdminTeacherReadUpdate(threadId)
                 || isAnnouncementReadUpdate(threadId)
                 || isAnnouncementPinThreadUpdate(threadId)
+                || isTypingUpdate(threadId)
               );
         allow delete: if false;
 
@@ -286,6 +303,19 @@ service cloud.firestore {
           allow delete: if false;
         }
       }
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn()
+        && request.resource.data.actor_role == request.auth.token.role
+        && request.resource.data.actor_name == request.auth.token.displayName
+        && request.resource.data.action is string
+        && request.resource.data.resource_type is string
+        && request.resource.data.resource_id is string
+        && request.resource.data.metadata is map
+        && request.resource.data.created_at == request.time;
+      allow update, delete: if false;
     }
   }
 }

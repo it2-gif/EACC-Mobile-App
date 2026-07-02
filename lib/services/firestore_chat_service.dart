@@ -161,6 +161,25 @@ class FirestoreChatService {
     return getThread(courseId: courseId, threadId: announcementThreadId);
   }
 
+  static Stream<QuerySnapshot<Map<String, dynamic>>>
+  getRecentMessagesForModeration({int limit = 100}) {
+    return _db
+        .collectionGroup('messages')
+        .orderBy('created_at', descending: true)
+        .limit(limit)
+        .snapshots();
+  }
+
+  static Stream<QuerySnapshot<Map<String, dynamic>>> getAuditLogs({
+    int limit = 100,
+  }) {
+    return _db
+        .collection('audit_logs')
+        .orderBy('created_at', descending: true)
+        .limit(limit)
+        .snapshots();
+  }
+
   static Future<void> createOrUpdateThread({
     required String courseId,
     required String threadId,
@@ -216,6 +235,41 @@ class FirestoreChatService {
       'announcement_reads.$readerKey': FieldValue.serverTimestamp(),
       'updated_at': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+  }
+
+  static Future<void> setTypingState({
+    required String courseId,
+    required String threadId,
+    required String senderRole,
+    required String senderName,
+    required bool isTyping,
+  }) async {
+    await _threadsRef(courseId: courseId).doc(threadId).set({
+      'thread_id': threadId,
+      'typing_active': isTyping,
+      'typing_role': senderRole,
+      'typing_name': senderName,
+      'typing_at': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  static Future<void> logAuditEvent({
+    required String actorRole,
+    required String actorName,
+    required String action,
+    required String resourceType,
+    required String resourceId,
+    Map<String, dynamic>? metadata,
+  }) async {
+    await _db.collection('audit_logs').add({
+      'actor_role': actorRole,
+      'actor_name': actorName,
+      'action': action,
+      'resource_type': resourceType,
+      'resource_id': resourceId,
+      'metadata': metadata ?? <String, dynamic>{},
+      'created_at': FieldValue.serverTimestamp(),
+    });
   }
 
   static Future<String> sendTextMessage({
@@ -278,6 +332,18 @@ class FirestoreChatService {
       courseId: courseId,
       threadId: threadId,
     ).doc(messageId).update({
+      'deleted_at': FieldValue.serverTimestamp(),
+      'deleted_by_role': deletedByRole,
+      'deleted_by_name': deletedByName,
+    });
+  }
+
+  static Future<void> deleteMessageByReference({
+    required DocumentReference<Map<String, dynamic>> messageRef,
+    required String deletedByRole,
+    required String deletedByName,
+  }) async {
+    await messageRef.update({
       'deleted_at': FieldValue.serverTimestamp(),
       'deleted_by_role': deletedByRole,
       'deleted_by_name': deletedByName,
