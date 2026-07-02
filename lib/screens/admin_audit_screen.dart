@@ -69,6 +69,7 @@ class _AuditLogTile extends StatelessWidget {
     final resourceType = data['resource_type']?.toString() ?? 'resource';
     final resourceId = data['resource_id']?.toString() ?? '';
     final metadata = data['metadata'];
+    final messagePreview = _messagePreview(metadata);
 
     return Card(
       child: Padding(
@@ -116,9 +117,31 @@ class _AuditLogTile extends StatelessWidget {
                     '$actorName ($actorRole) changed $resourceType',
                     style: const TextStyle(color: AppColors.muted),
                   ),
+                  if (messagePreview.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Text(
+                        messagePreview,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.ink,
+                          fontWeight: FontWeight.w800,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
                   if (resourceId.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    _MetaPill(label: 'ID $resourceId'),
+                    _MetaPill(label: 'Message ID $resourceId'),
                   ],
                   if (metadata is Map && metadata.isNotEmpty) ...[
                     const SizedBox(height: 10),
@@ -126,7 +149,16 @@ class _AuditLogTile extends StatelessWidget {
                       spacing: 8,
                       runSpacing: 8,
                       children: metadata.entries
-                          .where((entry) => entry.value != null)
+                          .where(
+                            (entry) =>
+                                entry.value != null &&
+                                !{
+                                  'preview',
+                                  'previous_text',
+                                  'text',
+                                  'file_name',
+                                }.contains(entry.key.toString()),
+                          )
                           .map(
                             (entry) => _MetaPill(
                               label: '${entry.key}: ${entry.value}',
@@ -166,6 +198,17 @@ class _AuditLogTile extends StatelessWidget {
     if (lower.contains('delete')) return AppColors.danger;
     if (lower.contains('pin')) return AppColors.admin;
     return AppColors.primary;
+  }
+
+  String _messagePreview(Object? metadata) {
+    if (metadata is! Map) return '';
+
+    for (final key in ['preview', 'text', 'file_name']) {
+      final value = metadata[key]?.toString().trim() ?? '';
+      if (value.isNotEmpty) return value;
+    }
+
+    return '';
   }
 }
 

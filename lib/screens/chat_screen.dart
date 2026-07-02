@@ -676,6 +676,12 @@ class _ChatScreenState extends State<ChatScreen> {
           action: 'message_edited',
           resourceType: 'message',
           resourceId: messageId,
+          metadata: {
+            'preview': updatedText,
+            'previous_text': currentText.trim(),
+            'course_id': widget.courseId,
+            'thread_id': widget.threadId,
+          },
         ),
       );
     } catch (error) {
@@ -687,7 +693,10 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> deleteMessage(String messageId) async {
+  Future<void> deleteMessage({
+    required String messageId,
+    required Map<String, dynamic> data,
+  }) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -727,6 +736,13 @@ class _ChatScreenState extends State<ChatScreen> {
           action: 'message_deleted',
           resourceType: 'message',
           resourceId: messageId,
+          metadata: {
+            'preview': _messagePreview(data),
+            'sender_name': data['sender_name']?.toString() ?? '',
+            'sender_role': data['sender_role']?.toString() ?? '',
+            'course_id': widget.courseId,
+            'thread_id': widget.threadId,
+          },
         ),
       );
     } catch (error) {
@@ -835,6 +851,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> togglePinMessage({
     required String messageId,
     required bool currentlyPinned,
+    required Map<String, dynamic> data,
   }) async {
     if (!canPinMessages) return;
 
@@ -852,6 +869,11 @@ class _ChatScreenState extends State<ChatScreen> {
           action: currentlyPinned ? 'message_unpinned' : 'message_pinned',
           resourceType: 'message',
           resourceId: messageId,
+          metadata: {
+            'preview': _messagePreview(data),
+            'course_id': widget.courseId,
+            'thread_id': widget.threadId,
+          },
         ),
       );
     } catch (error) {
@@ -1846,6 +1868,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                                       currentlyPinned:
                                                           data['pinned'] ==
                                                           true,
+                                                      data: data,
                                                     )
                                                   : null,
                                               onEdit:
@@ -1864,7 +1887,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                                   canManageMessage &&
                                                       data['deleted_at'] == null
                                                   ? () => deleteMessage(
-                                                      message.id,
+                                                      messageId: message.id,
+                                                      data: data,
                                                     )
                                                   : null,
                                             );

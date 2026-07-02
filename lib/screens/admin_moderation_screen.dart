@@ -215,6 +215,9 @@ class _AdminModerationScreenState extends State<AdminModerationScreen> {
           resourceType: 'message',
           resourceId: doc.id,
           metadata: {
+            'preview': _messagePreview(doc.data()),
+            'sender_name': doc.data()['sender_name']?.toString() ?? '',
+            'sender_role': doc.data()['sender_role']?.toString() ?? '',
             'course_id': pathInfo.courseId,
             'thread_id': pathInfo.threadId,
             'message_id': doc.id,
