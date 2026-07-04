@@ -30,7 +30,7 @@ class AdminDashboardScreen extends StatelessWidget {
       title: 'Logged out successfully',
       message: 'Your EACC Connection session was closed.',
       icon: Icons.logout_rounded,
-      color: AppColors.primary,
+      color: AppColors.danger,
     );
 
     if (!context.mounted) return;
@@ -166,8 +166,13 @@ class AdminDashboardScreen extends StatelessWidget {
           // Logout
           OutlinedButton.icon(
             onPressed: () => _logout(context),
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout_rounded),
             label: const Text('Logout'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.danger,
+              side: BorderSide(color: AppColors.danger.withValues(alpha: 0.55)),
+              textStyle: const TextStyle(fontWeight: FontWeight.w900),
+            ),
           ),
         ],
       ),
@@ -224,9 +229,11 @@ class _WelcomeHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                const Text(
-                  'EACC Administrator',
-                  style: TextStyle(
+                Text(
+                  isSuperAdmin
+                      ? 'EACC Super Administrator'
+                      : 'EACC Administrator',
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
@@ -258,7 +265,7 @@ class _WelcomeHeader extends StatelessWidget {
                       const SizedBox(width: 6),
                       Text(
                         isSuperAdmin
-                            ? 'Super admin moderation enabled'
+                            ? 'Full access enabled'
                             : 'Standard admin access',
                         style: const TextStyle(
                           color: Colors.white,

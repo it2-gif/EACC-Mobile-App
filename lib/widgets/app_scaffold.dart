@@ -29,7 +29,7 @@ class AppScaffold extends StatelessWidget {
       title: 'Logged out successfully',
       message: 'Your EACC Connection session was closed.',
       icon: Icons.logout_rounded,
-      color: AppColors.primary,
+      color: AppColors.danger,
     );
 
     if (!context.mounted) return;
@@ -51,10 +51,17 @@ class AppScaffold extends StatelessWidget {
         actions: [
           ...?actions,
           if (showLogout)
-            IconButton(
-              onPressed: () async => _logout(context),
-              icon: const Icon(Icons.logout),
-              tooltip: 'Logout',
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: TextButton.icon(
+                onPressed: () async => _logout(context),
+                icon: const Icon(Icons.logout_rounded, size: 18),
+                label: const Text('Logout'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.danger,
+                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
             ),
         ],
       ),

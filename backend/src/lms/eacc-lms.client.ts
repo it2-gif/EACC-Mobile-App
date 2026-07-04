@@ -91,6 +91,7 @@ export class EaccLmsClient implements LmsClient {
       timeout,
       credentials.role,
       credentials,
+      responseText,
     );
 
     if (credentials.role === 'student' || credentials.role === 'teacher') {
@@ -165,6 +166,7 @@ export class EaccLmsClient implements LmsClient {
     timeout: number,
     role: LmsUserRole,
     credentials?: LmsLoginCredentials,
+    loginResponseHtml = '',
   ): Promise<NormalizedLmsUser> {
     const html = await this.loadAuthenticatedHtml(url, sessionCookie, timeout);
 
@@ -177,7 +179,10 @@ export class EaccLmsClient implements LmsClient {
     }
 
     if (role === 'admin') {
-      return parseAdminIdentity(credentials!.username, html);
+      return parseAdminIdentity(
+        credentials!.username,
+        `${loginResponseHtml}\n${html}`,
+      );
     }
 
     throw new LmsUnavailableError();
@@ -245,12 +250,40 @@ function parseAdminIdentity(username: string, html: string): NormalizedLmsUser {
 function hasAdminFullAccess(html: string): boolean {
   const normalized = html.toLowerCase();
 
-  return [
-    /full[_-]?access['"\s:=]+1/,
-    /full[_-]?access['"\s:=]+true/,
-    /name=["']full[_-]?access["'][^>]*value=["']1["']/,
-    /name=["']full[_-]?access["'][^>]*value=["']true["']/,
-  ].some((pattern) => pattern.test(normalized));
+  const truthyValue = '(?:1|true|yes|y|on)';
+  const fullAccessKeys = [
+    'full[_-]?access',
+    'fullaccess',
+    'is[_-]?super[_-]?admin',
+    'super[_-]?admin',
+  ];
+
+  const directPatterns = fullAccessKeys.flatMap((key) => [
+    new RegExp(`\\b${key}\\b\\s*(?:=|:|=>)\\s*["']?${truthyValue}["']?`),
+    new RegExp(`["']${key}["']\\s*:\\s*["']?${truthyValue}["']?`),
+    new RegExp(`${key}["'\\s:=]+${truthyValue}`),
+  ]);
+
+  if (directPatterns.some((pattern) => pattern.test(normalized))) {
+    return true;
+  }
+
+  const inputPattern =
+    /<input[^>]+name\s*=\s*["']([^"']+)["'][^>]*value\s*=\s*["']?([^"'\s>]+)["']?[^>]*>/g;
+
+  for (const match of normalized.matchAll(inputPattern)) {
+    const key = match[1].replace(/[-_\s]/g, '');
+    const value = match[2].trim();
+
+    if (
+      ['fullaccess', 'issuperadmin', 'superadmin'].includes(key) &&
+      ['1', 'true', 'yes', 'y', 'on'].includes(value)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function extractSessionCookie(headers: Headers): string | undefined {
