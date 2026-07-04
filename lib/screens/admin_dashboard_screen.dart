@@ -7,6 +7,7 @@ import '../services/push_notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/action_feedback.dart';
 import '../widgets/app_scaffold.dart';
+import 'admin_analysis_screen.dart';
 import 'admin_announcements_screen.dart';
 import 'admin_audit_screen.dart';
 import 'admin_chats_screen.dart';
@@ -52,6 +53,15 @@ class AdminDashboardScreen extends StatelessWidget {
           _WelcomeHeader(
             name: session.appUser.name,
             isSuperAdmin: session.appUser.isSuperAdmin,
+          ),
+          const SizedBox(height: 14),
+          _AnalysisEntryButton(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AdminAnalysisScreen(session: session),
+              ),
+            ),
           ),
           const SizedBox(height: 20),
 
@@ -269,6 +279,83 @@ class _WelcomeHeader extends StatelessWidget {
 }
 
 // ─── Live stat cards ─────────────────────────────────────────────────────────
+
+class _AnalysisEntryButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _AnalysisEntryButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.analytics_rounded,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Application Analysis',
+                      style: TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 3),
+                    Text(
+                      'View courses, users, chats, messages, and upload totals.',
+                      style: TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.arrow_forward_rounded,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _StatsRow extends StatelessWidget {
   final AuthSession session;

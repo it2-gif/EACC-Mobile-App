@@ -55,6 +55,26 @@ class CourseActivitySummary {
   int get uploads => images + videos + documents;
 }
 
+class ApplicationActivitySummary {
+  final int chats;
+  final int messages;
+  final int images;
+  final int videos;
+  final int documents;
+  final int voiceMessages;
+
+  const ApplicationActivitySummary({
+    required this.chats,
+    required this.messages,
+    required this.images,
+    required this.videos,
+    required this.documents,
+    required this.voiceMessages,
+  });
+
+  int get uploads => images + videos + documents;
+}
+
 class FirestoreChatService {
   static const String announcementThreadId = 'announcements';
   static const String adminTeacherThreadId = 'admin_teacher';
@@ -254,6 +274,58 @@ class FirestoreChatService {
       documents: documents,
       voiceMessages: voiceMessages,
     );
+  }
+
+  static Future<ApplicationActivitySummary> getApplicationActivitySummary({
+    required Iterable<String> courseIds,
+  }) async {
+    var chats = 0;
+    var messages = 0;
+    var images = 0;
+    var videos = 0;
+    var documents = 0;
+    var voiceMessages = 0;
+
+    final uniqueCourseIds = courseIds
+        .map((courseId) => courseId.trim())
+        .where((courseId) => courseId.isNotEmpty)
+        .toSet();
+
+    for (final courseId in uniqueCourseIds) {
+      final threadSnapshot = await _threadsRef(courseId: courseId).get();
+      chats += threadSnapshot.docs.length;
+
+      for (final thread in threadSnapshot.docs) {
+        final messagesRef = thread.reference.collection('messages');
+        messages += await _countQuery(messagesRef);
+        images += await _countQuery(
+          messagesRef.where('type', isEqualTo: 'image'),
+        );
+        videos += await _countQuery(
+          messagesRef.where('type', isEqualTo: 'video'),
+        );
+        documents += await _countQuery(
+          messagesRef.where('type', isEqualTo: 'document'),
+        );
+        voiceMessages += await _countQuery(
+          messagesRef.where('type', isEqualTo: 'voice'),
+        );
+      }
+    }
+
+    return ApplicationActivitySummary(
+      chats: chats,
+      messages: messages,
+      images: images,
+      videos: videos,
+      documents: documents,
+      voiceMessages: voiceMessages,
+    );
+  }
+
+  static Future<int> _countQuery(Query<Map<String, dynamic>> query) async {
+    final snapshot = await query.count().get();
+    return snapshot.count ?? 0;
   }
 
   static Stream<QuerySnapshot<Map<String, dynamic>>> getAuditLogs({
