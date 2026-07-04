@@ -8,14 +8,47 @@ import '../widgets/app_scaffold.dart';
 import '../widgets/screen_header.dart';
 import 'chat_screen.dart';
 
-class AdminChatsScreen extends StatelessWidget {
+class AdminChatsScreen extends StatefulWidget {
   final AuthSession session;
 
   const AdminChatsScreen({super.key, required this.session});
 
   @override
+  State<AdminChatsScreen> createState() => _AdminChatsScreenState();
+}
+
+class _AdminChatsScreenState extends State<AdminChatsScreen> {
+  final courseIdController = TextEditingController();
+  Course? loadedCourse;
+  bool searched = false;
+
+  @override
+  void dispose() {
+    courseIdController.dispose();
+    super.dispose();
+  }
+
+  void _loadCourse() {
+    final courseId = courseIdController.text.trim();
+    if (courseId.isEmpty) return;
+
+    Course? match;
+    for (final course in widget.session.courses) {
+      if (course.id == courseId) {
+        match = course;
+        break;
+      }
+    }
+
+    setState(() {
+      searched = true;
+      loadedCourse = match;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final items = _buildChatItems(session.courses);
+    final items = loadedCourse == null ? <_ChatItem>[] : _buildChatItems();
 
     return AppScaffold(
       title: 'Chat Monitor',
@@ -25,26 +58,48 @@ class AdminChatsScreen extends StatelessWidget {
         children: [
           ScreenHeader(
             title: 'Chat Monitor',
-            subtitle: items.isEmpty
-                ? 'No LMS chats available yet.'
-                : '${items.length} conversation${items.length == 1 ? '' : 's'} ready from LMS sync.',
+            subtitle:
+                'Load one LMS course to monitor its teacher and student conversations.',
             icon: Icons.forum_rounded,
           ),
           const SizedBox(height: 18),
-          if (items.isEmpty)
-            const _EmptyState()
+          _CourseLookupBar(controller: courseIdController, onLoad: _loadCourse),
+          const SizedBox(height: 18),
+          if (!searched)
+            const _EmptyState(
+              icon: Icons.filter_alt_rounded,
+              title: 'Choose a course',
+              subtitle: 'Enter a course ID to show its monitorable chats.',
+            )
+          else if (loadedCourse == null)
+            const _EmptyState(
+              icon: Icons.search_off_rounded,
+              title: 'Course not found',
+              subtitle:
+                  'This admin session does not include that course. Log in again after LMS sync if it was recently added.',
+            )
+          else if (items.isEmpty)
+            const _EmptyState(
+              icon: Icons.forum_outlined,
+              title: 'No conversations yet',
+              subtitle: 'This course has no LMS student chats available.',
+            )
           else
-            ...items.map((item) => _ChatTile(item: item, session: session)),
+            ...items.map(
+              (item) => _ChatTile(item: item, session: widget.session),
+            ),
         ],
       ),
     );
   }
 
-  List<_ChatItem> _buildChatItems(List<Course> courses) {
+  List<_ChatItem> _buildChatItems() {
     final items = <_ChatItem>[];
+    final course = loadedCourse;
+    if (course == null) return items;
 
-    for (final course in courses) {
-      items.add(
+    items
+      ..add(
         _ChatItem(
           courseId: course.id,
           courseName: course.name,
@@ -57,11 +112,10 @@ class AdminChatsScreen extends StatelessWidget {
           icon: Icons.menu_book_rounded,
           color: AppColors.teacher,
         ),
-      );
-
-      for (final student in course.students) {
-        items.add(
-          _ChatItem(
+      )
+      ..addAll(
+        course.students.map(
+          (student) => _ChatItem(
             courseId: course.id,
             courseName: course.name,
             threadId: student.id,
@@ -73,9 +127,8 @@ class AdminChatsScreen extends StatelessWidget {
             color: AppColors.student,
             studentName: student.name,
           ),
-        );
-      }
-    }
+        ),
+      );
 
     items.sort((a, b) {
       final courseCompare = a.courseName.toLowerCase().compareTo(
@@ -86,6 +139,45 @@ class AdminChatsScreen extends StatelessWidget {
     });
 
     return items;
+  }
+}
+
+class _CourseLookupBar extends StatelessWidget {
+  final TextEditingController controller;
+  final VoidCallback onLoad;
+
+  const _CourseLookupBar({required this.controller, required this.onLoad});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.search,
+                decoration: const InputDecoration(
+                  labelText: 'Course ID',
+                  hintText: 'Enter course ID',
+                  prefixIcon: Icon(Icons.filter_alt_rounded),
+                ),
+                onSubmitted: (_) => onLoad(),
+              ),
+            ),
+            const SizedBox(width: 10),
+            FilledButton.icon(
+              onPressed: onLoad,
+              icon: const Icon(Icons.search_rounded),
+              label: const Text('Load'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -193,27 +285,35 @@ class _ChatTile extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Padding(
-        padding: EdgeInsets.only(top: 32),
+        padding: const EdgeInsets.only(top: 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.forum_outlined, size: 52, color: AppColors.muted),
-            SizedBox(height: 14),
+            Icon(icon, size: 52, color: AppColors.muted),
+            const SizedBox(height: 14),
             Text(
-              'No conversations yet',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              title,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
-              'Student chats will appear here once LMS courses are synced.',
+              subtitle,
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.muted),
+              style: const TextStyle(color: AppColors.muted),
             ),
           ],
         ),

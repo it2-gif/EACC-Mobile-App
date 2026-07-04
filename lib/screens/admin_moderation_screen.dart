@@ -17,8 +17,11 @@ class AdminModerationScreen extends StatefulWidget {
 }
 
 class _AdminModerationScreenState extends State<AdminModerationScreen> {
+  final courseIdController = TextEditingController();
   final searchController = TextEditingController();
   final selectedMessagePaths = <String>{};
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>? messagesFuture;
+  String loadedCourseId = '';
   String query = '';
   bool isDeleting = false;
 
@@ -26,6 +29,7 @@ class _AdminModerationScreenState extends State<AdminModerationScreen> {
 
   @override
   void dispose() {
+    courseIdController.dispose();
     searchController.dispose();
     super.dispose();
   }
@@ -34,123 +38,177 @@ class _AdminModerationScreenState extends State<AdminModerationScreen> {
   Widget build(BuildContext context) {
     return AppScaffold(
       title: 'Bulk Moderation',
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirestoreChatService.getRecentMessagesForModeration(limit: 160),
+      body: FutureBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+        future: messagesFuture,
         builder: (context, snapshot) {
+          if (messagesFuture == null) {
+            return _ModerationShell(
+              canBulkModerate: canBulkModerate,
+              courseIdController: courseIdController,
+              searchController: searchController,
+              query: query,
+              enabledSearch: false,
+              onLoad: _loadCourseMessages,
+              onClearSearch: _clearSearch,
+              onSearchChanged: (value) {
+                setState(() => query = value.trim().toLowerCase());
+              },
+              child: const _StateMessage(
+                icon: Icons.filter_alt_rounded,
+                title: 'Choose a course first',
+                message:
+                    'Enter a course ID to review and moderate messages from that course only.',
+              ),
+            );
+          }
+
           if (snapshot.hasError) {
-            return _StateMessage(
-              icon: Icons.error_outline_rounded,
-              title: 'Could not load messages',
-              message: '${snapshot.error}',
+            return _ModerationShell(
+              canBulkModerate: canBulkModerate,
+              courseIdController: courseIdController,
+              searchController: searchController,
+              query: query,
+              enabledSearch: false,
+              onLoad: _loadCourseMessages,
+              onClearSearch: _clearSearch,
+              onSearchChanged: (value) {
+                setState(() => query = value.trim().toLowerCase());
+              },
+              child: _StateMessage(
+                icon: Icons.error_outline_rounded,
+                title: 'Could not load messages',
+                message: '${snapshot.error}',
+              ),
             );
           }
 
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return _ModerationShell(
+              canBulkModerate: canBulkModerate,
+              courseIdController: courseIdController,
+              searchController: searchController,
+              query: query,
+              enabledSearch: false,
+              onLoad: _loadCourseMessages,
+              onClearSearch: _clearSearch,
+              onSearchChanged: (value) {
+                setState(() => query = value.trim().toLowerCase());
+              },
+              child: const Center(child: CircularProgressIndicator()),
+            );
           }
 
-          final allDocs = snapshot.data?.docs ?? [];
+          final allDocs = snapshot.data ?? [];
           final visibleDocs = allDocs.where(_matchesSearch).toList();
           final selectedDocs = visibleDocs
               .where((doc) => selectedMessagePaths.contains(doc.reference.path))
               .toList();
 
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
-                child: Column(
-                  children: [
-                    if (!canBulkModerate) const _PermissionBanner(),
-                    if (!canBulkModerate) const SizedBox(height: 10),
-                    TextField(
-                      controller: searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Search messages, files, sender, course',
-                        prefixIcon: const Icon(Icons.search_rounded),
-                        suffixIcon: query.isEmpty
-                            ? null
-                            : IconButton(
-                                tooltip: 'Clear search',
-                                onPressed: () {
-                                  searchController.clear();
-                                  setState(() => query = '');
-                                },
-                                icon: const Icon(Icons.close_rounded),
-                              ),
-                      ),
-                      onChanged: (value) {
-                        setState(() => query = value.trim().toLowerCase());
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    _ModerationToolbar(
-                      visibleCount: visibleDocs.length,
-                      selectedCount: selectedDocs.length,
-                      canBulkModerate: canBulkModerate,
-                      isDeleting: isDeleting,
-                      onSelectVisible: () {
-                        setState(() {
-                          for (final doc in visibleDocs) {
-                            if (doc.data()['deleted_at'] == null) {
-                              selectedMessagePaths.add(doc.reference.path);
-                            }
-                          }
-                        });
-                      },
-                      onClear: () => setState(selectedMessagePaths.clear),
-                      onDelete: selectedDocs.isEmpty
-                          ? null
-                          : () => _deleteSelected(selectedDocs),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: visibleDocs.isEmpty
-                    ? const _StateMessage(
-                        icon: Icons.manage_search_rounded,
-                        title: 'No matching messages',
-                        message:
-                            'Try another keyword or clear the search field.',
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-                        itemCount: visibleDocs.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final doc = visibleDocs[index];
-                          final data = doc.data();
-                          final deleted = data['deleted_at'] != null;
-                          final selected = selectedMessagePaths.contains(
-                            doc.reference.path,
-                          );
+          return _ModerationShell(
+            canBulkModerate: canBulkModerate,
+            courseIdController: courseIdController,
+            searchController: searchController,
+            query: query,
+            enabledSearch: true,
+            onLoad: _loadCourseMessages,
+            onClearSearch: _clearSearch,
+            onSearchChanged: (value) {
+              setState(() => query = value.trim().toLowerCase());
+            },
+            toolbar: _ModerationToolbar(
+              visibleCount: visibleDocs.length,
+              selectedCount: selectedDocs.length,
+              canBulkModerate: canBulkModerate,
+              isDeleting: isDeleting,
+              loadedCourseId: loadedCourseId,
+              onSelectVisible: () {
+                setState(() {
+                  for (final doc in visibleDocs) {
+                    if (doc.data()['deleted_at'] == null) {
+                      selectedMessagePaths.add(doc.reference.path);
+                    }
+                  }
+                });
+              },
+              onClear: () => setState(selectedMessagePaths.clear),
+              onDelete: selectedDocs.isEmpty
+                  ? null
+                  : () => _deleteSelected(selectedDocs),
+              onRefresh: _refreshLoadedCourse,
+            ),
+            child: visibleDocs.isEmpty
+                ? _StateMessage(
+                    icon: Icons.manage_search_rounded,
+                    title: allDocs.isEmpty
+                        ? 'No messages in this course'
+                        : 'No matching messages',
+                    message: allDocs.isEmpty
+                        ? 'Course $loadedCourseId has no loaded messages yet.'
+                        : 'Try another keyword or clear the search field.',
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                    itemCount: visibleDocs.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final doc = visibleDocs[index];
+                      final data = doc.data();
+                      final deleted = data['deleted_at'] != null;
+                      final selected = selectedMessagePaths.contains(
+                        doc.reference.path,
+                      );
 
-                          return _ModerationMessageTile(
-                            data: data,
-                            reference: doc.reference,
-                            selected: selected,
-                            canSelect: canBulkModerate && !deleted,
-                            onChanged: (checked) {
-                              setState(() {
-                                if (checked == true) {
-                                  selectedMessagePaths.add(doc.reference.path);
-                                } else {
-                                  selectedMessagePaths.remove(
-                                    doc.reference.path,
-                                  );
-                                }
-                              });
-                            },
-                          );
+                      return _ModerationMessageTile(
+                        data: data,
+                        reference: doc.reference,
+                        selected: selected,
+                        canSelect: canBulkModerate && !deleted,
+                        onChanged: (checked) {
+                          setState(() {
+                            if (checked == true) {
+                              selectedMessagePaths.add(doc.reference.path);
+                            } else {
+                              selectedMessagePaths.remove(doc.reference.path);
+                            }
+                          });
                         },
-                      ),
-              ),
-            ],
+                      );
+                    },
+                  ),
           );
         },
       ),
     );
+  }
+
+  void _loadCourseMessages() {
+    final courseId = courseIdController.text.trim();
+    if (courseId.isEmpty) return;
+
+    setState(() {
+      loadedCourseId = courseId;
+      selectedMessagePaths.clear();
+      messagesFuture =
+          FirestoreChatService.getRecentCourseMessagesForModeration(
+            courseId: courseId,
+          );
+    });
+  }
+
+  void _refreshLoadedCourse() {
+    if (loadedCourseId.isEmpty) return;
+    setState(() {
+      selectedMessagePaths.clear();
+      messagesFuture =
+          FirestoreChatService.getRecentCourseMessagesForModeration(
+            courseId: loadedCourseId,
+          );
+    });
+  }
+
+  void _clearSearch() {
+    searchController.clear();
+    setState(() => query = '');
   }
 
   bool _matchesSearch(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
@@ -227,6 +285,7 @@ class _AdminModerationScreenState extends State<AdminModerationScreen> {
 
       if (!mounted) return;
       setState(selectedMessagePaths.clear);
+      _refreshLoadedCourse();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Deleted $deletedCount selected message(s).')),
       );
@@ -259,13 +318,102 @@ class _AdminModerationScreenState extends State<AdminModerationScreen> {
   }
 }
 
+class _ModerationShell extends StatelessWidget {
+  final bool canBulkModerate;
+  final TextEditingController courseIdController;
+  final TextEditingController searchController;
+  final String query;
+  final bool enabledSearch;
+  final VoidCallback onLoad;
+  final VoidCallback onClearSearch;
+  final ValueChanged<String> onSearchChanged;
+  final Widget? toolbar;
+  final Widget child;
+
+  const _ModerationShell({
+    required this.canBulkModerate,
+    required this.courseIdController,
+    required this.searchController,
+    required this.query,
+    required this.enabledSearch,
+    required this.onLoad,
+    required this.onClearSearch,
+    required this.onSearchChanged,
+    required this.child,
+    this.toolbar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+          child: Column(
+            children: [
+              if (!canBulkModerate) const _PermissionBanner(),
+              if (!canBulkModerate) const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: courseIdController,
+                      keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.search,
+                      decoration: const InputDecoration(
+                        hintText: 'Course ID, for example 2203',
+                        labelText: 'Course ID',
+                        prefixIcon: Icon(Icons.filter_alt_rounded),
+                      ),
+                      onSubmitted: (_) => onLoad(),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  FilledButton.icon(
+                    onPressed: onLoad,
+                    icon: const Icon(Icons.manage_search_rounded),
+                    label: const Text('Load'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: searchController,
+                enabled: enabledSearch,
+                decoration: InputDecoration(
+                  hintText: enabledSearch
+                      ? 'Search loaded messages, files, sender'
+                      : 'Load a course before searching',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: query.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Clear search',
+                          onPressed: onClearSearch,
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                ),
+                onChanged: onSearchChanged,
+              ),
+              if (toolbar != null) ...[const SizedBox(height: 10), toolbar!],
+            ],
+          ),
+        ),
+        Expanded(child: child),
+      ],
+    );
+  }
+}
+
 class _ModerationToolbar extends StatelessWidget {
   final int visibleCount;
   final int selectedCount;
   final bool canBulkModerate;
   final bool isDeleting;
+  final String loadedCourseId;
   final VoidCallback onSelectVisible;
   final VoidCallback onClear;
+  final VoidCallback onRefresh;
   final VoidCallback? onDelete;
 
   const _ModerationToolbar({
@@ -273,8 +421,10 @@ class _ModerationToolbar extends StatelessWidget {
     required this.selectedCount,
     required this.canBulkModerate,
     required this.isDeleting,
+    required this.loadedCourseId,
     required this.onSelectVisible,
     required this.onClear,
+    required this.onRefresh,
     required this.onDelete,
   });
 
@@ -284,12 +434,17 @@ class _ModerationToolbar extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            '$visibleCount messages shown',
+            '$visibleCount messages shown from course $loadedCourseId',
             style: const TextStyle(
               color: AppColors.muted,
               fontWeight: FontWeight.w700,
             ),
           ),
+        ),
+        IconButton(
+          tooltip: 'Refresh course messages',
+          onPressed: onRefresh,
+          icon: const Icon(Icons.refresh_rounded),
         ),
         if (canBulkModerate) ...[
           TextButton(

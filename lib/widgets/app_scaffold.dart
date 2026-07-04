@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../screens/login_screen.dart';
 import '../services/auth_session_manager.dart';
 import '../services/push_notification_service.dart';
+import 'action_feedback.dart';
 
 class AppScaffold extends StatelessWidget {
   final String title;
@@ -23,10 +24,15 @@ class AppScaffold extends StatelessWidget {
     await AuthSessionManager().logout();
     await PushNotificationService.instance.deactivate();
     if (!context.mounted) return;
-    ScaffoldMessenger.of(
+    await showActionConfirmation(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Logged out successfully.')));
+      title: 'Logged out successfully',
+      message: 'Your EACC Connection session was closed.',
+      icon: Icons.logout_rounded,
+      color: AppColors.primary,
+    );
 
+    if (!context.mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const LoginScreen()),

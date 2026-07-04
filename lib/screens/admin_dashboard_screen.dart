@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../models/auth_session.dart';
@@ -6,7 +5,7 @@ import '../services/auth_session_manager.dart';
 import '../services/firestore_chat_service.dart';
 import '../services/push_notification_service.dart';
 import '../theme/app_theme.dart';
-import '../utils/time_format.dart';
+import '../widgets/action_feedback.dart';
 import '../widgets/app_scaffold.dart';
 import 'admin_announcements_screen.dart';
 import 'admin_audit_screen.dart';
@@ -25,9 +24,15 @@ class AdminDashboardScreen extends StatelessWidget {
     await AuthSessionManager().logout();
     await PushNotificationService.instance.deactivate();
     if (!context.mounted) return;
-    ScaffoldMessenger.of(
+    await showActionConfirmation(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Logged out successfully.')));
+      title: 'Logged out successfully',
+      message: 'Your EACC Connection session was closed.',
+      icon: Icons.logout_rounded,
+      color: AppColors.primary,
+    );
+
+    if (!context.mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -53,7 +58,7 @@ class AdminDashboardScreen extends StatelessWidget {
           // Live stat cards
           _StatsRow(session: session),
           const SizedBox(height: 24),
-          const _RecentActivityPanel(),
+          const _CourseActivityPanel(),
           const SizedBox(height: 24),
 
           // Navigation tiles
@@ -350,48 +355,132 @@ class _StatCard extends StatelessWidget {
 
 // ─── Navigation tile ─────────────────────────────────────────────────────────
 
-class _RecentActivityPanel extends StatelessWidget {
-  const _RecentActivityPanel();
+class _CourseActivityPanel extends StatefulWidget {
+  const _CourseActivityPanel();
+
+  @override
+  State<_CourseActivityPanel> createState() => _CourseActivityPanelState();
+}
+
+class _CourseActivityPanelState extends State<_CourseActivityPanel> {
+  final courseIdController = TextEditingController();
+  Future<CourseActivitySummary>? summaryFuture;
+  String loadedCourseId = '';
+
+  @override
+  void dispose() {
+    courseIdController.dispose();
+    super.dispose();
+  }
+
+  void _loadSummary() {
+    final courseId = courseIdController.text.trim();
+    if (courseId.isEmpty) return;
+
+    setState(() {
+      loadedCourseId = courseId;
+      summaryFuture = FirestoreChatService.getCourseActivitySummary(
+        courseId: courseId,
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirestoreChatService.getRecentThreads(limit: 5),
+    return FutureBuilder<CourseActivitySummary>(
+      future: summaryFuture,
       builder: (context, snapshot) {
-        final docs = snapshot.data?.docs ?? const [];
-
         return Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.bolt_rounded, color: AppColors.primary),
-                    SizedBox(width: 8),
-                    Text(
-                      'Recent activity',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.analytics_rounded,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Course activity summary',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Load one course to count recent messages and uploads.',
+                            style: TextStyle(
+                              color: AppColors.muted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                if (snapshot.connectionState == ConnectionState.waiting)
-                  const LinearProgressIndicator(minHeight: 3)
-                else if (docs.isEmpty)
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: courseIdController,
+                        keyboardType: TextInputType.number,
+                        textInputAction: TextInputAction.search,
+                        decoration: const InputDecoration(
+                          labelText: 'Course ID',
+                          hintText: 'Enter course ID',
+                          prefixIcon: Icon(Icons.filter_alt_rounded),
+                        ),
+                        onSubmitted: (_) => _loadSummary(),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    FilledButton.icon(
+                      onPressed: _loadSummary,
+                      icon: const Icon(Icons.insights_rounded),
+                      label: const Text('Show'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                if (summaryFuture == null)
                   const Text(
-                    'No chat activity yet.',
+                    'No course loaded yet.',
                     style: TextStyle(
                       color: AppColors.muted,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  )
+                else if (snapshot.connectionState == ConnectionState.waiting)
+                  const LinearProgressIndicator(minHeight: 3)
+                else if (snapshot.hasError)
+                  Text(
+                    'Could not load course $loadedCourseId: ${snapshot.error}',
+                    style: const TextStyle(
+                      color: AppColors.danger,
+                      fontWeight: FontWeight.w700,
                     ),
                   )
                 else
-                  ...docs.map((doc) => _ActivityRow(doc: doc)),
+                  _CourseSummaryGrid(summary: snapshot.data!),
               ],
             ),
           ),
@@ -401,88 +490,106 @@ class _RecentActivityPanel extends StatelessWidget {
   }
 }
 
-class _ActivityRow extends StatelessWidget {
-  final QueryDocumentSnapshot<Map<String, dynamic>> doc;
+class _CourseSummaryGrid extends StatelessWidget {
+  final CourseActivitySummary summary;
 
-  const _ActivityRow({required this.doc});
+  const _CourseSummaryGrid({required this.summary});
 
   @override
   Widget build(BuildContext context) {
-    final data = doc.data();
-    final courseId = doc.reference.parent.parent?.id ?? 'Course';
-    final title = _threadTitle(data, doc.id);
-    final lastMessage = data['last_message']?.toString().trim();
-    final time = formatThreadTime(
-      data['last_message_at'] ?? data['updated_at'],
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        _MiniStat(
+          label: 'Messages',
+          value: summary.messages,
+          icon: Icons.chat_bubble_rounded,
+          color: AppColors.primary,
+        ),
+        _MiniStat(
+          label: 'Uploads',
+          value: summary.uploads,
+          icon: Icons.cloud_upload_rounded,
+          color: AppColors.accent,
+        ),
+        _MiniStat(
+          label: 'Images',
+          value: summary.images,
+          icon: Icons.image_rounded,
+          color: AppColors.student,
+        ),
+        _MiniStat(
+          label: 'Videos',
+          value: summary.videos,
+          icon: Icons.videocam_rounded,
+          color: AppColors.admin,
+        ),
+        _MiniStat(
+          label: 'Docs',
+          value: summary.documents,
+          icon: Icons.description_rounded,
+          color: const Color(0xFF6A3DE8),
+        ),
+      ],
     );
+  }
+}
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
+class _MiniStat extends StatelessWidget {
+  final String label;
+  final int value;
+  final IconData icon;
+  final Color color;
+
+  const _MiniStat({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 124,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
       child: Row(
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.forum_rounded,
-              color: AppColors.primary,
-              size: 18,
-            ),
-          ),
-          const SizedBox(width: 10),
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  '$value',
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 Text(
-                  lastMessage?.isNotEmpty == true
-                      ? '$lastMessage - Course $courseId'
-                      : 'Course $courseId',
-                  maxLines: 1,
+                  label,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
           ),
-          if (time.isNotEmpty)
-            Text(
-              time,
-              style: const TextStyle(
-                color: AppColors.muted,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
         ],
       ),
     );
-  }
-
-  static String _threadTitle(Map<String, dynamic> data, String threadId) {
-    final studentName = data['student_name']?.toString().trim();
-    if (studentName != null && studentName.isNotEmpty) return studentName;
-
-    final title = data['title']?.toString().trim();
-    if (title != null && title.isNotEmpty) return title;
-
-    if (threadId == FirestoreChatService.announcementThreadId) {
-      return 'Announcement chat';
-    }
-    if (threadId == FirestoreChatService.adminTeacherThreadId) {
-      return 'Admin and teacher';
-    }
-    return 'Thread $threadId';
   }
 }
 

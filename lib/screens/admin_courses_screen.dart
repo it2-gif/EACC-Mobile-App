@@ -7,16 +7,46 @@ import '../widgets/app_scaffold.dart';
 import '../widgets/screen_header.dart';
 import 'admin_threads_screen.dart';
 
-class AdminCoursesScreen extends StatelessWidget {
+class AdminCoursesScreen extends StatefulWidget {
   final AuthSession session;
 
   const AdminCoursesScreen({super.key, required this.session});
 
   @override
-  Widget build(BuildContext context) {
-    final courses = [...session.courses]
-      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  State<AdminCoursesScreen> createState() => _AdminCoursesScreenState();
+}
 
+class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
+  final courseIdController = TextEditingController();
+  Course? loadedCourse;
+  bool searched = false;
+
+  @override
+  void dispose() {
+    courseIdController.dispose();
+    super.dispose();
+  }
+
+  void _loadCourse() {
+    final courseId = courseIdController.text.trim();
+    if (courseId.isEmpty) return;
+
+    Course? match;
+    for (final course in widget.session.courses) {
+      if (course.id == courseId) {
+        match = course;
+        break;
+      }
+    }
+
+    setState(() {
+      searched = true;
+      loadedCourse = match;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return AppScaffold(
       title: 'All Courses',
       showLogout: false,
@@ -24,28 +54,69 @@ class AdminCoursesScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
           ScreenHeader(
-            title: 'All Courses',
-            subtitle: courses.isEmpty
-                ? 'No LMS courses were synced for this admin account yet.'
-                : '${courses.length} course${courses.length == 1 ? '' : 's'} synced from the LMS.',
+            title: 'Course lookup',
+            subtitle:
+                'Enter a course ID to open its students and chats without rendering every LMS course.',
             icon: Icons.menu_book_rounded,
           ),
           const SizedBox(height: 18),
-          if (courses.isEmpty)
+          _CourseLookupBar(controller: courseIdController, onLoad: _loadCourse),
+          const SizedBox(height: 18),
+          if (!searched)
             const _FullState(
-              icon: Icons.menu_book_outlined,
-              title: 'No courses yet',
+              icon: Icons.filter_alt_rounded,
+              title: 'Choose a course',
+              subtitle: 'Use the LMS course ID, for example 2203 or 2285.',
+            )
+          else if (loadedCourse == null)
+            const _FullState(
+              icon: Icons.search_off_rounded,
+              title: 'Course not found',
               subtitle:
-                  'Courses will appear here after LMS sync brings them into Postgres.',
+                  'This admin session does not include that course. Log in again after LMS sync if it was recently added.',
             )
           else
-            ...courses.map((course) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _CourseCard(course: course, session: session),
-              );
-            }),
+            _CourseCard(course: loadedCourse!, session: widget.session),
         ],
+      ),
+    );
+  }
+}
+
+class _CourseLookupBar extends StatelessWidget {
+  final TextEditingController controller;
+  final VoidCallback onLoad;
+
+  const _CourseLookupBar({required this.controller, required this.onLoad});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.search,
+                decoration: const InputDecoration(
+                  labelText: 'Course ID',
+                  hintText: 'Enter course ID',
+                  prefixIcon: Icon(Icons.filter_alt_rounded),
+                ),
+                onSubmitted: (_) => onLoad(),
+              ),
+            ),
+            const SizedBox(width: 10),
+            FilledButton.icon(
+              onPressed: onLoad,
+              icon: const Icon(Icons.search_rounded),
+              label: const Text('Load'),
+            ),
+          ],
+        ),
       ),
     );
   }

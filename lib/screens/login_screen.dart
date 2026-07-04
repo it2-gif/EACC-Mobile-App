@@ -6,6 +6,7 @@ import '../services/auth_api.dart';
 import '../services/auth_session_manager.dart';
 import '../services/push_notification_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/action_feedback.dart';
 import 'admin_dashboard_screen.dart';
 import 'student_courses_screen.dart';
 import 'teacher_courses_screen.dart';
@@ -71,10 +72,13 @@ class _LoginScreenState extends State<LoginScreen> {
       await PushNotificationService.instance.activate(session);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(
+      await showActionConfirmation(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Logged in successfully.')));
+        title: 'Logged in successfully',
+        message: 'Welcome back to EACC Connection.',
+      );
 
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(

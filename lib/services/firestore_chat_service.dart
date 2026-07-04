@@ -37,6 +37,24 @@ class MessageReply {
   }
 }
 
+class CourseActivitySummary {
+  final int messages;
+  final int images;
+  final int videos;
+  final int documents;
+  final int voiceMessages;
+
+  const CourseActivitySummary({
+    required this.messages,
+    required this.images,
+    required this.videos,
+    required this.documents,
+    required this.voiceMessages,
+  });
+
+  int get uploads => images + videos + documents;
+}
+
 class FirestoreChatService {
   static const String announcementThreadId = 'announcements';
   static const String adminTeacherThreadId = 'admin_teacher';
@@ -118,16 +136,6 @@ class FirestoreChatService {
     ).orderBy('updated_at', descending: true).snapshots();
   }
 
-  static Stream<QuerySnapshot<Map<String, dynamic>>> getRecentThreads({
-    int limit = 8,
-  }) {
-    return _db
-        .collectionGroup('threads')
-        .orderBy('updated_at', descending: true)
-        .limit(limit)
-        .snapshots();
-  }
-
   static Stream<DocumentSnapshot<Map<String, dynamic>>> getThread({
     required String courseId,
     required String threadId,
@@ -161,13 +169,91 @@ class FirestoreChatService {
     return getThread(courseId: courseId, threadId: announcementThreadId);
   }
 
-  static Stream<QuerySnapshot<Map<String, dynamic>>>
-  getRecentMessagesForModeration({int limit = 100}) {
-    return _db
-        .collectionGroup('messages')
-        .orderBy('created_at', descending: true)
-        .limit(limit)
-        .snapshots();
+  static Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+  getRecentCourseMessagesForModeration({
+    required String courseId,
+    int maxThreads = 60,
+    int messagesPerThread = 12,
+    int limit = 80,
+  }) async {
+    final normalizedCourseId = courseId.trim();
+    if (normalizedCourseId.isEmpty) return [];
+
+    final threadSnapshot = await _threadsRef(
+      courseId: normalizedCourseId,
+    ).orderBy('updated_at', descending: true).limit(maxThreads).get();
+
+    final messageSnapshots = await Future.wait(
+      threadSnapshot.docs.map((thread) {
+        return thread.reference
+            .collection('messages')
+            .orderBy('created_at', descending: true)
+            .limit(messagesPerThread)
+            .get();
+      }),
+    );
+
+    final docs = messageSnapshots
+        .expand((snapshot) => snapshot.docs)
+        .toList(growable: false);
+
+    final sortedDocs = [...docs]
+      ..sort((a, b) {
+        final aTime = a.data()['created_at'];
+        final bTime = b.data()['created_at'];
+        final aDate = aTime is Timestamp
+            ? aTime.toDate()
+            : DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate = bTime is Timestamp
+            ? bTime.toDate()
+            : DateTime.fromMillisecondsSinceEpoch(0);
+        return bDate.compareTo(aDate);
+      });
+
+    return sortedDocs.take(limit).toList(growable: false);
+  }
+
+  static Future<CourseActivitySummary> getCourseActivitySummary({
+    required String courseId,
+    int maxThreads = 80,
+    int messagesPerThread = 50,
+  }) async {
+    final docs = await getRecentCourseMessagesForModeration(
+      courseId: courseId,
+      maxThreads: maxThreads,
+      messagesPerThread: messagesPerThread,
+      limit: maxThreads * messagesPerThread,
+    );
+
+    var images = 0;
+    var videos = 0;
+    var documents = 0;
+    var voiceMessages = 0;
+
+    for (final doc in docs) {
+      switch (doc.data()['type']?.toString()) {
+        case 'image':
+          images++;
+          break;
+        case 'video':
+          videos++;
+          break;
+        case 'document':
+          documents++;
+          break;
+        case 'voice':
+          voiceMessages++;
+          break;
+      }
+    }
+
+    return CourseActivitySummary(
+      messages: docs.length,
+      images: images,
+      videos: videos,
+      documents: documents,
+      voiceMessages: voiceMessages,
+    );
   }
 
   static Stream<QuerySnapshot<Map<String, dynamic>>> getAuditLogs({
