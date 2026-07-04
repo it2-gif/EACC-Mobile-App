@@ -55,15 +55,17 @@ class AdminDashboardScreen extends StatelessWidget {
             isSuperAdmin: session.appUser.isSuperAdmin,
           ),
           const SizedBox(height: 14),
-          _AnalysisEntryButton(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => AdminAnalysisScreen(session: session),
+          if (session.appUser.isSuperAdmin) ...[
+            _AnalysisEntryButton(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AdminAnalysisScreen(session: session),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 20),
+            const SizedBox(height: 20),
+          ],
 
           // Live stat cards
           _StatsRow(session: session),
@@ -134,34 +136,35 @@ class AdminDashboardScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          _NavTile(
-            icon: Icons.admin_panel_settings_rounded,
-            title: 'Bulk Moderation',
-            subtitle: session.appUser.isSuperAdmin
-                ? 'Search and soft-delete selected messages'
-                : 'Review recent messages with super-admin controls locked',
-            color: AppColors.danger,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => AdminModerationScreen(session: session),
+          if (session.appUser.isSuperAdmin) ...[
+            _NavTile(
+              icon: Icons.admin_panel_settings_rounded,
+              title: 'Bulk Moderation',
+              subtitle: 'Search and soft-delete selected messages',
+              color: AppColors.danger,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AdminModerationScreen(session: session),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 10),
-          _NavTile(
-            icon: Icons.history_edu_rounded,
-            title: 'Audit Trail',
-            subtitle: 'Review message edits, deletes, pins, and moderation',
-            color: AppColors.primaryDark,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => AdminAuditScreen(session: session),
+            const SizedBox(height: 10),
+            _NavTile(
+              icon: Icons.history_edu_rounded,
+              title: 'Audit Trail',
+              subtitle: 'Review message edits, deletes, pins, and moderation',
+              color: AppColors.primaryDark,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AdminAuditScreen(session: session),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 24),
+            const SizedBox(height: 24),
+          ] else
+            const SizedBox(height: 24),
 
           // Logout
           OutlinedButton.icon(
