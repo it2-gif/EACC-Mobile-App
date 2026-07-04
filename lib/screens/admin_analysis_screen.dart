@@ -97,6 +97,7 @@ class _AnalysisData {
   final int videos;
   final int documents;
   final int voiceMessages;
+  final int uploadedBytes;
   final String? usersError;
 
   const _AnalysisData({
@@ -111,6 +112,7 @@ class _AnalysisData {
     required this.videos,
     required this.documents,
     required this.voiceMessages,
+    required this.uploadedBytes,
     this.usersError,
   });
 
@@ -156,9 +158,12 @@ class _AnalysisData {
       videos: activity.videos,
       documents: activity.documents,
       voiceMessages: activity.voiceMessages,
+      uploadedBytes: activity.uploadedBytes,
       usersError: usersError,
     );
   }
+
+  int get storageItems => uploads + voiceMessages;
 }
 
 class _AnalysisContent extends StatelessWidget {
@@ -177,6 +182,8 @@ class _AnalysisContent extends StatelessWidget {
           _WarningBanner(message: data.usersError!),
           const SizedBox(height: 14),
         ],
+        _CostUsagePanel(data: data),
+        const SizedBox(height: 18),
         _SectionTitle(
           title: 'LMS structure',
           subtitle: 'People and courses available to this admin session.',
@@ -351,6 +358,367 @@ class _OverviewHero extends StatelessWidget {
   }
 }
 
+class _CostUsagePanel extends StatelessWidget {
+  static const int _firebaseStorageFreeBytes = 5 * 1024 * 1024 * 1024;
+  static const int _firebaseUploadRequestsFreeMonthly = 5000;
+  static const int _firestoreReadReferenceDaily = 50000;
+  static const int _firestoreWriteReferenceDaily = 20000;
+
+  final _AnalysisData data;
+
+  const _CostUsagePanel({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final storageRatio = _safeRatio(
+      data.uploadedBytes,
+      _firebaseStorageFreeBytes,
+    );
+    final uploadRatio = _safeRatio(
+      data.storageItems,
+      _firebaseUploadRequestsFreeMonthly,
+    );
+    final messageReadRatio = _safeRatio(
+      data.messages,
+      _firestoreReadReferenceDaily,
+    );
+    final messageWriteRatio = _safeRatio(
+      data.messages,
+      _firestoreWriteReferenceDaily,
+    );
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.savings_rounded,
+                    color: AppColors.success,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Cost and usage estimate',
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Estimated from app data. Firebase and Railway remain the billing source of truth.',
+                        style: TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _UsageLimitRow(
+              icon: Icons.storage_rounded,
+              title: 'Firebase Storage',
+              value: _formatBytes(data.uploadedBytes),
+              limit: '5 GB free storage reference',
+              ratio: storageRatio,
+              color: AppColors.accent,
+            ),
+            const SizedBox(height: 12),
+            _UsageLimitRow(
+              icon: Icons.cloud_upload_rounded,
+              title: 'Upload records',
+              value: '${data.storageItems}',
+              limit: '5K upload requests/month reference',
+              ratio: uploadRatio,
+              color: AppColors.student,
+            ),
+            const SizedBox(height: 12),
+            _UsageLimitRow(
+              icon: Icons.mark_chat_read_rounded,
+              title: 'Message read volume',
+              value: '${data.messages}',
+              limit: '50K Firestore reads/day reference',
+              ratio: messageReadRatio,
+              color: AppColors.primary,
+            ),
+            const SizedBox(height: 12),
+            _UsageLimitRow(
+              icon: Icons.edit_note_rounded,
+              title: 'Message write volume',
+              value: '${data.messages}',
+              limit: '20K Firestore writes/day reference',
+              ratio: messageWriteRatio,
+              color: const Color(0xFF6A3DE8),
+            ),
+            const SizedBox(height: 14),
+            const Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _CostChip(
+                  icon: Icons.rocket_launch_rounded,
+                  title: 'Railway backend',
+                  value: 'USD 5/month',
+                  note: 'Current hosting estimate',
+                  color: AppColors.primary,
+                ),
+                _CostChip(
+                  icon: Icons.local_fire_department_rounded,
+                  title: 'Firebase',
+                  value: 'Free tier',
+                  note: 'Until usage passes free limits',
+                  color: AppColors.admin,
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.14),
+                ),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.dns_rounded, color: AppColors.primary, size: 20),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Railway backend is the fixed hosted service. Your current planning estimate is the Railway hobby cost plus any Firebase overage after free limits.',
+                      style: TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CostChip extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+  final String note;
+  final Color color;
+
+  const _CostChip({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.note,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 260,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  note,
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UsageLimitRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+  final String limit;
+  final double ratio;
+  final Color color;
+
+  const _UsageLimitRow({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.limit,
+    required this.ratio,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final status = _usageStatus(ratio);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.045),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.13)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: AppColors.ink,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      limit,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    value,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  _UsageStatusChip(status: status),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: ratio,
+              minHeight: 7,
+              backgroundColor: color.withValues(alpha: 0.11),
+              color: status.color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UsageStatusChip extends StatelessWidget {
+  final _UsageStatus status;
+
+  const _UsageStatusChip({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: status.color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: status.color.withValues(alpha: 0.18)),
+      ),
+      child: Text(
+        status.label,
+        style: TextStyle(
+          color: status.color,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _UsageStatus {
+  final String label;
+  final Color color;
+
+  const _UsageStatus({required this.label, required this.color});
+}
+
 class _MetricGrid extends StatelessWidget {
   final List<_MetricData> cards;
 
@@ -514,6 +882,39 @@ class _WarningBanner extends StatelessWidget {
       ),
     );
   }
+}
+
+double _safeRatio(int value, int limit) {
+  if (limit <= 0) return 0;
+  return (value / limit).clamp(0.0, 1.0);
+}
+
+String _formatBytes(int bytes) {
+  if (bytes <= 0) return '0 B';
+
+  const units = ['B', 'KB', 'MB', 'GB'];
+  var value = bytes.toDouble();
+  var unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+
+  final decimals = value >= 10 || unitIndex == 0 ? 0 : 1;
+  return '${value.toStringAsFixed(decimals)} ${units[unitIndex]}';
+}
+
+_UsageStatus _usageStatus(double ratio) {
+  if (ratio >= 0.9) {
+    return const _UsageStatus(label: 'High', color: AppColors.danger);
+  }
+
+  if (ratio >= 0.7) {
+    return const _UsageStatus(label: 'Watch', color: AppColors.admin);
+  }
+
+  return const _UsageStatus(label: 'Healthy', color: AppColors.success);
 }
 
 class _AnalysisLoading extends StatelessWidget {

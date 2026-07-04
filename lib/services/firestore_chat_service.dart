@@ -62,6 +62,7 @@ class ApplicationActivitySummary {
   final int videos;
   final int documents;
   final int voiceMessages;
+  final int uploadedBytes;
 
   const ApplicationActivitySummary({
     required this.chats,
@@ -70,9 +71,11 @@ class ApplicationActivitySummary {
     required this.videos,
     required this.documents,
     required this.voiceMessages,
+    required this.uploadedBytes,
   });
 
   int get uploads => images + videos + documents;
+  int get storageItems => images + videos + documents + voiceMessages;
 }
 
 class FirestoreChatService {
@@ -285,6 +288,7 @@ class FirestoreChatService {
     var videos = 0;
     var documents = 0;
     var voiceMessages = 0;
+    var uploadedBytes = 0;
 
     final uniqueCourseIds = courseIds
         .map((courseId) => courseId.trim())
@@ -310,6 +314,18 @@ class FirestoreChatService {
         voiceMessages += await _countQuery(
           messagesRef.where('type', isEqualTo: 'voice'),
         );
+        uploadedBytes += await _sumFileSizeBytes(
+          messagesRef.where('type', isEqualTo: 'image'),
+        );
+        uploadedBytes += await _sumFileSizeBytes(
+          messagesRef.where('type', isEqualTo: 'video'),
+        );
+        uploadedBytes += await _sumFileSizeBytes(
+          messagesRef.where('type', isEqualTo: 'document'),
+        );
+        uploadedBytes += await _sumFileSizeBytes(
+          messagesRef.where('type', isEqualTo: 'voice'),
+        );
       }
     }
 
@@ -320,12 +336,26 @@ class FirestoreChatService {
       videos: videos,
       documents: documents,
       voiceMessages: voiceMessages,
+      uploadedBytes: uploadedBytes,
     );
   }
 
   static Future<int> _countQuery(Query<Map<String, dynamic>> query) async {
     final snapshot = await query.count().get();
     return snapshot.count ?? 0;
+  }
+
+  static Future<int> _sumFileSizeBytes(
+    Query<Map<String, dynamic>> query,
+  ) async {
+    final snapshot = await query.get();
+    var total = 0;
+
+    for (final doc in snapshot.docs) {
+      total += (doc.data()['file_size_bytes'] as num?)?.toInt() ?? 0;
+    }
+
+    return total;
   }
 
   static Stream<QuerySnapshot<Map<String, dynamic>>> getAuditLogs({
