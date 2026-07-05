@@ -253,7 +253,6 @@ function parseAdminIdentity(username: string, html: string): NormalizedLmsUser {
       'username',
       'admin_name',
       'ad_name',
-      'name',
     ]) ?? trimmed;
 
   return {
