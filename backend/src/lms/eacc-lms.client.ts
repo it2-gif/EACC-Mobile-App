@@ -233,26 +233,66 @@ function tryParseJson(value: string): { value: unknown } | undefined {
   }
 }
 
-/**
- * Admin identity is derived from the login username.
- * front.php contains no user-specific identity fields, so the username
- * acts as the stable LMS user ID. The display name is capitalised from
- * the username for a clean presentation in chat.
- */
 function parseAdminIdentity(username: string, html: string): NormalizedLmsUser {
   const trimmed = username.trim().toLowerCase();
-  const displayName = trimmed
-    .split(/[._\-\s]+/)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+  const lmsUserId =
+    readAdminIdentityValue(html, [
+      'admin_id',
+      'ad_id',
+      'adminId',
+      'user_id',
+      'userId',
+    ]) ?? trimmed;
+  const displayName =
+    readAdminIdentityValue(html, [
+      'admin_shortname',
+      'adminShortname',
+      'short_name',
+      'shortName',
+      'shortname',
+      'username',
+      'admin_name',
+      'ad_name',
+      'name',
+    ]) ?? trimmed;
 
   return {
-    lmsUserId: trimmed,
+    lmsUserId,
     role: 'admin',
-    name: displayName || trimmed,
+    name: displayName,
     isSuperAdmin: hasAdminFullAccess(html),
     courses: [],
   };
+}
+
+function readAdminIdentityValue(
+  html: string,
+  keys: string[],
+): string | undefined {
+  for (const key of keys) {
+    const escapedKey = escapeRegex(key);
+    const patterns = [
+      new RegExp(`["']${escapedKey}["']\\s*:\\s*["']?([^"',}\\s]+)`, 'i'),
+      new RegExp(`\\b${escapedKey}\\b\\s*(?:=|:|=>)\\s*["']?([^"',}\\s<>]+)`, 'i'),
+      new RegExp(
+        `name=["']${escapedKey}["'][^>]*value=["']?([^"'>\\s]+)`,
+        'i',
+      ),
+    ];
+
+    for (const pattern of patterns) {
+      const value = pattern.exec(html)?.[1]?.trim();
+      if (value) {
+        return value;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function hasAdminFullAccess(html: string): boolean {

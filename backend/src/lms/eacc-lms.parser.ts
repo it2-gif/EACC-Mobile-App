@@ -22,8 +22,18 @@ const userFields: Record<
     email: ['te_email', 'teacher_email', 'email'],
   },
   admin: {
-    id: ['admin_id', 'ad_id', 'id'],
-    name: ['admin_name', 'ad_name', 'name', 'username'],
+    id: ['admin_id', 'ad_id', 'adminId', 'user_id', 'userId', 'id'],
+    name: [
+      'admin_shortname',
+      'adminShortname',
+      'short_name',
+      'shortName',
+      'shortname',
+      'admin_name',
+      'ad_name',
+      'name',
+      'username',
+    ],
     email: ['admin_email', 'ad_email', 'email'],
   },
 };
