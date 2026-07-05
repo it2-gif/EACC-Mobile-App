@@ -11,6 +11,7 @@ import {
   InvalidLmsCredentialsError,
   LmsUnavailableError,
 } from './eacc-lms.errors';
+import { parseAdminCoursesHtml } from './eacc-lms.admin-courses-parser';
 import { parseTeacherCourseStudentsHtml } from './eacc-lms.course-students-parser';
 import { parseStudentCoursesHtml } from './eacc-lms.courses-parser';
 import { parseLmsDashboardHtml } from './eacc-lms.html-parser';
@@ -179,10 +180,17 @@ export class EaccLmsClient implements LmsClient {
     }
 
     if (role === 'admin') {
-      return parseAdminIdentity(
+      const admin = parseAdminIdentity(
         credentials!.username,
         `${loginResponseHtml}\n${html}`,
       );
+
+      return admin.isSuperAdmin
+        ? admin
+        : {
+            ...admin,
+            courses: parseAdminCoursesHtml(html, admin.lmsUserId, admin.name),
+          };
     }
 
     throw new LmsUnavailableError();
