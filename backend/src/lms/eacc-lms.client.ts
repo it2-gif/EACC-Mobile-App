@@ -242,7 +242,9 @@ function parseAdminIdentity(username: string, html: string): NormalizedLmsUser {
       'adminId',
       'user_id',
       'userId',
-    ]) ?? trimmed;
+    ]) ??
+    readAdminIdOverride(trimmed) ??
+    trimmed;
   const displayName =
     readAdminIdentityValue(html, [
       'admin_shortname',
@@ -262,6 +264,25 @@ function parseAdminIdentity(username: string, html: string): NormalizedLmsUser {
     isSuperAdmin: hasAdminFullAccess(html),
     courses: [],
   };
+}
+
+function readAdminIdOverride(username: string): string | undefined {
+  const overrides = process.env.LMS_ADMIN_ID_OVERRIDES;
+  if (!overrides) {
+    return undefined;
+  }
+
+  for (const entry of overrides.split(',')) {
+    const [rawUsername, rawLmsId] = entry.split(':');
+    const normalizedUsername = rawUsername?.trim().toLowerCase();
+    const lmsId = rawLmsId?.trim();
+
+    if (normalizedUsername === username && lmsId) {
+      return lmsId;
+    }
+  }
+
+  return undefined;
 }
 
 function readAdminIdentityValue(
