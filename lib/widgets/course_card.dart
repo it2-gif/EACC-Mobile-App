@@ -21,6 +21,8 @@ class CourseCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasTeacher =
         course.teacherName != null && course.teacherName!.trim().isNotEmpty;
+    final hasKeyPerson =
+        course.keyPersonName != null && course.keyPersonName!.trim().isNotEmpty;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -162,6 +164,48 @@ class CourseCard extends StatelessWidget {
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       color: AppColors.ink,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (hasKeyPerson)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: AppColors.primary.withValues(
+                                  alpha: 0.18,
+                                ),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.verified_user_outlined,
+                                  size: 14,
+                                  color: AppColors.primaryDark,
+                                ),
+                                const SizedBox(width: 5),
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 160,
+                                  ),
+                                  child: Text(
+                                    'Managed by ${course.keyPersonName!}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: AppColors.primaryDark,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
                                     ),

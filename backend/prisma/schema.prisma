@@ -86,6 +86,8 @@ model Course {
   lmsCourseId String       @map("lms_course_id") @db.VarChar(100)
   name        String       @db.VarChar(250)
   category    String?      @db.VarChar(200)
+  keyPersonLmsUserId String? @map("key_person_lms_user_id") @db.VarChar(100)
+  keyPersonName      String? @map("key_person_name") @db.VarChar(200)
   status      CourseStatus @default(ACTIVE)
   startsAt    DateTime?    @map("starts_at") @db.Timestamptz(6)
   endsAt      DateTime?    @map("ends_at") @db.Timestamptz(6)
@@ -97,6 +99,7 @@ model Course {
   @@unique([lmsSource, lmsCourseId])
   @@index([status])
   @@index([name])
+  @@index([keyPersonLmsUserId])
   @@map("courses")
 }
 

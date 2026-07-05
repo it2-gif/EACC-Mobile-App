@@ -3,6 +3,8 @@ class Course {
   final String name;
   final String category;
   final String? teacherName;
+  final String? keyPersonLmsUserId;
+  final String? keyPersonName;
   final List<CourseStudent> students;
 
   Course({
@@ -10,6 +12,8 @@ class Course {
     required this.name,
     required this.category,
     this.teacherName,
+    this.keyPersonLmsUserId,
+    this.keyPersonName,
     this.students = const [],
   });
 
@@ -22,6 +26,8 @@ class Course {
       name: json['name'] as String,
       category: category,
       teacherName: _readTeacherName(json) ?? _extractTeacherName(category),
+      keyPersonLmsUserId: _readKeyPersonLmsUserId(json),
+      keyPersonName: _readKeyPersonName(json),
       students: students
           .map(
             (student) =>
@@ -37,6 +43,8 @@ class Course {
       'name': name,
       'category': category,
       'teacherName': teacherName,
+      'keyPersonLmsUserId': keyPersonLmsUserId,
+      'keyPersonName': keyPersonName,
       'students': students.map((student) => student.toJson()).toList(),
     };
   }
@@ -51,6 +59,25 @@ class Course {
 
   static String? _readTeacherName(Map<String, dynamic> json) {
     final value = json['teacherName'] ?? json['teacher_name'];
+    if (value is String && value.trim().isNotEmpty) {
+      return value.trim();
+    }
+
+    return null;
+  }
+
+  static String? _readKeyPersonLmsUserId(Map<String, dynamic> json) {
+    final value =
+        json['keyPersonLmsUserId'] ?? json['key_person_lms_user_id'];
+    if (value is String && value.trim().isNotEmpty) {
+      return value.trim();
+    }
+
+    return null;
+  }
+
+  static String? _readKeyPersonName(Map<String, dynamic> json) {
+    final value = json['keyPersonName'] ?? json['key_person_name'];
     if (value is String && value.trim().isNotEmpty) {
       return value.trim();
     }

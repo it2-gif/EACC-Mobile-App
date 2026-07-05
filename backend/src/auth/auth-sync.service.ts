@@ -78,11 +78,15 @@ export class AuthSyncService {
         lmsCourseId: lmsCourse.lmsCourseId,
         name: lmsCourse.name,
         category: lmsCourse.category,
+        keyPersonLmsUserId: lmsCourse.keyPersonLmsUserId,
+        keyPersonName: lmsCourse.keyPersonName,
         status: CourseStatus.ACTIVE,
       },
       update: {
         name: lmsCourse.name,
         category: lmsCourse.category,
+        keyPersonLmsUserId: lmsCourse.keyPersonLmsUserId,
+        keyPersonName: lmsCourse.keyPersonName,
         status: CourseStatus.ACTIVE,
       },
     });

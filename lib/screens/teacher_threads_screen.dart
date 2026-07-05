@@ -16,18 +16,32 @@ class TeacherThreadsScreen extends StatelessWidget {
   final String viewerRole;
   final String senderName;
   final List<CourseStudent> students;
+  final String viewerLmsUserId;
+  final bool isSuperAdmin;
+  final String? courseKeyPersonLmsUserId;
+  final String? courseKeyPersonName;
 
   const TeacherThreadsScreen({
     super.key,
     required this.courseId,
     required this.courseName,
     required this.senderName,
+    required this.viewerLmsUserId,
+    required this.isSuperAdmin,
+    this.courseKeyPersonLmsUserId,
+    this.courseKeyPersonName,
     this.viewerRole = 'teacher',
     this.students = const [],
   });
 
   @override
   Widget build(BuildContext context) {
+    final canManageCourse =
+        isSuperAdmin ||
+        (courseKeyPersonLmsUserId != null &&
+            viewerLmsUserId == courseKeyPersonLmsUserId);
+    final keyPersonName = courseKeyPersonName?.trim();
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -43,16 +57,28 @@ class TeacherThreadsScreen extends StatelessWidget {
                 fontWeight: FontWeight.normal,
               ),
             ),
+            if (keyPersonName != null && keyPersonName.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                'Key person: $keyPersonName',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: 'Broadcast message',
-            icon: const Icon(Icons.mark_email_unread_rounded),
-            onPressed: students.isEmpty
-                ? null
-                : () => _showStudentBroadcastSheet(context),
-          ),
+          if (canManageCourse)
+            IconButton(
+              tooltip: 'Broadcast message',
+              icon: const Icon(Icons.mark_email_unread_rounded),
+              onPressed: students.isEmpty
+                  ? null
+                  : () => _showStudentBroadcastSheet(context),
+            ),
         ],
       ),
       body: SafeArea(
@@ -78,10 +104,11 @@ class TeacherThreadsScreen extends StatelessWidget {
 
                 final threads = snapshot.data?.docs ?? [];
                 final items = _buildStudentChatItems(threads);
+                final totalItems = items.length + 1 + (canManageCourse ? 1 : 0);
 
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: items.length + 2,
+                  itemCount: totalItems,
                   itemBuilder: (context, index) {
                     if (index == 0) {
                       return _AnnouncementThreadCard(
@@ -90,14 +117,15 @@ class TeacherThreadsScreen extends StatelessWidget {
                       );
                     }
 
-                    if (index == 1) {
+                    if (canManageCourse && index == 1) {
                       return _AdminTeacherThreadCard(
                         courseId: courseId,
                         onTap: () => _openAdminChat(context),
                       );
                     }
 
-                    final item = items[index - 2];
+                    final itemIndex = canManageCourse ? index - 2 : index - 1;
+                    final item = items[itemIndex];
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),

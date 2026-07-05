@@ -22,6 +22,7 @@ class StudentCourseChatsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final studentThreadId = session.lmsUser.lmsUserId;
     final teacherDisplayName = _teacherDisplayName(course);
+    final keyPersonName = course.keyPersonName?.trim();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -38,6 +39,17 @@ class StudentCourseChatsScreen extends StatelessWidget {
                 fontWeight: FontWeight.normal,
               ),
             ),
+            if (keyPersonName != null && keyPersonName.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                'Key person: $keyPersonName',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ],
         ),
       ),

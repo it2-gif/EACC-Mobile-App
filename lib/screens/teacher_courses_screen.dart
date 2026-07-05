@@ -107,6 +107,10 @@ class _TeacherCourseCardState extends State<_TeacherCourseCard> {
           courseName: widget.course.name,
           senderName: widget.session.appUser.name,
           students: widget.course.students,
+          viewerLmsUserId: widget.session.lmsUser.lmsUserId,
+          isSuperAdmin: widget.session.appUser.isSuperAdmin,
+          courseKeyPersonLmsUserId: widget.course.keyPersonLmsUserId,
+          courseKeyPersonName: widget.course.keyPersonName,
         ),
       ),
     );

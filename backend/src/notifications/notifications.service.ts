@@ -15,6 +15,8 @@ import { FirebaseAuthService } from '../firebase/firebase-auth.service';
 import { RegisterDeviceTokenDto } from './dto/register-device-token.dto';
 import { SendChatNotificationDto } from './dto/send-chat-notification.dto';
 
+const LMS_SOURCE = 'eacc_lms';
+
 @Injectable()
 export class NotificationsService {
   private readonly recentNotificationKeys = new Map<string, number>();
@@ -125,8 +127,27 @@ export class NotificationsService {
     }[] = [];
 
     if (isAdminsAudience) {
-      const adminUsers = await this.prisma.user.findMany({
+      const course = await this.prisma.course.findUnique({
         where: {
+          lmsSource_lmsCourseId: {
+            lmsSource: LMS_SOURCE,
+            lmsCourseId: input.courseId,
+          },
+        },
+        select: {
+          keyPersonLmsUserId: true,
+        },
+      });
+
+      const keyPersonLmsUserId = course?.keyPersonLmsUserId?.trim();
+      if (!keyPersonLmsUserId) {
+        return { status: 'skipped' as const, deliveredTo: 0, failed: 0 };
+      }
+
+      const keyPerson = await this.prisma.user.findFirst({
+        where: {
+          lmsSource: LMS_SOURCE,
+          lmsUserId: keyPersonLmsUserId,
           role: UserRole.ADMIN,
           status: UserStatus.ACTIVE,
         },
@@ -137,9 +158,9 @@ export class NotificationsService {
         },
       });
 
-      recipientDeviceTokens = adminUsers
-        .flatMap((user) => user.deviceTokens)
-        .filter((token) => token.userId !== senderAppUserId);
+      recipientDeviceTokens = (keyPerson?.deviceTokens ?? []).filter(
+        (token) => token.userId !== senderAppUserId,
+      );
     } else {
       const rolesForQuery: UserRole[] = isCourseAudience
         ? [UserRole.STUDENT]

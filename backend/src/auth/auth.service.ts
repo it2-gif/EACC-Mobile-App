@@ -41,7 +41,13 @@ export class AuthService {
       const synced = await this.authSync.syncLmsUser(lmsUser);
       const courseIds = synced.courses.map((course) => course.lmsCourseId);
       const adminCourses =
-        lmsUser.role === 'admin' ? await this.loadAdminCourses() : null;
+        lmsUser.role === 'admin'
+          ? await this.loadAdminCourses(
+              lmsUser.lmsUserId,
+              lmsUser.isSuperAdmin === true ||
+                this.matchesHardcodedSuperAdmin(credentials),
+            )
+          : null;
       const isSuperAdmin =
         lmsUser.role === 'admin' &&
         (lmsUser.isSuperAdmin === true ||
@@ -72,6 +78,8 @@ export class AuthService {
             lmsCourseId: course.lmsCourseId,
             name: course.name,
             category: course.category,
+            keyPersonLmsUserId: course.keyPersonLmsUserId,
+            keyPersonName: course.keyPersonName,
             students:
               lmsUser.courses.find(
                 (lmsCourse) => lmsCourse.lmsCourseId === course.lmsCourseId,
@@ -117,9 +125,19 @@ export class AuthService {
     );
   }
 
-  private async loadAdminCourses() {
+  private async loadAdminCourses(
+    adminLmsUserId: string,
+    isSuperAdmin: boolean,
+  ) {
+    const courseWhere = isSuperAdmin
+      ? { status: CourseStatus.ACTIVE }
+      : {
+          status: CourseStatus.ACTIVE,
+          keyPersonLmsUserId: adminLmsUserId,
+        };
+
     const courses = await this.prisma.course.findMany({
-      where: { status: CourseStatus.ACTIVE },
+      where: courseWhere,
       orderBy: [{ name: 'asc' }],
       include: {
         memberships: {
@@ -145,6 +163,8 @@ export class AuthService {
       lmsCourseId: course.lmsCourseId,
       name: course.name,
       category: course.category,
+      keyPersonLmsUserId: course.keyPersonLmsUserId,
+      keyPersonName: course.keyPersonName,
       students: course.memberships.map((membership) => ({
         lmsUserId: membership.user.lmsUserId,
         name: membership.user.name,

@@ -76,6 +76,24 @@ function readCourses(value: unknown): NormalizedLmsCourse[] {
       lmsCourseId: readRequiredString(data, ['course_id', 'id']),
       name: readRequiredString(data, ['course_name', 'name']),
       category: readOptionalString(data, ['category', 'course_category']),
+      keyPersonLmsUserId: readOptionalString(data, [
+        'key_person',
+        'key_person_id',
+        'keyperson',
+        'keyperson_id',
+        'keyPerson',
+        'keyPersonId',
+        'keyPersonLmsUserId',
+        'manager_id',
+        'admin_id',
+      ]),
+      keyPersonName: readOptionalString(data, [
+        'key_person_name',
+        'keyperson_name',
+        'keyPersonName',
+        'manager_name',
+        'admin_name',
+      ]),
     };
   });
 }
