@@ -5,13 +5,18 @@ import { LmsClient } from './contracts/lms-client';
 import {
   LmsLoginCredentials,
   LmsUserRole,
+  NormalizedLmsCourse,
   NormalizedLmsUser,
 } from './contracts/lms-types';
 import {
   InvalidLmsCredentialsError,
   LmsUnavailableError,
 } from './eacc-lms.errors';
-import { parseAdminCoursesHtml } from './eacc-lms.admin-courses-parser';
+import {
+  parseAdminCourseEditHtml,
+  parseAdminCourseIdsHtml,
+  parseAdminCoursesHtml,
+} from './eacc-lms.admin-courses-parser';
 import { parseTeacherCourseStudentsHtml } from './eacc-lms.course-students-parser';
 import { parseStudentCoursesHtml } from './eacc-lms.courses-parser';
 import { parseLmsDashboardHtml } from './eacc-lms.html-parser';
@@ -189,7 +194,13 @@ export class EaccLmsClient implements LmsClient {
         ? admin
         : {
             ...admin,
-            courses: parseAdminCoursesHtml(html, admin.lmsUserId, admin.name),
+            courses: await this.loadAdminKeyPersonCourses(
+              url.origin,
+              sessionCookie,
+              timeout,
+              html,
+              admin,
+            ),
           };
     }
 
@@ -223,6 +234,92 @@ export class EaccLmsClient implements LmsClient {
 
     return html;
   }
+
+  private async loadAdminKeyPersonCourses(
+    baseUrl: string,
+    sessionCookie: string,
+    timeout: number,
+    dashboardHtml: string,
+    admin: NormalizedLmsUser,
+  ): Promise<NormalizedLmsCourse[]> {
+    const dashboardCourses = parseAdminCoursesHtml(
+      dashboardHtml,
+      admin.lmsUserId,
+      admin.name,
+    );
+    const candidateIds = uniqueStrings([
+      ...dashboardCourses.map((course) => course.lmsCourseId),
+      ...parseAdminCourseIdsHtml(dashboardHtml),
+      ...readConfiguredKeyPersonCourseIds(admin.lmsUserId),
+    ]);
+
+    if (candidateIds.length === 0) {
+      return dashboardCourses;
+    }
+
+    const verifiedCourses: NormalizedLmsCourse[] = [];
+
+    for (const courseId of candidateIds) {
+      const courseUrl = new URL('/edit_course.php', baseUrl);
+      courseUrl.searchParams.set('wcid', courseId);
+
+      try {
+        const html = await this.loadAuthenticatedHtml(
+          courseUrl,
+          sessionCookie,
+          timeout,
+        );
+        const course = parseAdminCourseEditHtml(html, courseId);
+
+        if (course?.keyPersonLmsUserId === admin.lmsUserId) {
+          verifiedCourses.push({
+            ...course,
+            keyPersonName: course.keyPersonName ?? admin.name,
+          });
+        }
+      } catch {
+        // Some candidate course IDs may not be visible in this LMS admin session.
+      }
+    }
+
+    return verifiedCourses.length > 0
+      ? uniqueCourses(verifiedCourses)
+      : dashboardCourses;
+  }
+}
+
+function readConfiguredKeyPersonCourseIds(lmsUserId: string): string[] {
+  const raw = process.env.LMS_KEY_PERSON_COURSE_IDS;
+  if (!raw) {
+    return [];
+  }
+
+  return raw.split(/[;\n]+/).flatMap((entry) => {
+    const [entryLmsUserId, courseIds] = entry.split(':');
+
+    if (entryLmsUserId?.trim() !== lmsUserId || !courseIds) {
+      return [];
+    }
+
+    return courseIds
+      .split(/[|,\s]+/)
+      .map((courseId) => courseId.trim())
+      .filter(Boolean);
+  });
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function uniqueCourses(courses: NormalizedLmsCourse[]): NormalizedLmsCourse[] {
+  const byId = new Map<string, NormalizedLmsCourse>();
+
+  for (const course of courses) {
+    byId.set(course.lmsCourseId, course);
+  }
+
+  return [...byId.values()];
 }
 
 function tryParseJson(value: string): { value: unknown } | undefined {
