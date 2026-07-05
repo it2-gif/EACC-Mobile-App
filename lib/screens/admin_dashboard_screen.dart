@@ -70,7 +70,7 @@ class AdminDashboardScreen extends StatelessWidget {
           // Live stat cards
           _StatsRow(session: session),
           const SizedBox(height: 24),
-          const _CourseActivityPanel(),
+          _CourseActivityPanel(session: session),
           const SizedBox(height: 24),
 
           // Navigation tiles
@@ -453,7 +453,9 @@ class _StatCard extends StatelessWidget {
 // ─── Navigation tile ─────────────────────────────────────────────────────────
 
 class _CourseActivityPanel extends StatefulWidget {
-  const _CourseActivityPanel();
+  final AuthSession session;
+
+  const _CourseActivityPanel({required this.session});
 
   @override
   State<_CourseActivityPanel> createState() => _CourseActivityPanelState();
@@ -463,6 +465,21 @@ class _CourseActivityPanelState extends State<_CourseActivityPanel> {
   final courseIdController = TextEditingController();
   Future<CourseActivitySummary>? summaryFuture;
   String loadedCourseId = '';
+  String? statusMessage;
+
+  @override
+  void initState() {
+    super.initState();
+
+    if (widget.session.courses.length == 1) {
+      final courseId = widget.session.courses.first.id;
+      courseIdController.text = courseId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _loadSummary();
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -472,10 +489,30 @@ class _CourseActivityPanelState extends State<_CourseActivityPanel> {
 
   void _loadSummary() {
     final courseId = courseIdController.text.trim();
-    if (courseId.isEmpty) return;
+    if (courseId.isEmpty) {
+      setState(() {
+        loadedCourseId = '';
+        summaryFuture = null;
+        statusMessage = 'Please enter a course id first.';
+      });
+      return;
+    }
+
+    final hasAccess = widget.session.appUser.isSuperAdmin ||
+        widget.session.courses.any((course) => course.id == courseId);
+    if (!hasAccess) {
+      setState(() {
+        loadedCourseId = courseId;
+        summaryFuture = null;
+        statusMessage =
+            'Course $courseId is not available in this admin session.';
+      });
+      return;
+    }
 
     setState(() {
       loadedCourseId = courseId;
+      statusMessage = null;
       summaryFuture = FirestoreChatService.getCourseActivitySummary(
         courseId: courseId,
       );
@@ -557,10 +594,49 @@ class _CourseActivityPanelState extends State<_CourseActivityPanel> {
                     ),
                   ],
                 ),
+                if (widget.session.courses.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: widget.session.courses.map((course) {
+                      return ActionChip(
+                        label: Text(course.id),
+                        avatar: const Icon(Icons.tag_rounded, size: 18),
+                        onPressed: () {
+                          courseIdController.text = course.id;
+                          _loadSummary();
+                        },
+                      );
+                    }).toList(growable: false),
+                  ),
+                ],
                 const SizedBox(height: 14),
-                if (summaryFuture == null)
+                if (statusMessage != null)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.16),
+                      ),
+                    ),
+                    child: Text(
+                      statusMessage!,
+                      style: const TextStyle(
+                        color: AppColors.ink,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  )
+                else if (summaryFuture == null)
                   const Text(
-                    'No course loaded yet.',
+                    'No course loaded yet. Tap a course chip above or enter a course ID.',
                     style: TextStyle(
                       color: AppColors.muted,
                       fontWeight: FontWeight.w700,
