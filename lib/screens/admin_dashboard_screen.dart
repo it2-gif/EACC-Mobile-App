@@ -21,25 +21,7 @@ class AdminDashboardScreen extends StatelessWidget {
 
   const AdminDashboardScreen({super.key, required this.session});
 
-  Future<void> _logout(BuildContext context) async {
-    await AuthSessionManager().logout();
-    await PushNotificationService.instance.deactivate();
-    if (!context.mounted) return;
-    await showActionConfirmation(
-      context,
-      title: 'Logged out successfully',
-      message: 'Your EACC Connection session was closed.',
-      icon: Icons.logout_rounded,
-      color: AppColors.danger,
-    );
 
-    if (!context.mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (route) => false,
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,8 +70,8 @@ class AdminDashboardScreen extends StatelessWidget {
             icon: Icons.menu_book_rounded,
             title: 'Courses',
             subtitle: session.appUser.isSuperAdmin
-                ? 'Browse all courses and student threads'
-                : 'Open your linked courses and student threads',
+                ? 'Browse all courses and student chats'
+                : 'Open your linked courses and student chats',
             color: AppColors.primary,
             onTap: () => Navigator.push(
               context,
@@ -169,18 +151,6 @@ class AdminDashboardScreen extends StatelessWidget {
             const SizedBox(height: 24),
           ] else
             const SizedBox(height: 24),
-
-          // Logout
-          OutlinedButton.icon(
-            onPressed: () => _logout(context),
-            icon: const Icon(Icons.logout_rounded),
-            label: const Text('Logout'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.danger,
-              side: BorderSide(color: AppColors.danger.withValues(alpha: 0.55)),
-              textStyle: const TextStyle(fontWeight: FontWeight.w900),
-            ),
-          ),
         ],
       ),
     );
@@ -398,7 +368,7 @@ class _StatsRow extends StatelessWidget {
         Expanded(
           child: _StatCard(
             icon: Icons.chat_bubble_rounded,
-            label: 'Threads',
+            label: 'Chats',
             value: threadCount,
             color: const Color(0xFF6A3DE8),
           ),

@@ -192,6 +192,33 @@ class FirestoreChatService {
     );
   }
 
+  static Stream<AdminUnreadCounts> getAdminUnreadCounts({
+    required String courseId,
+  }) {
+    return getThreads(courseId: courseId).map((snapshot) {
+      int teacherUnread = 0;
+      int studentUnread = 0;
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final threadId = doc.id;
+        final unread = (data['admin_unread_count'] as num?)?.toInt() ?? 0;
+        if (unread > 0) {
+          if (threadId == adminTeacherThreadId) {
+            teacherUnread += unread;
+          } else if (isKeyPersonStudentThreadId(threadId)) {
+            studentUnread += 1;
+          }
+        }
+      }
+
+      return AdminUnreadCounts(
+        teacherUnread: teacherUnread,
+        studentUnread: studentUnread,
+      );
+    });
+  }
+
   static Stream<int> getStudentUnreadCount({
     required String courseId,
     required String threadId,
@@ -1256,3 +1283,14 @@ class FirestoreChatService {
     }
   }
 }
+
+class AdminUnreadCounts {
+  final int teacherUnread;
+  final int studentUnread;
+
+  AdminUnreadCounts({
+    required this.teacherUnread,
+    required this.studentUnread,
+  });
+}
+

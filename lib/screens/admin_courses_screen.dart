@@ -95,7 +95,9 @@ class _AccessSummary extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isFullAccess ? 'Full access admin' : 'Contact-person scope',
+                    isFullAccess
+                        ? 'Full access admin'
+                        : 'Contact manager courses and students',
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
                       color: AppColors.ink,
@@ -131,40 +133,88 @@ class _AdminCourseCard extends StatefulWidget {
 }
 
 class _AdminCourseCardState extends State<_AdminCourseCard> {
-  int? _lastUnreadThreads;
+  int? _lastUnreadCount;
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<int>(
-      stream: FirestoreChatService.getTeacherUnreadThreadCount(
+    return StreamBuilder<AdminUnreadCounts>(
+      stream: FirestoreChatService.getAdminUnreadCounts(
         courseId: widget.course.id,
       ),
       builder: (context, snapshot) {
-        final unread = snapshot.data ?? 0;
-        _notifyIfIncreased(unread);
+        final counts = snapshot.data;
+        final teacherUnread = counts?.teacherUnread ?? 0;
+        final studentUnread = counts?.studentUnread ?? 0;
+
+        final totalUnread = teacherUnread + studentUnread;
+        _notifyIfIncreased(totalUnread);
+
+        final List<Widget> customBadges = [];
+        if (teacherUnread > 0) {
+          customBadges.add(
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.teacher.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: AppColors.teacher.withValues(alpha: 0.25),
+                ),
+              ),
+              child: Text(
+                teacherUnread == 1 ? '1 teacher' : '$teacherUnread teachers',
+                style: const TextStyle(
+                  color: AppColors.teacher,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          );
+        }
+
+        if (studentUnread > 0) {
+          customBadges.add(
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.25),
+                ),
+              ),
+              child: Text(
+                studentUnread == 1 ? '1 student' : '$studentUnread students',
+                style: const TextStyle(
+                  color: AppColors.primaryDark,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          );
+        }
 
         return CourseCard(
           course: widget.course,
-          unreadCount: unread,
-          unreadLabel: unread == 1 ? '1 student' : '$unread students',
+          customBadges: customBadges.isNotEmpty ? customBadges : null,
           onTap: _openThreads,
         );
       },
     );
   }
 
-  void _notifyIfIncreased(int unread) {
-    final previous = _lastUnreadThreads;
-    _lastUnreadThreads = unread;
-    if (previous == null || unread <= previous) return;
+  void _notifyIfIncreased(int totalUnread) {
+    final previous = _lastUnreadCount;
+    _lastUnreadCount = totalUnread;
+    if (previous == null || totalUnread <= previous) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       PushNotificationService.instance.showInAppNotification(
         title: widget.course.name,
-        body: unread == 1
-            ? 'A student sent a new message.'
-            : '$unread students have unread messages.',
+        body: 'You have new unread messages in this course.',
         onOpen: _openThreads,
       );
     });

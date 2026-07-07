@@ -8,6 +8,7 @@ class CourseCard extends StatelessWidget {
   final VoidCallback onTap;
   final int unreadCount;
   final String? unreadLabel;
+  final List<Widget>? customBadges;
 
   const CourseCard({
     super.key,
@@ -15,6 +16,7 @@ class CourseCard extends StatelessWidget {
     required this.onTap,
     this.unreadCount = 0,
     this.unreadLabel,
+    this.customBadges,
   });
 
   @override
@@ -110,7 +112,9 @@ class CourseCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (unreadCount > 0)
+                        if (customBadges != null)
+                          ...customBadges!
+                        else if (unreadCount > 0)
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
