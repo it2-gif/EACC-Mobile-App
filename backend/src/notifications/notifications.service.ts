@@ -134,14 +134,14 @@ export class NotificationsService {
     if (isKeyPersonAudience && senderRole !== 'student') {
       throw new UnauthorizedException({
         code: 'KEY_PERSON_AUDIENCE_DENIED',
-        message: 'Only students can notify the course key person directly.',
+        message: 'Only students can notify the course contact person directly.',
       });
     }
 
     if (isKeyPersonStudentAudience && senderRole !== 'admin') {
       throw new UnauthorizedException({
         code: 'KEY_PERSON_STUDENT_AUDIENCE_DENIED',
-        message: 'Only admins can notify a key-person student thread.',
+        message: 'Only admins can notify a contact-person student thread.',
       });
     }
 
@@ -204,7 +204,7 @@ export class NotificationsService {
       if (isKeyPersonStudentAudience && !keyPersonStudentLmsUserId) {
         throw new BadRequestException({
           code: 'INVALID_KEY_PERSON_STUDENT_THREAD',
-          message: 'Key-person student thread ID is invalid.',
+          message: 'Contact-person student thread ID is invalid.',
         });
       }
 
@@ -475,7 +475,7 @@ export class NotificationsService {
     }
 
     if (input.audience === 'keyperson_student') {
-      return `${input.senderName} - Key person`;
+      return `${input.senderName} - Contact person`;
     }
 
     return input.senderName;

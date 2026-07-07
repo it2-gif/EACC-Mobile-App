@@ -62,7 +62,7 @@ service cloud.firestore {
     function canAccessThread(courseId, threadId) {
       return hasCourse(courseId)
         && (
-          (isTeacher() && !isKeyPersonStudentThreadId(threadId))
+          isTeacher()
           || isStudentThread(threadId)
           || isKeyPersonStudentThread(threadId)
           || isAnnouncementThread(threadId)

@@ -85,7 +85,7 @@ class AdminThreadsScreen extends StatelessWidget {
 
                 _AdminThreadTile(
                     title: teacherTitle,
-                    subtitle: 'Private chat between the teacher and key person.',
+                    subtitle: 'Private chat between the teacher and contact person.',
                     icon: Icons.admin_panel_settings_rounded,
                     color: AppColors.teacher,
                     badge: const Icon(
@@ -137,16 +137,16 @@ class AdminThreadsScreen extends StatelessWidget {
                     ),
                   ),
                   _AdminThreadTile(
-                    title: '${student.name} - key person chat',
+                    title: '${student.name} - contact person chat',
                     subtitle: 'Private chat between you and this student.',
                     icon: Icons.verified_user_rounded,
                     color: AppColors.admin,
-                    badge: _ThreadBadge(label: 'KEY PERSON', color: AppColors.admin),
+                    badge: _ThreadBadge(label: 'CONTACT PERSON', color: AppColors.admin),
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => ChatScreen(
-                          title: '${student.name} - key person',
+                          title: '${student.name} - contact person',
                           currentUserRole: 'admin',
                           courseId: courseId,
                           threadId: FirestoreChatService.keyPersonStudentThreadId(

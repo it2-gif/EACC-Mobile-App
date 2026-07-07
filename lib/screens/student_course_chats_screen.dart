@@ -29,7 +29,7 @@ class StudentCourseChatsScreen extends StatelessWidget {
     final keyPersonDisplayName =
         keyPersonName != null && keyPersonName.isNotEmpty
         ? keyPersonName
-        : 'Key person';
+        : 'Contact person';
     final hasKeyPersonChat =
         (keyPersonName != null && keyPersonName.isNotEmpty) ||
         (course.keyPersonLmsUserId?.trim().isNotEmpty ?? false);
@@ -52,7 +52,7 @@ class StudentCourseChatsScreen extends StatelessWidget {
             if (keyPersonName != null && keyPersonName.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(
-                'Key person: $keyPersonName',
+                'Contact person: $keyPersonName',
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.primary,

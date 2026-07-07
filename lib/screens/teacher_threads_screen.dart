@@ -44,7 +44,7 @@ class TeacherThreadsScreen extends StatelessWidget {
     final keyPersonDisplayName =
         keyPersonName != null && keyPersonName.isNotEmpty
         ? keyPersonName
-        : 'Key person';
+        : 'Contact person';
     final hasKeyPersonChat =
         (keyPersonName != null && keyPersonName.isNotEmpty) ||
         (courseKeyPersonLmsUserId?.trim().isNotEmpty ?? false);
@@ -67,7 +67,7 @@ class TeacherThreadsScreen extends StatelessWidget {
             if (keyPersonName != null && keyPersonName.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(
-                'Key person: $keyPersonName',
+                'Contact person: $keyPersonName',
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.primary,
@@ -129,7 +129,7 @@ class TeacherThreadsScreen extends StatelessWidget {
                       return _AdminTeacherThreadCard(
                         courseId: courseId,
                         title: keyPersonDisplayName,
-                        subtitle: 'Talk directly with the course key person',
+                        subtitle: 'Talk directly with the course contact person',
                         onTap: () => _openAdminChat(
                           context,
                           keyPersonDisplayName,

@@ -360,12 +360,12 @@ class PushNotificationService {
         final keyPersonName = resolvedCourse?.keyPersonName?.trim();
         title = keyPersonName != null && keyPersonName.isNotEmpty
             ? '$keyPersonName chat'
-            : 'Key person chat';
+            : 'Contact person chat';
         threadStudentName = session.appUser.name;
       } else {
         title = resolvedStudentName != null && resolvedStudentName.isNotEmpty
-            ? '$resolvedStudentName - key person'
-            : 'Student key-person chat';
+            ? '$resolvedStudentName - contact person'
+            : 'Student contact-person chat';
         threadStudentName = resolvedStudentName ?? resolvedSenderName;
       }
       effectiveThreadId = threadId;

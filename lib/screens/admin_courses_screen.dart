@@ -31,10 +31,10 @@ class AdminCoursesScreen extends StatelessWidget {
             subtitle: courses.isEmpty
                 ? isFullAccess
                     ? 'No active courses are available yet.'
-                    : 'No courses are linked to your key-person account yet.'
+                    : 'No courses are linked to your contact-person account yet.'
                 : isFullAccess
                     ? 'Full access is enabled. You can monitor every active course.'
-                    : 'Key-person access is active. You can monitor only your linked courses.',
+                    : 'Contact-person access is active. You can monitor only your linked courses.',
             icon: isFullAccess
                 ? Icons.admin_panel_settings_rounded
                 : Icons.verified_user_outlined,
@@ -95,7 +95,7 @@ class _AccessSummary extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isFullAccess ? 'Full access admin' : 'Key-person scope',
+                    isFullAccess ? 'Full access admin' : 'Contact-person scope',
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
                       color: AppColors.ink,
@@ -214,7 +214,7 @@ class _EmptyState extends StatelessWidget {
             Text(
               isFullAccess
                   ? 'Courses will appear here after they are synced from the LMS.'
-                  : 'Ask a full-access admin to assign you as key person in the LMS, then log in again.',
+                  : 'Ask a full-access admin to assign you as contact person in the LMS, then log in again.',
               textAlign: TextAlign.center,
               style: const TextStyle(color: AppColors.muted, height: 1.35),
             ),

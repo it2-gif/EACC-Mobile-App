@@ -239,7 +239,7 @@ class _WelcomeHeader extends StatelessWidget {
                 Text(
                   isSuperAdmin
                       ? 'EACC Super Administrator'
-                      : 'EACC Key-Person Administrator',
+                      : 'EACC Contact-Person Administrator',
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 13,
