@@ -34,6 +34,20 @@ export class NotificationsService {
     const identity = await this.firebaseAuth.verifyIdToken(firebaseIdToken);
     const appUserId = this.readAppUserId(identity);
 
+    if (identity.role === 'admin' && identity.isSuperAdmin === true) {
+      await this.prisma.deviceToken.updateMany({
+        where: {
+          userId: appUserId,
+          active: true,
+        },
+        data: {
+          active: false,
+        },
+      });
+
+      return { status: 'skipped_super_admin' as const };
+    }
+
     await this.prisma.deviceToken.upsert({
       where: { token: input.token },
       update: {

@@ -2269,7 +2269,9 @@ class _ChatScreenState extends State<ChatScreen> {
     required String messageType,
     required String previewText,
   }) async {
-    // All roles (student, teacher, admin) send push notifications.
+    if (widget.isSuperAdmin) return;
+
+    // Student, teacher, and scoped key-person admins send push notifications.
 
     try {
       debugPrint(
