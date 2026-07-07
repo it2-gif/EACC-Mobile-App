@@ -339,6 +339,8 @@ class PushNotificationService {
         threadId == FirestoreChatService.announcementThreadId;
     final isAdminTeacherThread =
         threadId == FirestoreChatService.adminTeacherThreadId;
+    final isKeyPersonStudentThread =
+        FirestoreChatService.isKeyPersonStudentThreadId(threadId);
     final role = session.appUser.role;
 
     late final String title;
@@ -352,6 +354,20 @@ class PushNotificationService {
       title = role == 'admin'
           ? (resolvedCourse?.teacherName ?? 'Teacher chat')
           : 'EACC Admin';
+      effectiveThreadId = threadId;
+    } else if (isKeyPersonStudentThread) {
+      if (role == 'student') {
+        final keyPersonName = resolvedCourse?.keyPersonName?.trim();
+        title = keyPersonName != null && keyPersonName.isNotEmpty
+            ? '$keyPersonName chat'
+            : 'Key person chat';
+        threadStudentName = session.appUser.name;
+      } else {
+        title = resolvedStudentName != null && resolvedStudentName.isNotEmpty
+            ? '$resolvedStudentName - key person'
+            : 'Student key-person chat';
+        threadStudentName = resolvedStudentName ?? resolvedSenderName;
+      }
       effectiveThreadId = threadId;
     } else if (role == 'teacher' || role == 'admin') {
       title = resolvedStudentName != null && resolvedStudentName.isNotEmpty

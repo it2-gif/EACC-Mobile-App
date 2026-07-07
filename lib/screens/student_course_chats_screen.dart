@@ -21,8 +21,18 @@ class StudentCourseChatsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final studentThreadId = session.lmsUser.lmsUserId;
+    final keyPersonThreadId = FirestoreChatService.keyPersonStudentThreadId(
+      studentThreadId,
+    );
     final teacherDisplayName = _teacherDisplayName(course);
     final keyPersonName = course.keyPersonName?.trim();
+    final keyPersonDisplayName =
+        keyPersonName != null && keyPersonName.isNotEmpty
+        ? keyPersonName
+        : 'Key person';
+    final hasKeyPersonChat =
+        (keyPersonName != null && keyPersonName.isNotEmpty) ||
+        (course.keyPersonLmsUserId?.trim().isNotEmpty ?? false);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -103,6 +113,49 @@ class StudentCourseChatsScreen extends StatelessWidget {
                     );
                   },
                 ),
+                if (hasKeyPersonChat) ...[
+                  const SizedBox(height: 12),
+                  StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                    stream: FirestoreChatService.getThread(
+                      courseId: course.id,
+                      threadId: keyPersonThreadId,
+                    ),
+                    builder: (context, snapshot) {
+                      final data = snapshot.data?.data();
+                      final unread =
+                          (data?['student_unread_count'] as num?)?.toInt() ??
+                          0;
+                      final lastMessage =
+                          data?['last_message']?.toString() ??
+                          'Chat directly with $keyPersonDisplayName';
+                      final lastTime = formatThreadTime(
+                        data?['last_message_at'] ?? data?['updated_at'],
+                      );
+
+                      return _ChatChoiceCard(
+                        title: '$keyPersonDisplayName chat',
+                        subtitle: lastMessage,
+                        time: lastTime,
+                        icon: Icons.verified_user_rounded,
+                        color: AppColors.admin,
+                        badge: unread > 0 ? '$unread' : null,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatScreen(
+                              title: keyPersonDisplayName,
+                              currentUserRole: 'student',
+                              courseId: course.id,
+                              threadId: keyPersonThreadId,
+                              senderName: session.appUser.name,
+                              threadStudentName: session.appUser.name,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ],
             ),
           ),

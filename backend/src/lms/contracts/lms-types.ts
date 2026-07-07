@@ -4,6 +4,18 @@ export interface LmsLoginCredentials {
   role: LmsUserRole;
   username: string;
   password: string;
+  /**
+   * Optional hints supplied by the caller to supplement course discovery.
+   * Not part of the HTTP request body — added internally by the backend.
+   */
+  hints?: {
+    /**
+     * Active LMS course IDs already known to the backend database.
+     * Used so admin course verification covers courses that are not
+     * listed on the admin's LMS dashboard page.
+     */
+    knownCourseIds?: string[];
+  };
 }
 
 export interface NormalizedLmsCourse {

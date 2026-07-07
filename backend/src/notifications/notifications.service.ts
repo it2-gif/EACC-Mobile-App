@@ -64,6 +64,7 @@ export class NotificationsService {
     const senderAppUserId = this.readAppUserId(identity);
     const senderRole = this.readSenderRole(identity);
     const senderCourseIds = this.readCourseIds(identity);
+    const senderIsSuperAdmin = identity.isSuperAdmin === true;
 
     if (senderRole !== input.senderRole) {
       throw new UnauthorizedException({
@@ -72,8 +73,11 @@ export class NotificationsService {
       });
     }
 
-    // Admin has no courseIds in their token — they have global access.
-    if (senderRole !== 'admin' && !senderCourseIds.includes(input.courseId)) {
+    // Only super admins bypass course scope; key-person admins use courseIds.
+    if (
+      !(senderRole === 'admin' && senderIsSuperAdmin) &&
+      !senderCourseIds.includes(input.courseId)
+    ) {
       throw new UnauthorizedException({
         code: 'COURSE_ACCESS_DENIED',
         message: 'The Firebase identity does not have access to this course.',
@@ -88,6 +92,9 @@ export class NotificationsService {
     const isCourseAudience = input.audience === 'course';
     const isTeachersAudience = input.audience === 'teachers';
     const isAdminsAudience = input.audience === 'admins';
+    const isKeyPersonAudience = input.audience === 'keyperson';
+    const isKeyPersonStudentAudience =
+      input.audience === 'keyperson_student';
 
     if (isCourseAudience && senderRole === 'student') {
       throw new UnauthorizedException({
@@ -110,6 +117,20 @@ export class NotificationsService {
       });
     }
 
+    if (isKeyPersonAudience && senderRole !== 'student') {
+      throw new UnauthorizedException({
+        code: 'KEY_PERSON_AUDIENCE_DENIED',
+        message: 'Only students can notify the course key person directly.',
+      });
+    }
+
+    if (isKeyPersonStudentAudience && senderRole !== 'admin') {
+      throw new UnauthorizedException({
+        code: 'KEY_PERSON_STUDENT_AUDIENCE_DENIED',
+        message: 'Only admins can notify a key-person student thread.',
+      });
+    }
+
     const dedupeKey = this.notificationDedupeKey(input);
     if (dedupeKey !== null && !this.reserveNotificationKey(dedupeKey)) {
       return {
@@ -126,7 +147,7 @@ export class NotificationsService {
       lastSeenAt: Date;
     }[] = [];
 
-    if (isAdminsAudience) {
+    if (isAdminsAudience || isKeyPersonAudience) {
       const course = await this.prisma.course.findUnique({
         where: {
           lmsSource_lmsCourseId: {
@@ -162,6 +183,17 @@ export class NotificationsService {
         (token) => token.userId !== senderAppUserId,
       );
     } else {
+      const keyPersonStudentLmsUserId = isKeyPersonStudentAudience
+        ? this.keyPersonStudentLmsUserId(input.threadId)
+        : null;
+
+      if (isKeyPersonStudentAudience && !keyPersonStudentLmsUserId) {
+        throw new BadRequestException({
+          code: 'INVALID_KEY_PERSON_STUDENT_THREAD',
+          message: 'Key-person student thread ID is invalid.',
+        });
+      }
+
       const rolesForQuery: UserRole[] = isCourseAudience
         ? [UserRole.STUDENT]
         : isTeachersAudience || senderRole === 'student'
@@ -196,7 +228,8 @@ export class NotificationsService {
             : targetMemberships.filter(
                 (m) =>
                   m.role === UserRole.STUDENT &&
-                  m.user.lmsUserId === input.threadId,
+                  m.user.lmsUserId ===
+                    (keyPersonStudentLmsUserId ?? input.threadId),
               );
 
       recipientDeviceTokens = recipients
@@ -423,7 +456,26 @@ export class NotificationsService {
       return `${input.senderName} - Teacher`;
     }
 
+    if (input.audience === 'keyperson') {
+      return `${input.senderName} - Student`;
+    }
+
+    if (input.audience === 'keyperson_student') {
+      return `${input.senderName} - Key person`;
+    }
+
     return input.senderName;
+  }
+
+  private keyPersonStudentLmsUserId(threadId: string): string | null {
+    const prefix = 'keyperson_student_';
+    const trimmedThreadId = threadId.trim();
+    if (!trimmedThreadId.startsWith(prefix)) {
+      return null;
+    }
+
+    const studentLmsUserId = trimmedThreadId.slice(prefix.length).trim();
+    return studentLmsUserId.length > 0 ? studentLmsUserId : null;
   }
 
   private notificationDedupeKey(input: SendChatNotificationDto): string | null {

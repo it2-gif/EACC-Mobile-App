@@ -41,6 +41,13 @@ class TeacherThreadsScreen extends StatelessWidget {
         (courseKeyPersonLmsUserId != null &&
             viewerLmsUserId == courseKeyPersonLmsUserId);
     final keyPersonName = courseKeyPersonName?.trim();
+    final keyPersonDisplayName =
+        keyPersonName != null && keyPersonName.isNotEmpty
+        ? keyPersonName
+        : 'Key person';
+    final hasKeyPersonChat =
+        (keyPersonName != null && keyPersonName.isNotEmpty) ||
+        (courseKeyPersonLmsUserId?.trim().isNotEmpty ?? false);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -104,7 +111,8 @@ class TeacherThreadsScreen extends StatelessWidget {
 
                 final threads = snapshot.data?.docs ?? [];
                 final items = _buildStudentChatItems(threads);
-                final totalItems = items.length + 1 + (canManageCourse ? 1 : 0);
+                final totalItems =
+                    items.length + 1 + (hasKeyPersonChat ? 1 : 0);
 
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
@@ -117,14 +125,19 @@ class TeacherThreadsScreen extends StatelessWidget {
                       );
                     }
 
-                    if (canManageCourse && index == 1) {
+                    if (hasKeyPersonChat && index == 1) {
                       return _AdminTeacherThreadCard(
                         courseId: courseId,
-                        onTap: () => _openAdminChat(context),
+                        title: keyPersonDisplayName,
+                        subtitle: 'Talk directly with the course key person',
+                        onTap: () => _openAdminChat(
+                          context,
+                          keyPersonDisplayName,
+                        ),
                       );
                     }
 
-                    final itemIndex = canManageCourse ? index - 2 : index - 1;
+                    final itemIndex = hasKeyPersonChat ? index - 2 : index - 1;
                     final item = items[itemIndex];
 
                     return Card(
@@ -299,12 +312,12 @@ class TeacherThreadsScreen extends StatelessWidget {
     );
   }
 
-  void _openAdminChat(BuildContext context) {
+  void _openAdminChat(BuildContext context, String keyPersonDisplayName) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ChatScreen(
-          title: 'EACC Admin',
+          title: keyPersonDisplayName,
           currentUserRole: viewerRole,
           courseId: courseId,
           threadId: FirestoreChatService.adminTeacherThreadId,
@@ -521,6 +534,7 @@ class TeacherThreadsScreen extends StatelessWidget {
       final threadId = doc.id;
       if (threadId == FirestoreChatService.announcementThreadId) continue;
       if (threadId == FirestoreChatService.adminTeacherThreadId) continue;
+      if (FirestoreChatService.isKeyPersonStudentThreadId(threadId)) continue;
 
       final rosterStudent = rosterById[threadId];
       final studentName =
@@ -758,9 +772,16 @@ class _AnnouncementThreadCard extends StatelessWidget {
 
 class _AdminTeacherThreadCard extends StatelessWidget {
   final String courseId;
+  final String title;
+  final String subtitle;
   final VoidCallback onTap;
 
-  const _AdminTeacherThreadCard({required this.courseId, required this.onTap});
+  const _AdminTeacherThreadCard({
+    required this.courseId,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -772,9 +793,7 @@ class _AdminTeacherThreadCard extends StatelessWidget {
       builder: (context, snapshot) {
         final data = snapshot.data?.data();
         final unread = (data?['teacher_unread_count'] as num?)?.toInt() ?? 0;
-        final lastMessage =
-            data?['last_message']?.toString() ??
-            'Talk directly with EACC Admin';
+        final lastMessage = data?['last_message']?.toString() ?? subtitle;
         final lastTime = formatThreadTime(
           data?['last_message_at'] ?? data?['updated_at'],
         );
@@ -810,9 +829,9 @@ class _AdminTeacherThreadCard extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            const Expanded(
+                            Expanded(
                               child: Text(
-                                'EACC Admin',
+                                title,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(

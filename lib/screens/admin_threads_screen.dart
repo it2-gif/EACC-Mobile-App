@@ -26,6 +26,10 @@ class AdminThreadsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = [...students]
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    final displayTeacher = teacherName?.trim();
+    final teacherTitle = displayTeacher != null && displayTeacher.isNotEmpty
+        ? '$displayTeacher chat'
+        : 'Teacher chat';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -51,12 +55,10 @@ class AdminThreadsScreen extends StatelessWidget {
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
-            child: ListView.builder(
+            child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              itemCount: items.length + 2,
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return _AdminThreadTile(
+              children: [
+                _AdminThreadTile(
                     title: 'Announcement chat',
                     subtitle: 'Pinned course-wide announcement thread.',
                     icon: Icons.campaign_rounded,
@@ -79,19 +81,11 @@ class AdminThreadsScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                  );
-                }
+                  ),
 
-                if (index == 1) {
-                  final displayTeacher = teacherName?.trim();
-                  final teacherTitle =
-                      displayTeacher != null && displayTeacher.isNotEmpty
-                      ? '$displayTeacher chat'
-                      : 'Teacher chat';
-
-                  return _AdminThreadTile(
+                _AdminThreadTile(
                     title: teacherTitle,
-                    subtitle: 'Talk directly with the course teacher.',
+                    subtitle: 'Private chat between the teacher and key person.',
                     icon: Icons.admin_panel_settings_rounded,
                     color: AppColors.teacher,
                     badge: const Icon(
@@ -112,53 +106,130 @@ class AdminThreadsScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                  );
-                }
+                  ),
 
-                final student = items[index - 2];
-                return _AdminThreadTile(
-                  title: student.name,
-                  subtitle: 'Open the conversation for this student.',
-                  iconLabel: student.name.isNotEmpty
-                      ? student.name[0].toUpperCase()
-                      : '?',
-                  color: AppColors.primary,
-                  badge: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
+                if (items.isNotEmpty) const _AdminThreadSection('Students'),
+                for (final student in items) ...[
+                  _AdminThreadTile(
+                    title: '${student.name} - teacher chat',
+                    subtitle: 'View the student conversation with the teacher.',
+                    iconLabel: student.name.isNotEmpty
+                        ? student.name[0].toUpperCase()
+                        : '?',
+                    color: AppColors.primary,
+                    badge: _ThreadBadge(
+                      label: 'TEACHER',
+                      color: AppColors.primary,
                     ),
-                    decoration: BoxDecoration(
-                      color: AppColors.admin.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      'ADMIN',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: AppColors.admin,
-                        fontWeight: FontWeight.w700,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatScreen(
+                          title: student.name,
+                          currentUserRole: 'admin',
+                          courseId: courseId,
+                          threadId: student.id,
+                          senderName: session.appUser.name,
+                          threadStudentName: student.name,
+                          isSuperAdmin: session.appUser.isSuperAdmin,
+                        ),
                       ),
                     ),
                   ),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ChatScreen(
-                        title: student.name,
-                        currentUserRole: 'admin',
-                        courseId: courseId,
-                        threadId: student.id,
-                        senderName: session.appUser.name,
-                        threadStudentName: student.name,
-                        isSuperAdmin: session.appUser.isSuperAdmin,
+                  _AdminThreadTile(
+                    title: '${student.name} - key person chat',
+                    subtitle: 'Private chat between you and this student.',
+                    icon: Icons.verified_user_rounded,
+                    color: AppColors.admin,
+                    badge: _ThreadBadge(label: 'KEY PERSON', color: AppColors.admin),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatScreen(
+                          title: '${student.name} - key person',
+                          currentUserRole: 'admin',
+                          courseId: courseId,
+                          threadId: FirestoreChatService.keyPersonStudentThreadId(
+                            student.id,
+                          ),
+                          senderName: session.appUser.name,
+                          threadStudentName: student.name,
+                          isSuperAdmin: session.appUser.isSuperAdmin,
+                        ),
                       ),
                     ),
                   ),
-                );
-              },
+                ],
+                if (items.isEmpty)
+                  const _AdminEmptyStudentsState(),
+              ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AdminThreadSection extends StatelessWidget {
+  final String title;
+
+  const _AdminThreadSection(this.title);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: AppColors.muted,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+}
+
+class _ThreadBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _ThreadBadge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _AdminEmptyStudentsState extends StatelessWidget {
+  const _AdminEmptyStudentsState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 18),
+      child: Center(
+        child: Text(
+          'No students are linked to this course yet.',
+          style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700),
         ),
       ),
     );

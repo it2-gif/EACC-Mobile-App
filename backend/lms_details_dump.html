@@ -1,0 +1,1274 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Egyptian American Culture Center</title>
+
+  <!-- Google Font: Source Sans Pro -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="plugins/fontawesome-free/css/all.min.css">
+  <!-- Ionicons -->
+  <link rel="stylesheet" href="https://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css">
+  <!-- Tempusdominus Bootstrap 4 -->
+  <link rel="stylesheet" href="plugins/tempusdominus-bootstrap-4/css/tempusdominus-bootstrap-4.min.css">
+  <!-- iCheck -->
+  <link rel="stylesheet" href="plugins/icheck-bootstrap/icheck-bootstrap.min.css">
+ 
+  <!-- DataTables -->
+  <link rel="stylesheet" href="plugins/datatables-bs4/css/dataTables.bootstrap4.min.css">
+  <link rel="stylesheet" href="plugins/datatables-responsive/css/responsive.bootstrap4.min.css">
+  <link rel="stylesheet" href="plugins/datatables-buttons/css/buttons.bootstrap4.min.css">
+   
+  <!-- JQVMap -->
+  <link rel="stylesheet" href="plugins/jqvmap/jqvmap.min.css">
+  <!-- Theme style -->
+  <link rel="stylesheet" href="dist/css/adminlte.min.css">
+  <!-- overlayScrollbars -->
+  <link rel="stylesheet" href="plugins/overlayScrollbars/css/OverlayScrollbars.min.css">
+  <!-- Daterange picker -->
+  <link rel="stylesheet" href="plugins/daterangepicker/daterangepicker.css">
+  <!-- summernote -->
+  <link rel="stylesheet" href="plugins/summernote/summernote-bs4.min.css">
+  <!-- our project just needs Font Awesome Solid + Brands -->
+  <link href="dist/fontawesome-free-6/css/fontawesome.css" rel="stylesheet">
+  <link href="dist/fontawesome-free-6/css/brands.css" rel="stylesheet">
+  <link href="dist/fontawesome-free-6/css/solid.css" rel="stylesheet">
+  <link href="../css/extra.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js"></script>
+  <link href="../css/academic.css" rel="stylesheet">
+  <style>
+      .nav .nav-treeview{
+          /*padding: 0 .6rem;*/
+           background-color: #085ba1 !important;
+           border-radius: .25rem !important;
+      }
+  .
+  </style>
+</head>
+<body class="hold-transition sidebar-mini layout-fixed sidebar-collapse ">
+<div class="wrapper">
+
+  <!-- Preloader -->
+  <!--
+  <div class="preloader flex-column justify-content-center align-items-center bg-navy">
+    <img class="animation__shake" src="dist/img/AdminLTELogo.png" alt="AdminLTELogo" height="60" width="60">
+  </div>
+-->
+  <!-- Navbar -->
+  <nav class="main-header navbar navbar-expand  navbar-white navbar-light">
+    <!-- Left navbar links -->
+    <ul class="navbar-nav">
+      <li class="nav-item">
+        <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
+      </li>
+      <li class="nav-item d-none d-sm-inline-block">
+        <a href="./" class="nav-link">Home</a>
+      </li>
+     
+    </ul>
+
+    <!-- Right navbar links -->
+    <ul class="navbar-nav ml-auto">
+      <!-- Navbar Search -->
+      <li class="nav-item">
+        <a class="nav-link" data-widget="navbar-search" href="#" role="button">
+          <i class="fas fa-search"></i>
+        </a>
+        <div class="navbar-search-block">
+          <form class="form-inline">
+            <div class="input-group input-group-sm">
+              <input class="form-control form-control-navbar" type="search" placeholder="Search" aria-label="Search">
+              <div class="input-group-append">
+                <button class="btn btn-navbar" type="submit">
+                  <i class="fas fa-search"></i>
+                </button>
+                <button class="btn btn-navbar" type="button" data-widget="navbar-search">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" data-widget="fullscreen" href="#" role="button">
+          <i class="fas fa-expand-arrows-alt"></i>
+        </a>
+      </li>
+      
+    </ul>
+  </nav>
+  <!-- /.navbar -->
+
+  <!-- Main Sidebar Container -->
+  <aside class="main-sidebar elevation-4  bg-navy sidebar-dark-primary ">
+    <!-- Brand Logo -->
+    <a href="./" class="brand-link">
+      <img src="../img/icon-white 2.png" alt="EACC Logo" class="brand-image  elevation-3" style="opacity: .8; margin-left: .5rem !important;">
+      <span class="brand-text font-weight-light">EACC Admin Portal</span>
+    </a>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <!-- Sidebar user panel (optional) -->
+      <div class="user-panel mt-3 pb-3 mb-3 d-flex">
+        <div class="image">
+                      <img src="img/avatar.jpg" class="img-circle elevation-2" alt="User Image">
+        </div>
+        <div class="info">
+          <a href="#" class="d-block">developer</a>
+        </div>
+      </div>
+
+      <!-- SidebarSearch Form --><!-- 
+      <div class="form-inline">
+        <div class="input-group" data-widget="sidebar-search">
+          <input class="form-control form-control-sidebar" type="search" placeholder="Search" aria-label="Search">
+          <div class="input-group-append">
+            <button class="btn btn-sidebar">
+              <i class="fas fa-search fa-fw"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar Menu -->
+      <nav class="mt-2">
+        <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
+          <!-- Add icons to the links using the .nav-icon class
+               with font-awesome or any other icon font library -->
+                 <!--
+          <li class="nav-item menu-open">
+            <a href="#" class="nav-link active">
+              <i class="nav-icon fas fa-tachometer-alt"></i>
+              <p>
+                Dashboard
+                <i class="right fas fa-angle-left"></i>
+              </p>
+            </a>
+            <ul class="nav nav-treeview">
+              <li class="nav-item">
+                <a href="./index.html" class="nav-link active">
+                  <i class="far fa-circle nav-icon"></i>
+                  <p>Dashboard v1</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="./index2.html" class="nav-link">
+                  <i class="far fa-circle nav-icon"></i>
+                  <p>Dashboard v2</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="./index3.html" class="nav-link">
+                  <i class="far fa-circle nav-icon"></i>
+                  <p>Dashboard v3</p>
+                </a>
+              </li>
+            </ul>
+            
+          </li>-->
+          
+           <li class="nav-item">
+            <a href="front.php" class="nav-link ">
+              <i class="fa-solid fa-circle"></i>
+              <p> Dashboard</p>
+            </a>
+          </li>
+                               <li class="nav-item">
+            <a href="CRM-Enroll.php" class="nav-link ">
+               <i class="fas fa-user-graduate"></i>
+              <p> Admissions</p>
+            </a>
+          </li>
+                           <li class="nav-item ">
+            <a href="#" class="nav-link active">
+              <i class="fas fa-quote-left"></i>
+              <p>
+                Working Courses
+                <i class="right fas fa-angle-left"></i>
+              </p>
+            </a>
+            <ul class="nav nav-treeview">
+              <li class="nav-item">
+                <a href="courses.php" class="nav-link active">
+                  <i class="fas fa-hourglass-half"></i>
+                  <p> View Working Courses</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="courses_today.php" class="nav-link ">
+                  <i class="fas fa-search-plus"></i>
+                  <p> View W.Courses Today</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="open_course.php" class="nav-link ">
+                  <i class="fas fa-plus-square"></i>
+                  <p> Open New W.Course</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="view_rquested_reports.php" class="nav-link ">
+                  <i class="fa-solid fa-flag"></i>
+                  <p> View Rquested Reports</p>
+                </a>
+              </li>
+            </ul>
+            
+          </li>
+          
+          
+                 <li class="nav-item ">
+            <a href="#" class="nav-link ">
+              <i class="fas fa-fw fa-cog"></i>
+              <p>
+                Student
+                <i class="right fas fa-angle-left"></i>
+              </p>
+            </a>
+            <ul class="nav nav-treeview">
+              <li class="nav-item">
+                <a href="add.php" class="nav-link ">
+                  <i class="fas fa-user-plus"></i>
+                  <p> Add Student</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="students_gv.php" class="nav-link ">
+                  <i class="fas fa-users"></i>
+                  <p> View Students</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="students_blocked.php" class="nav-link ">
+                  <i class="fas fa-hand-paper"></i>
+                  <p> Blocked Students</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="visitors.php" class="nav-link ">
+                  <i class="fas fa-walking"></i>
+                  <p> View/Add Visitors</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="leads.php" class="nav-link ">
+                  <i class="fas fa-tasks"></i>
+                  <p> View/Add Leads</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="view_st_payment1.php" class="nav-link ">
+                  <i class="fas fa-fw fa-money-check-alt"></i>
+                  <p> View Invoice</p>
+                </a>
+              </li>
+            </ul>
+            
+          </li>
+
+         
+          
+               
+           
+           <li class="nav-item ">
+        <a class="nav-link " href="teachers_gv.php">
+          <i class="fas fa-fw fa-cog"></i>
+          <p> Teachers</p></a>
+      </li>
+           
+           
+           
+           
+                         
+           <li class="nav-item ">
+            <a href="#" class="nav-link ">
+              <i class="fa-brands fa-readme"></i></i>
+            <p> Practice
+                <i class="right fas fa-angle-left"></i>
+              </p>
+            </a>
+            <ul class="nav nav-treeview">
+              <li class="nav-item">
+                <a href="add_reading_multy.php" class="nav-link ">
+                  <i class="fa-brands fa-readme"></i>
+                  <p>Add Reading</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="edit_reading.php" class="nav-link ">
+                  <i class="fa-brands fa-readme"></i>
+                  <p>View & Edit Reading</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="add_Listening_multy.php" class="nav-link ">
+                  <i class="fa-brands fa-readme"></i>
+                  <p>Add Listening</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="edit_Listening.php" class="nav-link ">
+                  <i class="fa-brands fa-readme"></i>
+                  <p>View & Edit Listening</p>
+                </a>
+              </li>
+               <li class="nav-item">
+                <a href="add_speaking_multy.php" class="nav-link ">
+                  <i class="fa-brands fa-readme"></i>
+                  <p>Add Speaking</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="edit_speaking.php" class="nav-link ">
+                  <i class="fa-brands fa-readme"></i>
+                  <p>View & Edit Speaking</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="add_grammer_multy.php" class="nav-link ">
+                  <i class="fa-brands fa-readme"></i>
+                  <p>Add Grammar</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="edit_grammar.php" class="nav-link ">
+                  <i class="fa-brands fa-readme"></i>
+                  <p>View & Edit Grammar</p>
+                </a>
+              </li>
+            </ul>
+           
+          </li>
+          
+           <li class="nav-item ">
+            <a href="#" class="nav-link ">
+              <i class="fas fa-flag-checkered"></i>
+              <p>
+                Offers
+                <i class="right fas fa-angle-left"></i>
+              </p>
+            </a>
+            <ul class="nav nav-treeview">
+              <li class="nav-item">
+                <a href="add_offer.php" class="nav-link ">
+                  <i class="fas fa-flag-checkered"></i>
+                  <p> Add Offers</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="view_offers.php" class="nav-link ">
+                  <i class="fas fa-fw fa-money-check-alt"></i>
+                  <p> View Offers</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="add_st_offer.php" class="nav-link ">
+                  <i class="fas fa-flag-checkered"></i>
+                  <p> Add Cross Marketing</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="view_st_offers.php" class="nav-link ">
+                  <i class="fas fa-fw fa-money-check-alt"></i>
+                  <p> View Cross Marketing</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="add_members_front_announce.php" class="nav-link ">
+                  <i class="fas fa-flag-checkered"></i>
+                  <p> Add Announce</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="view_announce.php" class="nav-link ">
+                  <i class="fas fa-fw fa-money-check-alt"></i>
+                  <p> View Announce</p>
+                </a>
+              </li>
+            </ul>
+            
+          </li>
+           <li class="nav-item ">
+            <a href="#" class="nav-link ">
+              <i class="fas fa-flag-checkered"></i>
+              <p>
+                Reports
+                <i class="right fas fa-angle-left"></i>
+              </p>
+            </a>
+            <ul class="nav nav-treeview">
+              <li class="nav-item">
+                <a href="exports.php" class="nav-link ">
+                  <i class="fas fa-flag-checkered"></i>
+                  <p> Marketing</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="report1.php" class="nav-link ">
+                  <i class="fas fa-users"></i>
+                  <p> Number of Students</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="view_statistics_info.php" class="nav-link ">
+                  <i class="fas fa-flag-checkered"></i>
+                  <p> Camps Statistics</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="view_cer.php" class="nav-link ">
+                  <i class="fas fa-fw fa-cog"></i>
+                  <p> Certificates</p>
+                </a>
+              </li>
+            </ul>
+            
+          </li>
+          
+           <li class="nav-item ">
+            <a href="#" class="nav-link ">
+              <i class="fas fa-calendar-alt"></i>
+              <p>
+                Calendar
+                <i class="right fas fa-angle-left"></i>
+              </p>
+            </a>
+            <ul class="nav nav-treeview">
+              <li class="nav-item">
+                <a href="calendertest.php" class="nav-link ">
+                  <i class="fas fa-calendar-alt"></i>
+                  <p> Calendar</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="new_calendar.php" class="nav-link ">
+                  <i class="fas fa-calendar-alt"></i>
+                  <p> Schedule</p>
+                </a>
+              </li>
+              
+            </ul>
+            
+          </li>
+                    
+          <li class="nav-item  ">
+        <a class="nav-link" href="logout.php">
+          <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
+          <p> Logout</p></a>
+      </li>
+        </ul>
+      </nav>
+      <!-- /.sidebar-menu -->
+    </div>
+    <!-- /.sidebar -->
+  </aside>
+ 
+ <!-- Content Wrapper. Contains page content -->
+  <div class="content-wrapper">
+    <!-- Content Header (Page header) -->
+    <div class="content-header">
+      <div class="container-fluid">
+        <div class="row mb-2">
+          <div class="col-sm-6">
+            <h1 class="m-0">View Students in Course</h1>
+          </div><!-- /.col -->
+          <div class="col-sm-6">
+            <ol class="breadcrumb float-sm-right">
+              <li class="breadcrumb-item"><a href="index.php">Home</a></li>
+              <li class="breadcrumb-item active">View Students in Course</li>
+            </ol>
+          </div><!-- /.col -->
+        </div><!-- /.row -->
+      </div><!-- /.container-fluid -->
+    </div>
+    <!-- /.content-header -->
+
+    <!-- Main content -->
+    <section class="content">
+      <div class="container-fluid">
+       <!-- start contant -->
+       
+    <link href="library/bootstrap-5/bootstrap.min.css" rel="stylesheet" />
+ <script src="library/bootstrap-5/bootstrap.bundle.min.js"></script>
+        <script src="library/dselect.js"></script>
+<link href="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/css/bootstrap4-toggle.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/js/bootstrap4-toggle.min.js"></script>
+   <style>
+       .selectWrappera {
+    border: 2px solid Green;
+    
+}
+.selectWrappern {
+    border: 2px solid #858796;
+    
+}
+.selectWrapperni {
+    border: 2px solid #e74a3b;
+    
+}
+
+   </style>
+<style>
+    #result {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 20px;
+        background-color: #fff;
+        border: 0px solid #ccc;
+        
+        z-index: 1000;
+    }
+    .link-poiner{
+        cursor: pointer;
+    }
+</style>
+ <div id="result"></div>
+       
+          <!-- Content Row -->
+          <div class="row">
+              
+           
+    <div class="col">
+                 <div align="left" style="padding:25px;">	<a href="view_att.php?wcid=2297" class="btn btn-primary" >View Attendance</a>
+
+	<a href="add_students.php?wcid=2297" class="btn btn-primary" >Add Students</a>
+    </div>
+    
+
+
+    
+    </div>
+   
+     <div class="col">
+                 
+ 
+                  <div align="right" style="padding:25px;">	<button id="exportBtn" class="btn btn-primary">Export to Excel</button>
+
+ </div>
+ 
+    </div>
+                <div class="table-responsive">
+                <table class="table table-bordered datatable1"  width="100%" cellspacing="0">
+                  <thead>
+                    <tr>
+                        
+                        <th>ID</th>
+                     
+                      <th>Department</th>
+                      <th>Stage</th>
+                       <th>Course</th>
+                       <th>Teacher</th>
+                      <th>Start date</th>
+                      <th>End Date</th>
+                      <th>Start Time</th>
+                      <th>End Time</th>
+                      
+                  <th>Status</th>
+                      
+                      
+                      
+                     
+                    </tr>
+                  </thead>
+                  
+                  <tbody>
+                                    
+                 <tr>
+                     
+                     <td>2297</td>
+                     <td>English Adult </td>
+                     <td>General English</td>
+                      <td>Elementary Level – 3</td>
+                      <td>
+                          teacher1               
+                      </td>
+                      <td>2026-06-29</td>
+                      <td>2026-07-07</td>
+                      <td>5:00 PM</td>
+                      <td>7:00 PM</td>
+                      <td>Open</td>
+
+                          
+                      
+                    </tr> 
+                  
+                  
+                  
+                                    </tbody>
+                  </table>
+            </div>
+                
+                
+                
+            </div>  
+              
+          </div>
+
+          <!-- Content Row -->
+
+          <div class="row">
+
+            <!-- Area Chart -->
+            <div class="col">
+                
+             <div class="card-body">
+                  <iframe id="fs1x" scrolling="no" name="fs1x" frameborder="0" style="overflow:hidden;height:50px;width:100%;margin-bottom: 15px;" height="50px" width="100%"></iframe>
+                      <form action="add_att_up.php" method="post"class="form-inline form-row align-items-center" id="send_or" name="send_or" target="fs1x">
+                          
+                              <input type='hidden' name='wcid' value='2297'>
+                              <input type='hidden' name='course' value='Elementary Level – 3'>
+                       <div class="form-group">
+    <label for="formGroupExampleInput">* Attend Date  </label>
+     <input type="date" class="form-control" id="atttdate" name="atttdate"  require  >
+  </div>
+  
+  <div class="col">
+      
+       <div class="form-group">
+                     <select  id="t_id" name="t_id">
+                                              <option value='262'>teacher1</option>
+                       
+                                                                  <option value='1'>Mohamed El-Sayad</option>
+                       
+                                           <option value='42'>Mohamed Omar </option>
+                       
+                                           <option value='73'>Rowan Mohammed</option>
+                       
+                                           <option value='92'>Test</option>
+                       
+                                           <option value='104'>Iman Ibraheem</option>
+                       
+                                           <option value='113'>Dina Abd Elhady</option>
+                       
+                                           <option value='115'>Jermeen Raafat </option>
+                       
+                                           <option value='124'>Salma Ahmed</option>
+                       
+                                           <option value='145'>Alaa Mina</option>
+                       
+                                           <option value='163'>Mohamed Gamal</option>
+                       
+                                           <option value='164'>Esam Oraby</option>
+                       
+                                           <option value='167'>Mostafa Mohammed</option>
+                       
+                                           <option value='170'>Amr Ali ELfeky</option>
+                       
+                                           <option value='173'>Farida Khalifa</option>
+                       
+                                           <option value='180'>Marwa Adel</option>
+                       
+                                           <option value='185'>Mariam Islam</option>
+                       
+                                           <option value='187'>Seham Tag </option>
+                       
+                                           <option value='188'>Salma Yasser </option>
+                       
+                                           <option value='190'>Eman Emad </option>
+                       
+                                           <option value='191'>Rawan Khater</option>
+                       
+                                           <option value='195'>Malak Walid</option>
+                       
+                                           <option value='196'>Hanin Ayman</option>
+                       
+                                           <option value='198'>Jana Ashraf</option>
+                       
+                                           <option value='203'>Malak Yasser </option>
+                       
+                                           <option value='204'>Haneen Mohamed </option>
+                       
+                                           <option value='206'>Amany Ahmed</option>
+                       
+                                           <option value='209'>Jana Tamer Safwat</option>
+                       
+                                           <option value='211'>Hala Hesham </option>
+                       
+                                           <option value='213'>Maram Hesham</option>
+                       
+                                           <option value='215'>Farah Helal </option>
+                       
+                                           <option value='217'>Nehal Reda</option>
+                       
+                                           <option value='221'>Yomna</option>
+                       
+                                           <option value='222'>Mariam</option>
+                       
+                                           <option value='224'>Bassant</option>
+                       
+                                           <option value='226'>Nahla diab </option>
+                       
+                                           <option value='227'>Amr el feky </option>
+                       
+                                           <option value='228'>Yara. Abdelhamid </option>
+                       
+                                           <option value='230'>Moamen Montaser</option>
+                       
+                                           <option value='231'>Salma Hassan</option>
+                       
+                                           <option value='232'>Omnia</option>
+                       
+                                           <option value='235'> Kassem</option>
+                       
+                                           <option value='240'>Malak Soliman</option>
+                       
+                                           <option value='241'>Maram zein</option>
+                       
+                                           <option value='242'>Retag Mamdouh</option>
+                       
+                                           <option value='243'>Sherien</option>
+                       
+                                           <option value='244'>Maram Hesham</option>
+                       
+                                           <option value='245'>Shahinda Farouk Mohamed </option>
+                       
+                                           <option value='246'>FARAH IBRAHIM ELGAMAL </option>
+                       
+                                           <option value='247'>Nour islam</option>
+                       
+                                           <option value='248'>Hala Kassem</option>
+                       
+                                           <option value='249'>Mayar Ahmed</option>
+                       
+                                           <option value='250'>Riham Maged</option>
+                       
+                                           <option value='251'>Fat</option>
+                       
+                                           <option value='252'>Fatema Elnagar</option>
+                       
+                                           <option value='253'>Sabreen</option>
+                       
+                                           <option value='254'>Doaa</option>
+                       
+                                           <option value='255'>Mariem</option>
+                       
+                                           <option value='256'>Sabrin</option>
+                       
+                                           <option value='257'>Doaa Maher</option>
+                       
+                                           <option value='258'>Passant Hussien</option>
+                       
+                                           <option value='259'>Sherouk </option>
+                       
+                                           <option value='260'>Ahmed</option>
+                       
+                                           <option value='261'>Ahmed </option>
+                       
+                                           <option value='262'>teacher1</option>
+                       
+                                           <option value='263'>teacher2</option>
+                       
+                                       </select>
+                   </div>
+                   
+  </div>
+  <script>
+
+   function showDiv3()
+
+   {
+       if (document.send_or.inlineRadio2.value==2)
+{
+       $("#reson1").show();
+}else{
+     $("#reson1").hide();
+}
+ if (document.send_or.inlineRadio3.value==3)
+{
+       $("#reson1").show();
+}else{
+     $("#reson1").hide();
+}
+
+   }
+    function showDiv4()
+
+   {
+       if (document.send_or.inlineRadio1.value==1)
+{
+       $("#reson1").hide();
+}
+if (document.send_or.inlineRadio0.value==0)
+{
+       $("#reson1").hide();
+}
+     
+   }
+    </script> 
+  <div class="form-check form-check-inline">
+  <input class="form-check-input" type="radio" name="att_all" id="inlineRadio0" onchange="showDiv4()"  value="0">
+  <label class="form-check-label" for="inlineRadio0">Select None</label>
+</div>
+  <div class="form-check form-check-inline" >
+  <input class="btn-check" type="radio" name="att_all" id="inlineRadio1" onchange="showDiv4()"value="1">
+  <label class="btn btn-outline-success" for="inlineRadio1" >All Present</label>
+</div>
+<div class="form-check form-check-inline">
+  <input class="btn-check" type="radio" name="att_all" id="inlineRadio2" onchange="showDiv3()" value="2">
+  <label class="btn btn-outline-primary" for="inlineRadio2"  >Holiday</label>
+</div>
+ <div class="form-check form-check-inline">
+  <input class="btn-check" type="radio" name="att_all" id="inlineRadio3"  onchange="showDiv3()" value="3">
+  <label class="btn btn-outline-secondary" for="inlineRadio3" >Canceled</label>
+</div> 
+  <div class="form-group" id="reson1" style="display: none;">
+      <input type='text' class="form-control" name='reson'>
+      </div>
+          
+  <div class="col">
+    <input type="submit"  name="starts" id="starts" class="btn btn-primary" value="Attend">
+    <div class="pull-right"> Feedback: 
+                                  <div class="published-switch-option switch-container" style="display:inline-block;vertical-align: middle;">
+                                                                                <a href="javascript:void(0)" id="sectionst2297" data-wcid="2297"  data-val="1">
+                                         <input type="checkbox"  data-toggle="toggle" data-on="Live" data-off="Draft"data-onstyle="success" data-offstyle="danger" data-size="xs" data-style="slow"> 
+                                         </a>
+
+                              
+                                                                        
+                              
+                              </div>
+                  </div>
+                  <script>
+                                  $(document).ready(function() {
+     $("#sectionst2297").click(function() {
+   //get data-id attribute of the clicked element
+    var LectId = $("#sectionst2297").data('id');
+    var Lectval = $("#sectionst2297").data('val');
+    var Lectwval = $("#sectionst2297").data('wcid');
+    
+    $('#result').load("feedback_status.php?wcid="+Lectwval+"&id="+Lectval);
+    // Show the result div as a centered popup
+                $("#result").fadeIn();
+
+                // Hide the result div after 3 seconds
+                setTimeout(function() {
+                    $("#result").fadeOut();
+                }, 1000);
+
+                // Reload the page after 3 seconds
+                setTimeout(function() {
+                    location.reload();
+                }, 2000);
+});
+});
+                              </script>
+    </div>
+    
+              <div class="table-responsive">
+                <table class="table table-bordered table-striped datatable1" id="dataTablex" width="100%" cellspacing="0">
+                  <thead>
+                    <tr>
+                        
+                        <th>ID</th>
+                      <th width="25%">Name</th>
+                       <!-- <th>Phone</th>-->
+                     
+                   <!-- <th>Send Material</th>-->
+                      <th>Attendance</th>
+                       <th>Grade</th>
+                      <th width="20%">More</th>
+                     
+                    </tr>
+                  </thead>
+                  
+                  <tbody>
+                      
+                                    
+                 <tr>
+                    
+                     <td>8660</td>
+                      <td><a href='details.php?stid=8660' target='_blank'>test2</a><br>
+                      <div dir='rtl' align='right'><a href='details.php?stid=8660'>test2</a></div>                                            </td>
+                        <td>
+                           
+                              
+                        <input type="hidden" name="stid[]" id="stid_1" value='8660'>
+                        
+                         <!--  
+                         <div class="form-check form-check-inline">
+  <input class="form-check-input" type="radio" id="att_1" name="att[]" value="1">
+  <label class="form-check-label" for="inlineRadio1"> Present</label>
+</div>
+<div class="form-check form-check-inline">
+  <input class="form-check-input" type="radio" id="att_1" name="att[]" value="0">
+  <label class="form-check-label" for="inlineRadio2">Absent</label>
+</div>
+        -->             
+  <div class="form-group">
+                   
+                      <select class="form-control" id="att_1" name="att[]" require>
+                       <option value=''>Select status</option>
+                     
+                       <option value='1'>Present </option>
+                    <option value='4'>Absent</option>
+                    
+                    
+                     </select>
+                    
+                    
+                   </div>
+  
+                    
+
+                          </td><td>
+                                          <a target="_blnk" href="add_grx.php?stid=8660&wsid=14591&wcid=2297">Add Grade</a>   
+            
+                             
+                          </td>
+                                                <td>
+                              <select class="form-control selectWrappera" id="urlSelect8660" onchange="window.location = jQuery('#urlSelect8660 option:selected').val();">
+                              <option value="" selected> Select Option </option>
+                              
+                               <!--       <option value="show_results.php?id=8660">View Results</option>    --> 
+                                                                  <option value="send_login.php?stid=8660">Send Invitation Login</option> 
+                                   <option value="edit_credential.php?stid=8660">Edit Login Credential  </option>
+                                                                  
+                               
+         <!--    <option value="add_gr.php?stid=8660&wsid=14591">Add Grade</option>-->
+            
+                                        <option value="add_cer.php?stid=8660&wsid=14591">Add Certificate</option>
+
+                                       <option value="block_course_material.php?wsid=14591&wcid=2297&bl=1">Block course material</option> 
+                       <option value="members/login_1_admin.php?username=test2@gmail.com&inputPassword=99073fb468acd0b744293f5224e88728">Login as Student</option>
+            <option value="remove_st2.php?wsid=14591&wcid=2297">Remove</option> 
+<option value="view_feedback.php?stid=8660&wcid=2297">View Feedback</option>
+ 
+
+</select>
+<br>
+<span class='text-success'><b>Active </b></span>                                                                                                       <iframe id="f214591" scrolling="no" name="f214591" frameborder="0" style="overflow:hidden; height:30px; width:100%;" height="30px" width="100%"></iframe>
+
+                          </td>
+                      
+                    </tr> 
+                  
+                  
+                  
+                                    
+                 <tr>
+                    
+                     <td>8657</td>
+                      <td><a href='details.php?stid=8657' target='_blank'>test 1</a><br>
+                      <div dir='rtl' align='right'><a href='details.php?stid=8657'>test 1</a></div>                                            </td>
+                        <td>
+                           
+                              
+                        <input type="hidden" name="stid[]" id="stid_2" value='8657'>
+                        
+                         <!--  
+                         <div class="form-check form-check-inline">
+  <input class="form-check-input" type="radio" id="att_2" name="att[]" value="1">
+  <label class="form-check-label" for="inlineRadio1"> Present</label>
+</div>
+<div class="form-check form-check-inline">
+  <input class="form-check-input" type="radio" id="att_2" name="att[]" value="0">
+  <label class="form-check-label" for="inlineRadio2">Absent</label>
+</div>
+        -->             
+  <div class="form-group">
+                   
+                      <select class="form-control" id="att_2" name="att[]" require>
+                       <option value=''>Select status</option>
+                     
+                       <option value='1'>Present </option>
+                    <option value='4'>Absent</option>
+                    
+                    
+                     </select>
+                    
+                    
+                   </div>
+  
+                    
+
+                          </td><td>
+                                          <a target="_blnk" href="add_grx.php?stid=8657&wsid=14583&wcid=2297">Add Grade</a>   
+            
+                             
+                          </td>
+                                                <td>
+                              <select class="form-control selectWrappera" id="urlSelect8657" onchange="window.location = jQuery('#urlSelect8657 option:selected').val();">
+                              <option value="" selected> Select Option </option>
+                              
+                               <!--       <option value="show_results.php?id=8657">View Results</option>    --> 
+                                                                  <option value="send_login.php?stid=8657">Send Invitation Login</option> 
+                                   <option value="edit_credential.php?stid=8657">Edit Login Credential  </option>
+                                                                  
+                               
+         <!--    <option value="add_gr.php?stid=8657&wsid=14583">Add Grade</option>-->
+            
+                                        <option value="add_cer.php?stid=8657&wsid=14583">Add Certificate</option>
+
+                                       <option value="block_course_material.php?wsid=14583&wcid=2297&bl=1">Block course material</option> 
+                       <option value="members/login_1_admin.php?username=test@gamil.com&inputPassword=5fd0d225722df9e9756bde30e5583254">Login as Student</option>
+            <option value="remove_st2.php?wsid=14583&wcid=2297">Remove</option> 
+<option value="view_feedback.php?stid=8657&wcid=2297">View Feedback</option>
+ 
+
+</select>
+<br>
+<span class='text-success'><b>Active </b></span>                                                                                                       <iframe id="f214583" scrolling="no" name="f214583" frameborder="0" style="overflow:hidden; height:30px; width:100%;" height="30px" width="100%"></iframe>
+
+                          </td>
+                      
+                    </tr> 
+                  
+                  
+                  
+                  				                         
+
+          
+  
+                        
+                          
+                        
+                   
+                     
+                          
+                                                   
+
+                  </tbody>
+                  </table>
+            </div>
+            
+            </form>
+            
+            
+            
+            
+            
+            
+            
+          </div>
+          
+<script>
+    document.getElementById('exportBtn').addEventListener('click', function() {
+      const tables = document.querySelectorAll('.datatable1');
+      if (tables.length > 0) {
+        const wb = XLSX.utils.book_new();
+        tables.forEach((table, index) => {
+          const ws = XLSX.utils.table_to_sheet(table);
+          XLSX.utils.book_append_sheet(wb, ws, `Table${index + 1}`);
+        });
+
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+        const blob = new Blob([s2ab(wbout)], { type: 'application/octet-stream' });
+        saveAs(blob, 'English Adult -Elementary Level – 3 - 2026-06-29 - 5:00 PM.xlsx');
+      } else {
+        alert("Tables with class 'datatable1' not found.");
+      }
+    });
+
+    function s2ab(s) {
+      const buf = new ArrayBuffer(s.length);
+      const view = new Uint8Array(buf);
+      for (let i = 0; i < s.length; i++) {
+        view[i] = s.charCodeAt(i) & 0xFF;
+      }
+      return buf;
+    }
+  </script>
+          <!-- Content Row -->
+          
+
+        </div>
+        <!-- /.container-fluid -->
+
+      </div>
+      <!-- End of Main Content -->
+
+     
+ <footer class="main-footer">
+    <strong>Copyright © Egyptian Amirecan Center <script>document.write(new Date().getFullYear())</script></strong>
+    All rights reserved.
+    <div class="float-right d-none d-sm-inline-block">
+      <b>Version</b> 2.1.0
+    </div>
+  </footer>
+
+  <!-- Control Sidebar -->
+  <aside class="control-sidebar control-sidebar-dark">
+    <!-- Control sidebar content goes here -->
+  </aside>
+  <!-- /.control-sidebar -->
+</div>
+<!-- ./wrapper -->
+
+<!-- jQuery -->
+<script src="plugins/jquery/jquery.min.js"></script>
+<!-- Bootstrap 4 -->
+<script src="plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
+<!-- jQuery UI 1.11.4 -->
+<script src="plugins/jquery-ui/jquery-ui.min.js"></script>
+<!-- Resolve conflict in jQuery UI tooltip with Bootstrap tooltip -->
+<script>
+  $.widget.bridge('uibutton', $.ui.button)
+</script>
+<!-- Bootstrap 4 -->
+<script src="plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
+<!-- ChartJS -->
+<script src="plugins/chart.js/Chart.min.js"></script>
+<!-- Sparkline -->
+<script src="plugins/sparklines/sparkline.js"></script>
+<!-- JQVMap -->
+<script src="plugins/jqvmap/jquery.vmap.min.js"></script>
+<script src="plugins/jqvmap/maps/jquery.vmap.usa.js"></script>
+<!-- jQuery Knob Chart -->
+<script src="plugins/jquery-knob/jquery.knob.min.js"></script>
+
+
+<!-- daterangepicker -->
+<script src="plugins/moment/moment.min.js"></script>
+<script src="plugins/daterangepicker/daterangepicker.js"></script>
+<!-- Tempusdominus Bootstrap 4 -->
+<script src="plugins/tempusdominus-bootstrap-4/js/tempusdominus-bootstrap-4.min.js"></script>
+<!-- Summernote -->
+<script src="plugins/summernote/summernote-bs4.min.js"></script>
+<!-- overlayScrollbars -->
+<script src="plugins/overlayScrollbars/js/jquery.overlayScrollbars.min.js"></script>
+
+<!-- AdminLTE App -->
+<script src="dist/js/adminlte.js"></script>
+<!-- AdminLTE for demo purposes -->
+<!--<script src="dist/js/demo.js"></script> -->
+<script src="dist/js/pages/dashboard.js"></script>
+<script src="plugins/datatables/jquery.dataTables.min.js"></script>
+<script src="plugins/datatables-bs4/js/dataTables.bootstrap4.min.js"></script>
+<script src="plugins/datatables-responsive/js/dataTables.responsive.min.js"></script>
+<script src="plugins/datatables-responsive/js/responsive.bootstrap4.min.js"></script>
+<script src="plugins/datatables-buttons/js/dataTables.buttons.min.js"></script>
+<script src="plugins/datatables-buttons/js/buttons.bootstrap4.min.js"></script>
+<script src="plugins/jszip/jszip.min.js"></script>
+<script src="plugins/pdfmake/pdfmake.min.js"></script>
+<script src="plugins/pdfmake/vfs_fonts.js"></script>
+<script src="plugins/datatables-buttons/js/buttons.html5.min.js"></script>
+<script src="plugins/datatables-buttons/js/buttons.print.min.js"></script>
+<script src="plugins/datatables-buttons/js/buttons.colVis.min.js"></script>
+</body>
+</html> 
+  <script>
+
+    var select_box_element = document.querySelector('#t_id');
+
+    dselect(select_box_element, {
+        search: true
+    });
+     var select_box_element2 = document.querySelector('#r_id');
+
+    dselect(select_box_element2, {
+        search: true
+    });
+
+</script>
+ <!-- Modal report-->
+  <script>
+     function submitFormcopyflip(formId) {
+        
+        // Close any open modals
+        $(".modal").fadeOut();
+        $(".modal-backdrop").fadeOut();
+        $(".modal-backdrop").fadeOut();
+       
+               // $("#loading-message").text("Please wait ").fadeIn();
+       // var formData = $("#" + formId).serialize(); // Serialize form data
+       var formData = new FormData($("#myFormcopyflip")[0]); 
+
+        $.ajax({
+            type: "POST",
+            url: "send_report.php",
+            data: formData,
+processData: false,  // Important: Don't process the data
+            contentType: false,  // Important: Don't set content type
+            success: function(response) {
+               // $("#loading-message").fadeOut();
+                // Handle the response from the server
+                $("#result").html(response);
+                
+
+                // Show the result div as a centered popup
+                
+                $("#result").fadeIn();
+
+                // Hide the result div after 3 seconds
+                setTimeout(function() {
+                    $("#result").fadeOut();
+                }, 2000);
+
+                // Reload the page after 3 seconds
+                setTimeout(function() {
+                    location.reload();
+                }, 1000);
+            }
+        });
+    }
+    
+</script>
+<script>
+$(document).ready(function () {   
+    $('#copyflip').on('show.bs.modal', function(e) {
+        //get data-id attribute of the clicked element
+    var SecId = $(e.relatedTarget).data('id');
+ var SecName = $(e.relatedTarget).data('name');
+    //get dep code
+    var SecDis = $(e.relatedTarget).data('dis');
+    
+    
+     //populate the textbox
+    $(e.currentTarget).find('input[name="editsection"]').val(SecId);
+   $(e.currentTarget).find('input[name="wcid"]').val(SecName);
+   
+    $(e.currentTarget).find('input[name="sectionObjective"]').val(SecDis);
+        
+    }); 
+});
+</script>
+  <div>
+     
+<div class="modal fade" id="copyflip" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="exampleModalLabel">Send Report</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <form class=" form-row align-items-center"  id="myFormcopyflip">
+          <input type="hidden" name="editsection" id="editsection" value=''>
+          
+          
+         
+      <div class="modal-body">
+        <div class="form-group">
+            <label for="title"> Report Share Link <sup style="color:red">*</sup></label>
+            <input id="fid" value="" name="fid" class="form-control" type="text" autocomplete="off" required>
+           
+          </div>
+          
+          
+          
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        
+         <button  type="button"  name ="startsvv" onclick="submitFormcopyflip('myFormcopyflip')" class="btn btn-primary"> Sent </button>
+      
+      </div>
+      </form>
+       
+    </div>
+  </div>
+</div>
+   </div>
+   </div>
+
+  <!-- Modal report-->

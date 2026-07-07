@@ -37,21 +37,51 @@ export class AuthService {
 
   async login(credentials: LmsLoginDto) {
     try {
-      const lmsUser = await this.lmsClient.authenticate(credentials);
+      // For admin logins, pre-fetch course IDs that are ALREADY known to belong
+      // to this admin in our DB. These are passed as hints to the LMS client so
+      // it can skip straight to verifying only the admin's own courses (fast path
+      // on subsequent logins). On the very first login the DB returns nothing and
+      // the LMS client falls back to scanning all courses from /courses.php.
+      const knownCourseIds =
+        credentials.role === 'admin'
+          ? await this.prisma.course
+              .findMany({
+                where: {
+                  status: CourseStatus.ACTIVE,
+                  OR: [
+                    { keyPersonLmsUserId: credentials.username.toLowerCase() },
+                    {
+                      keyPersonName: {
+                        equals: credentials.username,
+                        mode: 'insensitive',
+                      },
+                    },
+                  ],
+                },
+                select: { lmsCourseId: true },
+              })
+              .then((rows) => rows.map((r) => r.lmsCourseId))
+          : undefined;
+
+      const lmsUser = await this.lmsClient.authenticate({
+        ...credentials,
+        ...(knownCourseIds ? { hints: { knownCourseIds } } : {}),
+      });
       const synced = await this.authSync.syncLmsUser(lmsUser);
-      const courseIds = synced.courses.map((course) => course.lmsCourseId);
-      const adminCourses =
-        lmsUser.role === 'admin'
-          ? await this.loadAdminCourses(
-              lmsUser.lmsUserId,
-              lmsUser.isSuperAdmin === true ||
-                this.matchesHardcodedSuperAdmin(credentials),
-            )
-          : null;
       const isSuperAdmin =
         lmsUser.role === 'admin' &&
         (lmsUser.isSuperAdmin === true ||
           this.matchesHardcodedSuperAdmin(credentials));
+      const adminCourses =
+        lmsUser.role === 'admin' && isSuperAdmin
+          ? await this.loadAdminCourses(
+              lmsUser.lmsUserId,
+              credentials.username.trim().toLowerCase(),
+              lmsUser.name,
+              isSuperAdmin,
+            )
+          : null;
+      const courseIds = synced.courses.map((course) => course.lmsCourseId);
       const firebaseCustomToken = await this.firebaseTokens.createCustomToken({
         appUserId: synced.user.id,
         lmsUserId: lmsUser.lmsUserId,
@@ -127,13 +157,35 @@ export class AuthService {
 
   private async loadAdminCourses(
     adminLmsUserId: string,
+    loginUsername: string,
+    adminName: string,
     isSuperAdmin: boolean,
   ) {
     const courseWhere = isSuperAdmin
       ? { status: CourseStatus.ACTIVE }
       : {
           status: CourseStatus.ACTIVE,
-          keyPersonLmsUserId: adminLmsUserId,
+          OR: [
+            // Direct match on the extracted LMS user ID
+            { keyPersonLmsUserId: adminLmsUserId },
+            // Also try the raw login username (covers cases where ID extraction
+            // fell back to username, or the LMS stores usernames as keyperson values)
+            ...(loginUsername !== adminLmsUserId
+              ? [{ keyPersonLmsUserId: loginUsername }]
+              : []),
+            // Name-based fallback (covers cases where keyperson ID is numeric but
+            // the admin name matches the keyperson name stored on the course)
+            ...(adminName
+              ? [
+                  {
+                    keyPersonName: {
+                      equals: adminName,
+                      mode: 'insensitive' as const,
+                    },
+                  },
+                ]
+              : []),
+          ],
         };
 
     const courses = await this.prisma.course.findMany({

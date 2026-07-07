@@ -81,6 +81,7 @@ class ApplicationActivitySummary {
 class FirestoreChatService {
   static const String announcementThreadId = 'announcements';
   static const String adminTeacherThreadId = 'admin_teacher';
+  static const String _keyPersonStudentThreadPrefix = 'keyperson_student_';
   static const int maxImageSizeBytes = 5 * 1024 * 1024;
   static const int maxVoiceSizeBytes = 10 * 1024 * 1024;
   static const int maxDocumentSizeBytes = 25 * 1024 * 1024;
@@ -121,6 +122,21 @@ class FirestoreChatService {
 
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
   static final FirebaseStorage _storage = FirebaseStorage.instance;
+
+  static String keyPersonStudentThreadId(String studentLmsUserId) {
+    return '$_keyPersonStudentThreadPrefix${studentLmsUserId.trim()}';
+  }
+
+  static bool isKeyPersonStudentThreadId(String threadId) {
+    return threadId.startsWith(_keyPersonStudentThreadPrefix);
+  }
+
+  static String? keyPersonStudentLmsUserId(String threadId) {
+    if (!isKeyPersonStudentThreadId(threadId)) return null;
+
+    final studentId = threadId.substring(_keyPersonStudentThreadPrefix.length);
+    return studentId.trim().isEmpty ? null : studentId;
+  }
 
   static CollectionReference<Map<String, dynamic>> _messagesRef({
     required String courseId,
@@ -1022,6 +1038,16 @@ class FirestoreChatService {
       );
     }
 
+    if (isKeyPersonStudentThreadId(threadId)) {
+      return _keyPersonStudentThreadUpdateData(
+        threadId: threadId,
+        senderName: senderName,
+        senderRole: senderRole,
+        lastMessage: lastMessage,
+        studentName: studentName,
+      );
+    }
+
     return _threadUpdateData(
       threadId: threadId,
       senderName: senderName,
@@ -1073,6 +1099,40 @@ class FirestoreChatService {
       data['teacher_unread_count'] = 0;
       data['teacher_last_read_at'] = FieldValue.serverTimestamp();
       data['admin_unread_count'] = FieldValue.increment(1);
+    }
+
+    return data;
+  }
+
+  static Map<String, dynamic> _keyPersonStudentThreadUpdateData({
+    required String threadId,
+    required String senderName,
+    required String senderRole,
+    required String lastMessage,
+    String? studentName,
+  }) {
+    final data = <String, dynamic>{
+      'thread_id': threadId,
+      'is_keyperson_student': true,
+      'last_message': lastMessage,
+      'last_sender_name': senderName,
+      'last_sender_role': senderRole,
+      'last_message_at': FieldValue.serverTimestamp(),
+      'updated_at': FieldValue.serverTimestamp(),
+    };
+
+    if (senderRole == 'admin') {
+      data['admin_unread_count'] = 0;
+      data['admin_last_read_at'] = FieldValue.serverTimestamp();
+      data['student_unread_count'] = FieldValue.increment(1);
+    } else if (senderRole == 'student') {
+      data['student_unread_count'] = 0;
+      data['student_last_read_at'] = FieldValue.serverTimestamp();
+      data['admin_unread_count'] = FieldValue.increment(1);
+    }
+
+    if (studentName != null && studentName.trim().isNotEmpty) {
+      data['student_name'] = studentName.trim();
     }
 
     return data;

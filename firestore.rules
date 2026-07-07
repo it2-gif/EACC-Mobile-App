@@ -21,15 +21,34 @@ service cloud.firestore {
         && request.auth.token.role in ['student', 'teacher'];
     }
 
-    function hasCourse(courseId) {
-      return isSupportedRole()
+    function hasCourseClaim(courseId) {
+      return isSignedIn()
         && request.auth.token.courseIds is list
         && courseId in request.auth.token.courseIds;
+    }
+
+    function hasCourse(courseId) {
+      return isSupportedRole()
+        && hasCourseClaim(courseId);
+    }
+
+    function isCourseAdmin(courseId) {
+      return isAdmin()
+        && (isSuperAdmin() || hasCourseClaim(courseId));
     }
 
     function isStudentThread(threadId) {
       return request.auth.token.role == 'student'
         && request.auth.token.lmsUserId == threadId;
+    }
+
+    function isKeyPersonStudentThreadId(threadId) {
+      return threadId.matches('^keyperson_student_.+$');
+    }
+
+    function isKeyPersonStudentThread(threadId) {
+      return request.auth.token.role == 'student'
+        && threadId == 'keyperson_student_' + request.auth.token.lmsUserId;
     }
 
     function isAnnouncementThread(threadId) {
@@ -42,7 +61,12 @@ service cloud.firestore {
 
     function canAccessThread(courseId, threadId) {
       return hasCourse(courseId)
-        && (isTeacher() || isStudentThread(threadId) || isAnnouncementThread(threadId));
+        && (
+          (isTeacher() && !isKeyPersonStudentThreadId(threadId))
+          || isStudentThread(threadId)
+          || isKeyPersonStudentThread(threadId)
+          || isAnnouncementThread(threadId)
+        );
     }
 
     function canWriteThread(courseId, threadId) {
@@ -240,23 +264,50 @@ service cloud.firestore {
         );
     }
 
+    function isKeyPersonStudentReadUpdate(threadId) {
+      return isKeyPersonStudentThreadId(threadId)
+        && request.resource.data.thread_id == threadId
+        && sameField('last_message')
+        && sameField('last_sender_name')
+        && sameField('last_sender_role')
+        && sameField('last_message_at')
+        && (
+          (
+            request.auth.token.role == 'admin'
+            && request.resource.data.admin_unread_count == 0
+            && request.resource.data.admin_last_read_at == request.time
+            && sameField('student_unread_count')
+            && sameField('student_last_read_at')
+          )
+          ||
+          (
+            request.auth.token.role == 'student'
+            && request.resource.data.student_unread_count == 0
+            && request.resource.data.student_last_read_at == request.time
+            && sameField('admin_unread_count')
+            && sameField('admin_last_read_at')
+          )
+        );
+    }
+
     match /courses/{courseId} {
-      allow read: if isAdmin() || hasCourse(courseId);
+      allow read: if isCourseAdmin(courseId) || hasCourse(courseId);
       allow write: if false;
 
       match /threads/{threadId} {
-        allow read: if isAdmin() || canAccessThread(courseId, threadId);
-        allow create: if isAdmin()
+        allow read: if isCourseAdmin(courseId) || canAccessThread(courseId, threadId);
+        allow create: if isCourseAdmin(courseId)
             ? isAdminThreadUpdate(threadId)
             : canAccessThread(courseId, threadId)
               && (
                 (canWriteThread(courseId, threadId) && isOutgoingThreadUpdate(threadId))
                 || isAnnouncementPinThreadCreate(threadId)
               );
-        allow update: if isAdmin()
+        allow update: if isCourseAdmin(courseId)
             ? (
                 isAdminThreadUpdate(threadId)
                 || isAdminTeacherReadUpdate(threadId)
+                || isKeyPersonStudentReadUpdate(threadId)
                 || isAnnouncementPinThreadUpdate(threadId)
                 || isAnnouncementReadUpdate(threadId)
                 || isTypingUpdate(threadId)
@@ -266,6 +317,7 @@ service cloud.firestore {
                 (canWriteThread(courseId, threadId) && isOutgoingThreadUpdate(threadId))
                 || isReadReceiptUpdate(threadId)
                 || isAdminTeacherReadUpdate(threadId)
+                || isKeyPersonStudentReadUpdate(threadId)
                 || isAnnouncementReadUpdate(threadId)
                 || isAnnouncementPinThreadUpdate(threadId)
                 || isTypingUpdate(threadId)
@@ -273,8 +325,8 @@ service cloud.firestore {
         allow delete: if false;
 
         match /messages/{messageId} {
-          allow read: if isAdmin() || canAccessThread(courseId, threadId);
-          allow create: if isAdmin()
+          allow read: if isCourseAdmin(courseId) || canAccessThread(courseId, threadId);
+          allow create: if isCourseAdmin(courseId)
               ? hasValidSender()
                 && request.resource.data.type in ['text', 'image', 'video', 'voice', 'document']
                 && request.resource.data.created_at == request.time
@@ -282,7 +334,7 @@ service cloud.firestore {
                 && hasValidSender()
                 && request.resource.data.type in ['text', 'image', 'video', 'voice', 'document']
                 && request.resource.data.created_at == request.time;
-          allow update: if isAdmin()
+          allow update: if isCourseAdmin(courseId)
               ? (
                 (
                   (isSuperAdmin() || isMessageOwner())
@@ -306,12 +358,12 @@ service cloud.firestore {
     }
 
     match /{path=**}/messages/{messageId} {
-      allow read: if isAdmin();
+      allow read: if isSuperAdmin();
       allow create, update, delete: if false;
     }
 
     match /audit_logs/{logId} {
-      allow read: if isAdmin();
+      allow read: if isSuperAdmin();
       allow create: if isSignedIn()
         && request.resource.data.actor_role == request.auth.token.role
         && request.resource.data.actor_name == request.auth.token.displayName

@@ -81,6 +81,9 @@ class _ChatScreenState extends State<ChatScreen> {
   bool get isAdminTeacherThread =>
       widget.threadId == FirestoreChatService.adminTeacherThreadId;
 
+  bool get isKeyPersonStudentThread =>
+      FirestoreChatService.isKeyPersonStudentThreadId(widget.threadId);
+
   bool get canSendInThread =>
       !isAnnouncementThread || widget.currentUserRole != 'student';
 
@@ -231,7 +234,11 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    if (widget.currentUserRole == 'admin' && !isAdminTeacherThread) return;
+    if (widget.currentUserRole == 'admin' &&
+        !isAdminTeacherThread &&
+        !isKeyPersonStudentThread) {
+      return;
+    }
 
     try {
       await FirestoreChatService.markThreadRead(
@@ -2143,7 +2150,9 @@ class _ChatScreenState extends State<ChatScreen> {
     if (createdAt is! Timestamp) return MessageDeliveryStatus.sending;
 
     if (isAnnouncementThread ||
-        (widget.currentUserRole == 'admin' && !isAdminTeacherThread)) {
+        (widget.currentUserRole == 'admin' &&
+            !isAdminTeacherThread &&
+            !isKeyPersonStudentThread)) {
       return MessageDeliveryStatus.sent;
     }
 
@@ -2152,6 +2161,10 @@ class _ChatScreenState extends State<ChatScreen> {
         : isAdminTeacherThread
         ? widget.currentUserRole == 'admin'
               ? threadData['teacher_last_read_at']
+              : threadData['admin_last_read_at']
+        : isKeyPersonStudentThread
+        ? widget.currentUserRole == 'admin'
+              ? threadData['student_last_read_at']
               : threadData['admin_last_read_at']
         : widget.currentUserRole == 'student'
         ? threadData['teacher_last_read_at']
@@ -2281,6 +2294,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String? get _notificationAudience {
     if (isAnnouncementThread) return 'course';
+    if (isKeyPersonStudentThread) {
+      if (widget.currentUserRole == 'admin') return 'keyperson_student';
+      if (widget.currentUserRole == 'student') return 'keyperson';
+      return null;
+    }
     if (!isAdminTeacherThread) return null;
 
     if (widget.currentUserRole == 'admin') return 'teachers';

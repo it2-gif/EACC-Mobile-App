@@ -43,7 +43,7 @@ export function parseLmsResponse(
   expectedRole: LmsUserRole,
 ): NormalizedLmsUser {
   const root = asObject(payload);
-  const data = asObject(root.data ?? root.user ?? root);
+  const data = readRoleData(root, expectedRole);
   const fields = userFields[expectedRole];
 
   const lmsUserId = readRequiredString(data, fields.id);
@@ -52,13 +52,7 @@ export function parseLmsResponse(
   const responseRole = readOptionalString(data, ['role', 'type', 'user_type']);
   const isSuperAdmin =
     expectedRole === 'admin'
-      ? readOptionalBoolean(data, [
-          'full_access',
-          'fullAccess',
-          'is_super_admin',
-          'isSuperAdmin',
-          'super_admin',
-        ])
+      ? hasAdminFullAccess(data)
       : false;
 
   if (responseRole && normalizeRole(responseRole) !== expectedRole) {
@@ -71,16 +65,33 @@ export function parseLmsResponse(
     name,
     email,
     isSuperAdmin,
-    courses: readCourses(data.courses ?? root.courses),
+    courses: readCourses(data.courses ?? root.courses, root.admin ?? data.admin),
   };
 }
 
-function readCourses(value: unknown): NormalizedLmsCourse[] {
+function readRoleData(root: JsonObject, expectedRole: LmsUserRole): JsonObject {
+  const rolePayload =
+    expectedRole === 'admin' ? root.admin_name : root[expectedRole];
+
+  if (Array.isArray(rolePayload) && rolePayload.length > 0) {
+    return asObject(rolePayload[0]);
+  }
+
+  return asObject(root.data ?? root.user ?? root);
+}
+
+function readCourses(
+  value: unknown,
+  adminValues?: unknown,
+): NormalizedLmsCourse[] {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value)) throw new InvalidLmsResponseError();
 
-  return value.map((course) => {
+  const admins = Array.isArray(adminValues) ? adminValues : [];
+
+  return value.map((course, index) => {
     const data = asObject(course);
+    const admin = admins[index] ? asObject(admins[index]) : {};
 
     return {
       lmsCourseId: readRequiredString(data, ['course_id', 'id']),
@@ -97,15 +108,38 @@ function readCourses(value: unknown): NormalizedLmsCourse[] {
         'manager_id',
         'admin_id',
       ]),
-      keyPersonName: readOptionalString(data, [
-        'key_person_name',
-        'keyperson_name',
-        'keyPersonName',
-        'manager_name',
-        'admin_name',
-      ]),
+      keyPersonName:
+        readOptionalString(data, [
+          'shortname',
+          'Admin_shortname',
+          'key_person_name',
+          'keyperson_name',
+          'keyPersonName',
+          'manager_name',
+          'admin_name',
+        ]) ?? readOptionalString(admin, ['Admin_shortname', 'shortname']),
     };
   });
+}
+
+function hasAdminFullAccess(data: JsonObject): boolean {
+  const accessLevel = readOptionalNumber(data, [
+    'fullaccese',
+    'full_access',
+    'fullAccess',
+    'access_level',
+    'accessLevel',
+  ]);
+
+  if (accessLevel !== undefined) {
+    return accessLevel > 0;
+  }
+
+  return readOptionalBoolean(data, [
+    'is_super_admin',
+    'isSuperAdmin',
+    'super_admin',
+  ]);
 }
 
 function asObject(value: unknown): JsonObject {
@@ -135,6 +169,28 @@ function readOptionalString(
 
     if (typeof value === 'number' && Number.isFinite(value)) {
       return String(value);
+    }
+  }
+
+  return undefined;
+}
+
+function readOptionalNumber(
+  data: JsonObject,
+  keys: string[],
+): number | undefined {
+  for (const key of keys) {
+    const value = data[key];
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = Number(value.trim());
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
     }
   }
 

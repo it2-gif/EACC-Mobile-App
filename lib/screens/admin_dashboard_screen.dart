@@ -74,9 +74,9 @@ class AdminDashboardScreen extends StatelessWidget {
           const SizedBox(height: 24),
 
           // Navigation tiles
-          const Text(
-            'ADMIN TOOLS',
-            style: TextStyle(
+          Text(
+            session.appUser.isSuperAdmin ? 'ADMIN TOOLS' : 'COURSE TOOLS',
+            style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
               color: AppColors.muted,
@@ -87,7 +87,9 @@ class AdminDashboardScreen extends StatelessWidget {
           _NavTile(
             icon: Icons.menu_book_rounded,
             title: 'Courses',
-            subtitle: 'Browse all courses and student threads',
+            subtitle: session.appUser.isSuperAdmin
+                ? 'Browse all courses and student threads'
+                : 'Open your linked courses and student threads',
             color: AppColors.primary,
             onTap: () => Navigator.push(
               context,
@@ -97,32 +99,34 @@ class AdminDashboardScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          _NavTile(
-            icon: Icons.people_rounded,
-            title: 'Users',
-            subtitle: 'View all registered students and teachers',
-            color: const Color(0xFF0E7C86),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => AdminUsersScreen(session: session),
+          if (session.appUser.isSuperAdmin) ...[
+            _NavTile(
+              icon: Icons.people_rounded,
+              title: 'Users',
+              subtitle: 'View all registered students and teachers',
+              color: const Color(0xFF0E7C86),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AdminUsersScreen(session: session),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 10),
-          _NavTile(
-            icon: Icons.forum_rounded,
-            title: 'Chat Monitor',
-            subtitle: 'Monitor and join any active conversation',
-            color: const Color(0xFF6A3DE8),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => AdminChatsScreen(session: session),
+            const SizedBox(height: 10),
+            _NavTile(
+              icon: Icons.forum_rounded,
+              title: 'Chat Monitor',
+              subtitle: 'Monitor and join any active conversation',
+              color: const Color(0xFF6A3DE8),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AdminChatsScreen(session: session),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 10),
+            const SizedBox(height: 10),
+          ],
           _NavTile(
             icon: Icons.campaign_rounded,
             title: 'Announcements',
@@ -235,7 +239,7 @@ class _WelcomeHeader extends StatelessWidget {
                 Text(
                   isSuperAdmin
                       ? 'EACC Super Administrator'
-                      : 'EACC Administrator',
+                      : 'EACC Key-Person Administrator',
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 13,
@@ -261,7 +265,7 @@ class _WelcomeHeader extends StatelessWidget {
                       Icon(
                         isSuperAdmin
                             ? Icons.verified_user_rounded
-                            : Icons.admin_panel_settings_outlined,
+                            : Icons.link_rounded,
                         size: 15,
                         color: Colors.white,
                       ),
@@ -269,7 +273,7 @@ class _WelcomeHeader extends StatelessWidget {
                       Text(
                         isSuperAdmin
                             ? 'Full access enabled'
-                            : 'Standard admin access',
+                            : 'Linked courses only',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,
