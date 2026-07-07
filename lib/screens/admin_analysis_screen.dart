@@ -324,7 +324,7 @@ class _OverviewHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'EACC Connection overview',
+                  'EACC Connect overview',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/auth_session.dart';
 import '../models/course.dart';
+import '../services/auth_api.dart';
 import '../services/firestore_chat_service.dart';
 import '../services/push_notification_service.dart';
 import '../theme/app_theme.dart';
@@ -10,15 +11,63 @@ import '../widgets/course_card.dart';
 import '../widgets/screen_header.dart';
 import 'admin_threads_screen.dart';
 
-class AdminCoursesScreen extends StatelessWidget {
+class AdminCoursesScreen extends StatefulWidget {
   final AuthSession session;
 
   const AdminCoursesScreen({super.key, required this.session});
 
   @override
+  State<AdminCoursesScreen> createState() => _AdminCoursesScreenState();
+}
+
+class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
+  final courseIdController = TextEditingController();
+  Course? searchedCourse;
+  bool isSearching = false;
+  bool hasSearched = false;
+  String? searchError;
+
+  @override
+  void dispose() {
+    courseIdController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _searchCourse() async {
+    final courseId = courseIdController.text.trim();
+    if (courseId.isEmpty) return;
+
+    setState(() {
+      isSearching = true;
+      hasSearched = true;
+      searchError = null;
+      searchedCourse = null;
+    });
+
+    try {
+      final course = await AuthApi().fetchCourse(courseId);
+      if (mounted) {
+        setState(() {
+          searchedCourse = course;
+          isSearching = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          searchError = e.toString().replaceFirst('Exception: ', '');
+          isSearching = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final courses = session.courses;
-    final isFullAccess = session.appUser.isSuperAdmin;
+    final isFullAccess = widget.session.appUser.isSuperAdmin;
+    final courses = isFullAccess
+        ? (searchedCourse != null ? [searchedCourse!] : <Course>[])
+        : widget.session.courses;
 
     return AppScaffold(
       title: isFullAccess ? 'Admin Courses' : 'Linked Courses',
@@ -27,29 +76,102 @@ class AdminCoursesScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
           ScreenHeader(
-            title: 'Hello, ${session.appUser.name}',
-            subtitle: courses.isEmpty
-                ? isFullAccess
-                    ? 'No active courses are available yet.'
-                    : 'No courses are linked to your contact-person account yet.'
-                : isFullAccess
-                    ? 'Full access is enabled. You can monitor every active course.'
+            title: 'Hello, ${widget.session.appUser.name}',
+            subtitle: isFullAccess
+                ? 'Full access is enabled. Search a course ID to view its chats.'
+                : widget.session.courses.isEmpty
+                    ? 'No courses are linked to your contact-person account yet.'
                     : 'Contact-person access is active. You can monitor only your linked courses.',
             icon: isFullAccess
                 ? Icons.admin_panel_settings_rounded
                 : Icons.verified_user_outlined,
           ),
           const SizedBox(height: 18),
-          _AccessSummary(session: session, courses: courses),
-          const SizedBox(height: 18),
-          if (courses.isEmpty)
-            _EmptyState(isFullAccess: isFullAccess)
+          if (isFullAccess) ...[
+            _CourseLookupBar(
+              controller: courseIdController,
+              onSearch: _searchCourse,
+              isSearching: isSearching,
+            ),
+            const SizedBox(height: 18),
+          ],
+          if (!isFullAccess || searchedCourse != null) ...[
+            _AccessSummary(session: widget.session, courses: courses),
+            const SizedBox(height: 18),
+          ],
+          if (isSearching)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (isFullAccess && !hasSearched)
+            const _EmptyState(
+              icon: Icons.search_rounded,
+              title: 'Search for a course',
+              subtitle: 'Enter a course ID above to view its details and chats.',
+            )
+          else if (isFullAccess && searchedCourse == null)
+            _EmptyState(
+              icon: Icons.search_off_rounded,
+              title: 'Course not found',
+              subtitle: searchError ?? 'No course with that ID exists in the database.',
+            )
+          else if (courses.isEmpty)
+            _EmptyState(
+              icon: Icons.inventory_2_outlined,
+              title: isFullAccess ? 'No active courses' : 'No linked courses',
+              subtitle: isFullAccess
+                  ? 'Courses will appear here after they are synced.'
+                  : 'Ask a full-access admin to assign you as contact person in the LMS, then log in again.',
+            )
           else
             ...courses.map((course) => _AdminCourseCard(
                   course: course,
-                  session: session,
+                  session: widget.session,
                 )),
         ],
+      ),
+    );
+  }
+}
+
+class _CourseLookupBar extends StatelessWidget {
+  final TextEditingController controller;
+  final VoidCallback onSearch;
+  final bool isSearching;
+
+  const _CourseLookupBar({
+    required this.controller,
+    required this.onSearch,
+    required this.isSearching,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  hintText: 'Enter LMS Course ID (e.g. 2297)',
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                ),
+                keyboardType: TextInputType.number,
+                onSubmitted: isSearching ? null : (_) => onSearch(),
+              ),
+            ),
+            IconButton(
+              onPressed: isSearching ? null : onSearch,
+              icon: const Icon(Icons.search_rounded, color: AppColors.primary),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -237,9 +359,15 @@ class _AdminCourseCardState extends State<_AdminCourseCard> {
 }
 
 class _EmptyState extends StatelessWidget {
-  final bool isFullAccess;
+  final IconData icon;
+  final String title;
+  final String subtitle;
 
-  const _EmptyState({required this.isFullAccess});
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -248,23 +376,15 @@ class _EmptyState extends StatelessWidget {
         padding: const EdgeInsets.all(22),
         child: Column(
           children: [
-            Icon(
-              isFullAccess
-                  ? Icons.inventory_2_outlined
-                  : Icons.link_off_outlined,
-              size: 44,
-              color: AppColors.muted,
-            ),
+            Icon(icon, size: 44, color: AppColors.muted),
             const SizedBox(height: 12),
             Text(
-              isFullAccess ? 'No active courses' : 'No linked courses',
+              title,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
             Text(
-              isFullAccess
-                  ? 'Courses will appear here after they are synced from the LMS.'
-                  : 'Ask a full-access admin to assign you as contact person in the LMS, then log in again.',
+              subtitle,
               textAlign: TextAlign.center,
               style: const TextStyle(color: AppColors.muted, height: 1.35),
             ),

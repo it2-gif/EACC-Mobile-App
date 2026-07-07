@@ -15,14 +15,14 @@ class AdminAuditScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      title: 'Audit Trail',
+      title: 'Deleted Messages',
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirestoreChatService.getAuditLogs(limit: 120),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return _StateMessage(
               icon: Icons.error_outline_rounded,
-              title: 'Could not load audit logs',
+              title: 'Could not load deleted messages',
               message: '${snapshot.error}',
             );
           }
@@ -35,9 +35,9 @@ class AdminAuditScreen extends StatelessWidget {
           if (docs.isEmpty) {
             return const _StateMessage(
               icon: Icons.manage_search_rounded,
-              title: 'No audit activity yet',
+              title: 'No deleted messages yet',
               message:
-                  'Message edits, deletes, pins, and bulk moderation will appear here.',
+                  'Deleted messages and message edits will appear here.',
             );
           }
 

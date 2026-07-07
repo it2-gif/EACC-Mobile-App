@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 
 import '../models/auth_session.dart';
+import '../models/course.dart';
 import 'auth_session_manager.dart';
 
 class AuthApi {
@@ -39,6 +40,21 @@ class AuthApi {
     await (sessionManager ?? AuthSessionManager()).establish(session);
     return session;
   }
+
+  Future<Course> fetchCourse(String courseId) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/v1/admin/courses/${Uri.encodeComponent(courseId)}'),
+      headers: const {'Content-Type': 'application/json'},
+    );
+
+    final body = _decodeResponseBody(response.body);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(body['message'] ?? 'Course not found');
+    }
+
+    return Course.fromBackendJson(body);
+  }
+
 
   Map<String, dynamic> _decodeResponseBody(String rawBody) {
     final trimmed = rawBody.trim();

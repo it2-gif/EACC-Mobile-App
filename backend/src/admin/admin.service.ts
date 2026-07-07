@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { UserRole } from '../../generated/prisma/enums';
 
 @Injectable()
 export class AdminService {
@@ -28,5 +29,36 @@ export class AdminService {
       status: user.status.toLowerCase(),
       lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
     }));
+  }
+
+  async getCourse(lmsCourseId: string) {
+    const course = await this.prisma.course.findFirst({
+      where: { lmsCourseId },
+      include: {
+        memberships: {
+          where: { role: UserRole.STUDENT },
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (!course) {
+      throw new NotFoundException(`Course ${lmsCourseId} not found`);
+    }
+
+    return {
+      id: course.id,
+      lmsCourseId: course.lmsCourseId,
+      name: course.name,
+      category: course.category,
+      keyPersonLmsUserId: course.keyPersonLmsUserId,
+      keyPersonName: course.keyPersonName,
+      students: course.memberships.map((m) => ({
+        lmsUserId: m.user.lmsUserId,
+        name: m.user.name,
+      })),
+    };
   }
 }

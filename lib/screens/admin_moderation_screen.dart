@@ -37,7 +37,7 @@ class _AdminModerationScreenState extends State<AdminModerationScreen> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      title: 'Bulk Moderation',
+      title: 'Moderations',
       body: FutureBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
         future: messagesFuture,
         builder: (context, snapshot) {

@@ -129,7 +129,7 @@ class _StartupScreen extends StatelessWidget {
             ),
             SizedBox(height: 16),
             Text(
-              'Opening EACC Connection...',
+              'Opening EACC Connect...',
               style: TextStyle(
                 color: AppColors.muted,
                 fontWeight: FontWeight.w600,
@@ -163,7 +163,7 @@ class _StartupErrorScreen extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               const Text(
-                'EACC Connection could not start',
+                'EACC Connect could not start',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: AppColors.danger,

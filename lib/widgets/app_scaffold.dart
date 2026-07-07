@@ -59,7 +59,7 @@ class AppScaffold extends StatelessWidget {
     await showActionConfirmation(
       context,
       title: 'Logged out successfully',
-      message: 'Your EACC Connection session was closed.',
+      message: 'Your EACC Connect session was closed.',
       icon: Icons.logout_rounded,
       color: AppColors.danger,
     );

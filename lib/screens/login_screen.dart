@@ -75,7 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await showActionConfirmation(
         context,
         title: 'Logged in successfully',
-        message: 'Welcome back to EACC Connection.',
+        message: 'Welcome back to EACC Connect.',
       );
 
       if (!mounted) return;
@@ -205,7 +205,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         SizedBox(height: compact ? 14 : 18),
                         const Text(
-                          'EACC Connection',
+                          'EACC Connect',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 26,

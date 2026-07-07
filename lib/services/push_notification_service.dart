@@ -110,6 +110,9 @@ class PushNotificationService {
     VoidCallback? onOpen,
     bool playSound = true,
   }) {
+    if (_session?.appUser.isSuperAdmin == true) {
+      return;
+    }
     if (title.trim().isEmpty && (body == null || body.trim().isEmpty)) {
       return;
     }
@@ -156,8 +159,8 @@ class PushNotificationService {
   }
 
   Future<void> _registerDeviceTokenIfPossible({bool force = false}) async {
-    if (_session == null) {
-      debugPrint('Device token registration skipped: no active session.');
+    if (_session == null || _session!.appUser.isSuperAdmin) {
+      debugPrint('Device token registration skipped: no active session or super admin.');
       return;
     }
 
@@ -281,7 +284,7 @@ class PushNotificationService {
     final course = _findCourse(session, courseId);
     final studentName = message.data['studentName']?.toString();
     final senderName =
-        message.data['senderName']?.toString() ?? 'EACC Connection';
+        message.data['senderName']?.toString() ?? 'EACC Connect';
 
     _openChatFromRoute(
       session: session,
@@ -657,7 +660,7 @@ class _BannerCard extends StatelessWidget {
                         Row(
                           children: [
                             const Text(
-                              'EACC Connection',
+                              'EACC Connect',
                               style: TextStyle(
                                 color: Color(0xFF7FA8D4),
                                 fontSize: 11,

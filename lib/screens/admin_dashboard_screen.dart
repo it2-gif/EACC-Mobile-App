@@ -93,20 +93,7 @@ class AdminDashboardScreen extends StatelessWidget {
                   builder: (_) => AdminUsersScreen(session: session),
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-            _NavTile(
-              icon: Icons.forum_rounded,
-              title: 'Chat Monitor',
-              subtitle: 'Monitor and join any active conversation',
-              color: const Color(0xFF6A3DE8),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AdminChatsScreen(session: session),
-                ),
-              ),
-            ),
+             ),
             const SizedBox(height: 10),
           ],
           _NavTile(
@@ -125,7 +112,7 @@ class AdminDashboardScreen extends StatelessWidget {
           if (session.appUser.isSuperAdmin) ...[
             _NavTile(
               icon: Icons.admin_panel_settings_rounded,
-              title: 'Bulk Moderation',
+              title: 'Moderations',
               subtitle: 'Search and soft-delete selected messages',
               color: AppColors.danger,
               onTap: () => Navigator.push(
@@ -138,8 +125,8 @@ class AdminDashboardScreen extends StatelessWidget {
             const SizedBox(height: 10),
             _NavTile(
               icon: Icons.history_edu_rounded,
-              title: 'Audit Trail',
-              subtitle: 'Review message edits, deletes, pins, and moderation',
+              title: 'Deleted Messages',
+              subtitle: 'Review deleted messages and chat edits',
               color: AppColors.primaryDark,
               onTap: () => Navigator.push(
                 context,
