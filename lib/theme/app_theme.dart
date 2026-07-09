@@ -18,6 +18,7 @@ class AppColors {
   static const admin = Color(0xFF9A5A12);
   static const danger = Color(0xFFB42318);
   static const success = Color(0xFF0E8A3D);
+  static const warning = Color(0xFFB86B00);
 }
 
 class AppTheme {

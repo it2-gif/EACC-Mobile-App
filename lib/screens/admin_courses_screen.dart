@@ -26,6 +26,7 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
   bool isSearching = false;
   bool hasSearched = false;
   String? searchError;
+  String? searchNotice;
 
   @override
   void dispose() {
@@ -41,6 +42,7 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
       isSearching = true;
       hasSearched = true;
       searchError = null;
+      searchNotice = null;
       searchedCourse = null;
     });
 
@@ -54,9 +56,20 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
         });
       }
     } catch (e) {
+      final message = e.toString().replaceFirst('Exception: ', '');
+      final canViewAllCourses = widget.session.appUser.canViewAllCourses;
+      final canOpenUnsyncedCourse =
+          canViewAllCourses && !_isAuthErrorMessage(message);
+
       if (mounted) {
         setState(() {
-          searchError = e.toString().replaceFirst('Exception: ', '');
+          if (canOpenUnsyncedCourse) {
+            searchedCourse = _buildUnsyncedCourse(courseId);
+            searchNotice =
+                'Course $courseId is not synced in the app database yet. You can open its chat by ID, but course details and students may be missing until the LMS sync includes it.';
+          } else {
+            searchError = message;
+          }
           isSearching = false;
         });
       }
@@ -74,6 +87,23 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
     }
 
     return null;
+  }
+
+  bool _isAuthErrorMessage(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('secure session expired') ||
+        normalized.contains('firebase bearer token') ||
+        normalized.contains('unauthorized') ||
+        normalized.contains('forbidden');
+  }
+
+  Course _buildUnsyncedCourse(String courseId) {
+    return Course(
+      id: courseId,
+      name: 'Course $courseId',
+      category: 'Not synced yet',
+      keyPersonName: 'LMS lookup required',
+    );
   }
 
   @override
@@ -119,6 +149,10 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
             _AccessSummary(session: widget.session, courses: courses),
             const SizedBox(height: 18),
           ],
+          if (searchNotice != null) ...[
+            _SearchNotice(message: searchNotice!),
+            const SizedBox(height: 18),
+          ],
           if (isSearching)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 40),
@@ -150,6 +184,42 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
                   session: widget.session,
                 )),
         ],
+      ),
+    );
+  }
+}
+
+class _SearchNotice extends StatelessWidget {
+  final String message;
+
+  const _SearchNotice({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: AppColors.warning.withValues(alpha: 0.08),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.info_outline_rounded,
+              color: AppColors.warning,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: AppColors.ink,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
