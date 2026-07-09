@@ -3,6 +3,7 @@ import {
   Get,
   Headers,
   Param,
+  Post,
   UnauthorizedException,
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
@@ -22,6 +23,17 @@ export class AdminController {
     @Headers('authorization') authorization?: string,
   ) {
     return this.adminService.getCourse(
+      courseId,
+      this.readBearerToken(authorization),
+    );
+  }
+
+  @Post('courses/:courseId/refresh')
+  refreshCourse(
+    @Param('courseId') courseId: string,
+    @Headers('authorization') authorization?: string,
+  ) {
+    return this.adminService.refreshCourse(
       courseId,
       this.readBearerToken(authorization),
     );

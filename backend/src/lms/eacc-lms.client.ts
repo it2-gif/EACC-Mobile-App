@@ -43,6 +43,48 @@ const dashboardPaths: Record<LmsUserRole, string> = {
 export class EaccLmsClient implements LmsClient {
   constructor(private readonly config: ConfigService<Environment, true>) {}
 
+  async loadAdminCourseById(
+    credentials: Pick<LmsLoginCredentials, 'username' | 'password'>,
+    lmsCourseId: string,
+  ): Promise<NormalizedLmsCourse | undefined> {
+    const courseId = lmsCourseId.trim();
+    if (!courseId) return undefined;
+
+    const baseUrl = this.config.get('LMS_BASE_URL', { infer: true });
+    const timeout = this.config.get('LMS_REQUEST_TIMEOUT_MS', { infer: true });
+    const sessionCookie = await this.loginAdminSession(
+      baseUrl,
+      timeout,
+      credentials,
+    );
+    const editUrl = new URL('/edit_course.php', baseUrl);
+    editUrl.searchParams.set('wcid', courseId);
+    const detailsHtml = await this.loadAuthenticatedHtml(
+      editUrl,
+      sessionCookie,
+      timeout,
+    );
+    const course = parseAdminCourseEditHtml(detailsHtml, courseId);
+
+    if (!course) return undefined;
+
+    const catalog = await this.loadAdminCourseCatalog(
+      baseUrl,
+      sessionCookie,
+      timeout,
+    );
+    const catalogCourse = catalog.find(
+      (entry) => entry.lmsCourseId === course.lmsCourseId,
+    );
+
+    return this.loadAdminCourseStudents(
+      baseUrl,
+      sessionCookie,
+      timeout,
+      mergeCourseCatalogData(course, catalogCourse),
+    );
+  }
+
   async authenticate(
     credentials: LmsLoginCredentials,
   ): Promise<NormalizedLmsUser> {
@@ -168,6 +210,55 @@ export class EaccLmsClient implements LmsClient {
     }
 
     return user;
+  }
+
+  private async loginAdminSession(
+    baseUrl: string,
+    timeout: number,
+    credentials: Pick<LmsLoginCredentials, 'username' | 'password'>,
+  ): Promise<string> {
+    const endpoint = new URL(loginPaths.admin, baseUrl);
+    const sessionCookie = await this.createSession(baseUrl, timeout);
+    const body = new URLSearchParams({
+      ty: 'admin',
+      username: credentials.username,
+      inputPassword: credentials.password,
+    });
+
+    let response: Response;
+
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          accept: 'text/html,application/json',
+          'content-type': 'application/x-www-form-urlencoded',
+          ...(sessionCookie ? { cookie: sessionCookie } : {}),
+        },
+        body,
+        redirect: 'follow',
+        signal: AbortSignal.timeout(timeout),
+      });
+    } catch {
+      throw new LmsUnavailableError();
+    }
+
+    const responseText = await response.text();
+
+    if (
+      response.url.includes('login=failed') ||
+      response.status === 401 ||
+      response.status === 403 ||
+      responseText.includes('Username Not Found')
+    ) {
+      throw new InvalidLmsCredentialsError();
+    }
+
+    if (!response.ok) {
+      throw new LmsUnavailableError();
+    }
+
+    return mergeSessionCookie(sessionCookie, response.headers);
   }
 
   private async loadTeacherCoursesWithStudents(

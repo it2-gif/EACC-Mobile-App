@@ -20,8 +20,10 @@ npm.cmd install
 npm.cmd run prisma:generate
 ```
 
-Update `DATABASE_URL` and the three `FIREBASE_*` service-account values in
-`.env`, then create the development migration:
+Update `DATABASE_URL`, the three `FIREBASE_*` service-account values, and
+`LMS_SYNC_ADMIN_USERNAME` / `LMS_SYNC_ADMIN_PASSWORD` in `.env` when you need
+super-admin or operation-manager course search to refresh missing LMS courses
+on demand. Then create the development migration:
 
 ```powershell
 npm.cmd run prisma:migrate:dev -- --name init

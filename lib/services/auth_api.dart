@@ -43,6 +43,23 @@ class AuthApi {
   }
 
   Future<Course> fetchCourse(String courseId) async {
+    return _loadAdminCourse(
+      path: '/v1/admin/courses/${Uri.encodeComponent(courseId)}',
+      method: 'GET',
+    );
+  }
+
+  Future<Course> refreshCourse(String courseId) async {
+    return _loadAdminCourse(
+      path: '/v1/admin/courses/${Uri.encodeComponent(courseId)}/refresh',
+      method: 'POST',
+    );
+  }
+
+  Future<Course> _loadAdminCourse({
+    required String path,
+    required String method,
+  }) async {
     final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
     if (idToken == null) {
       throw const AuthApiException(
@@ -50,13 +67,13 @@ class AuthApi {
       );
     }
 
-    final response = await _client.get(
-      Uri.parse('$baseUrl/v1/admin/courses/${Uri.encodeComponent(courseId)}'),
-      headers: {
+    final request = http.Request(method, Uri.parse('$baseUrl$path'))
+      ..headers.addAll({
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $idToken',
-      },
-    );
+      });
+    final streamed = await _client.send(request);
+    final response = await http.Response.fromStream(streamed);
 
     final body = _decodeResponseBody(response.body);
     if (response.statusCode < 200 || response.statusCode >= 300) {

@@ -46,9 +46,11 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
       searchedCourse = null;
     });
 
+    final api = AuthApi();
+
     try {
       final sessionCourse = _findSessionCourse(courseId);
-      final course = sessionCourse ?? await AuthApi().fetchCourse(courseId);
+      final course = sessionCourse ?? await api.fetchCourse(courseId);
       if (mounted) {
         setState(() {
           searchedCourse = course;
@@ -58,18 +60,37 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
     } catch (e) {
       final message = e.toString().replaceFirst('Exception: ', '');
       final canViewAllCourses = widget.session.appUser.canViewAllCourses;
-      final canOpenUnsyncedCourse =
+      final canRefreshCourse =
           canViewAllCourses && !_isAuthErrorMessage(message);
+
+      if (canRefreshCourse) {
+        try {
+          final refreshedCourse = await api.refreshCourse(courseId);
+          if (mounted) {
+            setState(() {
+              searchedCourse = refreshedCourse;
+              searchNotice =
+                  'Course $courseId was refreshed from the LMS and saved to the app database.';
+              isSearching = false;
+            });
+          }
+          return;
+        } catch (refreshError) {
+          if (mounted) {
+            setState(() {
+              searchError = refreshError
+                  .toString()
+                  .replaceFirst('Exception: ', '');
+              isSearching = false;
+            });
+          }
+          return;
+        }
+      }
 
       if (mounted) {
         setState(() {
-          if (canOpenUnsyncedCourse) {
-            searchedCourse = _buildUnsyncedCourse(courseId);
-            searchNotice =
-                'Course $courseId is not synced in the app database yet. You can open its chat by ID, but course details and students may be missing until the LMS sync includes it.';
-          } else {
-            searchError = message;
-          }
+          searchError = message;
           isSearching = false;
         });
       }
@@ -95,15 +116,6 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
         normalized.contains('firebase bearer token') ||
         normalized.contains('unauthorized') ||
         normalized.contains('forbidden');
-  }
-
-  Course _buildUnsyncedCourse(String courseId) {
-    return Course(
-      id: courseId,
-      name: 'Course $courseId',
-      category: 'Not synced yet',
-      keyPersonName: 'LMS lookup required',
-    );
   }
 
   @override
@@ -168,7 +180,8 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
             _EmptyState(
               icon: Icons.search_off_rounded,
               title: 'Course not found',
-              subtitle: searchError ?? 'No course with that ID exists in the database.',
+              subtitle:
+                  searchError ?? 'No course with that ID exists in the database.',
             )
           else if (courses.isEmpty)
             _EmptyState(

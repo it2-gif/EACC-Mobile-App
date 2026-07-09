@@ -55,6 +55,17 @@ describe('validateEnvironment', () => {
     );
   });
 
+  it('requires LMS sync credentials to be configured together', () => {
+    expect(() =>
+      validateEnvironment({
+        DATABASE_URL: databaseUrl,
+        LMS_SYNC_ADMIN_USERNAME: 'sync-admin',
+      }),
+    ).toThrow(
+      'LMS_SYNC_ADMIN_USERNAME and LMS_SYNC_ADMIN_PASSWORD must be configured together',
+    );
+  });
+
   it('normalizes escaped newlines in the Firebase private key', () => {
     const environment = validateEnvironment({
       DATABASE_URL: databaseUrl,

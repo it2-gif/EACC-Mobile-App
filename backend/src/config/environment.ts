@@ -9,6 +9,8 @@ export interface Environment {
   ALLOWED_ORIGINS: string[];
   LMS_BASE_URL: string;
   LMS_REQUEST_TIMEOUT_MS: number;
+  LMS_SYNC_ADMIN_USERNAME?: string;
+  LMS_SYNC_ADMIN_PASSWORD?: string;
   FIREBASE_PROJECT_ID?: string;
   FIREBASE_CLIENT_EMAIL?: string;
   FIREBASE_PRIVATE_KEY?: string;
@@ -30,7 +32,26 @@ export function validateEnvironment(
       10000,
       'LMS_REQUEST_TIMEOUT_MS',
     ),
+    ...readLmsSyncCredentials(values),
     ...readFirebaseCredentials(values),
+  };
+}
+
+function readLmsSyncCredentials(
+  values: Record<string, unknown>,
+): Pick<Environment, 'LMS_SYNC_ADMIN_USERNAME' | 'LMS_SYNC_ADMIN_PASSWORD'> {
+  const username = readOptionalString(values.LMS_SYNC_ADMIN_USERNAME);
+  const password = readOptionalString(values.LMS_SYNC_ADMIN_PASSWORD);
+
+  if ((username && !password) || (!username && password)) {
+    throw new Error(
+      'LMS_SYNC_ADMIN_USERNAME and LMS_SYNC_ADMIN_PASSWORD must be configured together',
+    );
+  }
+
+  return {
+    LMS_SYNC_ADMIN_USERNAME: username,
+    LMS_SYNC_ADMIN_PASSWORD: password,
   };
 }
 
