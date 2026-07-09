@@ -76,6 +76,7 @@ describe('AuthService', () => {
       role: 'student',
       courseIds: ['2191'],
       isSuperAdmin: false,
+      canViewAllCourses: false,
     });
     expect(result.firebase).toEqual({ customToken: 'firebase-token' });
     expect(result.nextStep).toBe('ready');
@@ -126,8 +127,13 @@ describe('AuthService', () => {
     });
 
     expect(result.appUser.isSuperAdmin).toBe(false);
+    expect(result.appUser.isManagerOperation).toBe(false);
+    expect(result.appUser.canViewAllCourses).toBe(false);
     expect(firebaseTokens.createCustomToken).toHaveBeenCalledWith(
-      expect.objectContaining({ isSuperAdmin: false }),
+      expect.objectContaining({
+        isSuperAdmin: false,
+        canViewAllCourses: false,
+      }),
     );
   });
 
@@ -176,13 +182,113 @@ describe('AuthService', () => {
     });
 
     expect(result.appUser.isSuperAdmin).toBe(true);
+    expect(result.appUser.isManagerOperation).toBe(false);
+    expect(result.appUser.canViewAllCourses).toBe(true);
     expect(lmsClient.authenticate).toHaveBeenCalledWith(
       expect.objectContaining({
-        hints: expect.objectContaining({ hasFullAccess: true }),
+        hints: expect.objectContaining({
+          hasFullAccess: true,
+          canViewAllCourses: true,
+        }),
       }),
     );
     expect(firebaseTokens.createCustomToken).toHaveBeenCalledWith(
-      expect.objectContaining({ isSuperAdmin: true }),
+      expect.objectContaining({
+        isSuperAdmin: true,
+        canViewAllCourses: true,
+      }),
+    );
+  });
+
+  it('grants manager-operation visibility without super-admin permissions', async () => {
+    const lmsUser = {
+      lmsUserId: '77',
+      role: 'admin' as const,
+      name: 'Youssef',
+      isSuperAdmin: false,
+      courses: [
+        {
+          lmsCourseId: '2203',
+          name: 'Preparation IELTS - IELTS',
+          category: 'Preparation',
+          students: [{ lmsUserId: '9001', name: 'Student One' }],
+        },
+      ],
+    };
+    const synced = {
+      user: {
+        id: 'manager-uuid',
+        role: 'ADMIN',
+        name: 'Youssef',
+        email: null,
+      },
+      courses: [],
+    };
+    const lmsClient = { authenticate: jest.fn().mockResolvedValue(lmsUser) };
+    const authSync = { syncLmsUser: jest.fn().mockResolvedValue(synced) };
+    const prisma = {
+      course: {
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([
+            {
+              id: 'course-uuid',
+              lmsCourseId: '2203',
+              name: 'Preparation IELTS - IELTS',
+              category: 'Preparation',
+              keyPersonLmsUserId: '92',
+              keyPersonName: 'testapp',
+              memberships: [
+                {
+                  user: {
+                    lmsUserId: '9001',
+                    name: 'Student One',
+                  },
+                },
+              ],
+            },
+          ]),
+      },
+    };
+    const firebaseTokens = {
+      createCustomToken: jest.fn().mockResolvedValue('firebase-token'),
+    };
+    const config = {
+      get: jest.fn().mockReturnValue('test'),
+    } as unknown as ConfigService;
+    const service = new AuthService(
+      lmsClient as never,
+      authSync as never,
+      prisma as never,
+      firebaseTokens as never,
+      config as never,
+    );
+
+    const result = await service.login({
+      role: 'admin',
+      username: 'youssef',
+      password: 'youssef@2023',
+    });
+
+    expect(result.appUser.isSuperAdmin).toBe(false);
+    expect(result.appUser.isManagerOperation).toBe(true);
+    expect(result.appUser.canViewAllCourses).toBe(true);
+    expect(result.courses).toHaveLength(1);
+    expect(lmsClient.authenticate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hints: expect.objectContaining({
+          hasFullAccess: false,
+          canViewAllCourses: true,
+        }),
+      }),
+    );
+    expect(firebaseTokens.createCustomToken).toHaveBeenCalledWith(
+      expect.objectContaining({
+        courseIds: [],
+        isSuperAdmin: false,
+        canViewAllCourses: true,
+      }),
     );
   });
 });

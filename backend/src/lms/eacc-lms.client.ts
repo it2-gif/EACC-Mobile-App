@@ -336,7 +336,10 @@ export class EaccLmsClient implements LmsClient {
     admin: NormalizedLmsUser,
     credentials: LmsLoginCredentials,
   ): Promise<NormalizedLmsCourse[]> {
-    if (admin.isSuperAdmin) {
+    if (
+      admin.isSuperAdmin ||
+      credentials.hints?.canViewAllCourses === true
+    ) {
       return this.loadAdminAllCoursesWithStudents(
         baseUrl,
         sessionCookie,
@@ -449,12 +452,20 @@ export class EaccLmsClient implements LmsClient {
     timeout: number,
     dashboardHtml: string,
   ): Promise<NormalizedLmsCourse[]> {
+    const catalog = await this.loadAdminCourseCatalog(
+      baseUrl,
+      sessionCookie,
+      timeout,
+    );
     const courseIds = uniqueStrings([
       ...parseAdminCoursesHtml(dashboardHtml, '', '').map(
         (course) => course.lmsCourseId,
       ),
       ...parseAdminCourseIdsHtml(dashboardHtml),
-      ...(await this.loadAdminCourseIds(baseUrl, sessionCookie, timeout)),
+      ...catalog.map((course) => course.lmsCourseId),
+      ...(catalog.length === 0
+        ? await this.loadAdminCourseIds(baseUrl, sessionCookie, timeout)
+        : []),
     ]);
     const courses = await this.loadAdminCourseDetails(
       baseUrl,
@@ -462,12 +473,40 @@ export class EaccLmsClient implements LmsClient {
       timeout,
       courseIds,
     );
+    const catalogById = new Map(
+      catalog.map((course) => [course.lmsCourseId, course]),
+    );
+    const coursesWithCatalogNames = courses.map((course) =>
+      mergeCourseCatalogData(course, catalogById.get(course.lmsCourseId)),
+    );
 
     return Promise.all(
-      courses.map((course) =>
+      coursesWithCatalogNames.map((course) =>
         this.loadAdminCourseStudents(baseUrl, sessionCookie, timeout, course),
       ),
     );
+  }
+
+  private async loadAdminCourseCatalog(
+    baseUrl: string,
+    sessionCookie: string,
+    timeout: number,
+  ): Promise<NormalizedLmsCourse[]> {
+    try {
+      const html = await this.loadAuthenticatedHtml(
+        new URL('/courses.php', baseUrl),
+        sessionCookie,
+        timeout,
+      );
+      const courses = parseAdminCoursesHtml(html, '', '');
+      console.log(
+        `[AdminCourses] /courses.php -> ${courses.length} course records found`,
+      );
+      return courses;
+    } catch (error) {
+      console.log('[AdminCourses] /courses.php catalog failed:', error);
+      return [];
+    }
   }
 
   private async loadAdminCourseStudents(
@@ -567,6 +606,7 @@ export class EaccLmsClient implements LmsClient {
     extraCandidateIds: string[] = [],
   ): Promise<NormalizedLmsCourse[]> {
     // ── Step 1: Get all course IDs from /courses.php ──
+    let courseCatalog: NormalizedLmsCourse[] = [];
     let allCourseIds: string[] = [];
     try {
       const html = await this.loadAuthenticatedHtml(
@@ -574,7 +614,11 @@ export class EaccLmsClient implements LmsClient {
         sessionCookie,
         timeout,
       );
-      allCourseIds = parseAdminCourseIdsHtml(html);
+      courseCatalog = parseAdminCoursesHtml(html, '', '');
+      allCourseIds = uniqueStrings([
+        ...courseCatalog.map((course) => course.lmsCourseId),
+        ...parseAdminCourseIdsHtml(html),
+      ]);
       console.log(
         `[KeyPerson] /courses.php → ${allCourseIds.length} course IDs found`,
       );
@@ -660,6 +704,9 @@ export class EaccLmsClient implements LmsClient {
       admin.lmsUserId,
       admin.name,
     );
+    const catalogById = new Map(
+      courseCatalog.map((course) => [course.lmsCourseId, course]),
+    );
     const candidateIds = uniqueStrings([
       ...dashboardCourses.map((c) => c.lmsCourseId),
       ...parseAdminCourseIdsHtml(dashboardHtml),
@@ -708,13 +755,18 @@ export class EaccLmsClient implements LmsClient {
           `[KeyPerson] course ${courseId}: keypersonId="${course?.keyPersonLmsUserId}" name="${course?.keyPersonName}" → match=${match}`,
         );
         if (match) {
-          verifiedCourses.push({
-            lmsCourseId: courseId,
-            name: course?.name ?? `Course ${courseId}`,
-            category: course?.category,
-            keyPersonLmsUserId: admin.lmsUserId,
-            keyPersonName: course?.keyPersonName ?? admin.name,
-          });
+          verifiedCourses.push(
+            mergeCourseCatalogData(
+              {
+                lmsCourseId: courseId,
+                name: course?.name ?? `Course ${courseId}`,
+                category: course?.category,
+                keyPersonLmsUserId: admin.lmsUserId,
+                keyPersonName: course?.keyPersonName ?? admin.name,
+              },
+              catalogById.get(courseId),
+            ),
+          );
         }
       }
     }
@@ -796,6 +848,38 @@ function isAdminKeyPerson(
   if (keyName && adminName && keyName === adminName) return true;
 
   return false;
+}
+
+function mergeCourseCatalogData(
+  course: NormalizedLmsCourse,
+  catalogCourse: NormalizedLmsCourse | undefined,
+): NormalizedLmsCourse {
+  if (!catalogCourse) return course;
+
+  const currentName = course.name.trim();
+  const catalogName = catalogCourse.name.trim();
+  const catalogCategory = catalogCourse.category?.trim();
+  const shouldUseCatalogName =
+    catalogName.length > 0 &&
+    (isGenericCourseName(currentName, course.lmsCourseId) ||
+      Boolean(
+        catalogCategory &&
+          currentName.toLowerCase() === catalogCategory.toLowerCase() &&
+          catalogName.toLowerCase() !== currentName.toLowerCase(),
+      ));
+
+  return {
+    ...course,
+    name: shouldUseCatalogName ? catalogName : course.name,
+    category: catalogCourse.category ?? course.category,
+  };
+}
+
+function isGenericCourseName(name: string, lmsCourseId: string): boolean {
+  return (
+    name.length === 0 ||
+    name.toLowerCase() === `course ${lmsCourseId}`.toLowerCase()
+  );
 }
 
 function uniqueStrings(values: string[]): string[] {

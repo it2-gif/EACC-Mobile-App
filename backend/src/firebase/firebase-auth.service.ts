@@ -23,6 +23,7 @@ export interface FirebaseIdentity {
   role: 'student' | 'teacher' | 'admin';
   courseIds: string[];
   isSuperAdmin?: boolean;
+  canViewAllCourses?: boolean;
 }
 
 @Injectable()
@@ -41,6 +42,8 @@ export class FirebaseAuthService {
       role: identity.role,
       courseIds: [...new Set(identity.courseIds)],
       isSuperAdmin: identity.role === 'admin' && identity.isSuperAdmin === true,
+      canViewAllCourses:
+        identity.role === 'admin' && identity.canViewAllCourses === true,
     });
   }
 

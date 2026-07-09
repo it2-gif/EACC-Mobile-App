@@ -276,6 +276,7 @@ class _ChatTile extends StatelessWidget {
               senderName: session.appUser.name,
               threadStudentName: item.studentName,
               isSuperAdmin: session.appUser.isSuperAdmin,
+              readOnly: session.appUser.isManagerOperation,
             ),
           ),
         ),

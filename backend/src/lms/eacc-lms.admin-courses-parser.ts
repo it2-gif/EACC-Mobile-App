@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import type { AnyNode } from 'domhandler';
 import { NormalizedLmsCourse, NormalizedLmsStudent } from './contracts/lms-types';
 
 const courseIdPattern = /[?&]wcid=([A-Za-z0-9_-]+)/i;
@@ -26,10 +27,8 @@ export function parseAdminCoursesHtml(
 
   $('tr').each((_, row) => {
     const element = $(row);
-    const cells = element
-      .find('td')
-      .toArray()
-      .map((cell) => cleanText($(cell).text()));
+    const cellElements = element.find('td').toArray();
+    const cells = cellElements.map((cell) => cleanText($(cell).text()));
     const links = element.find('a[href*="wcid="]').toArray();
     const lmsCourseId =
       links
@@ -39,17 +38,40 @@ export function parseAdminCoursesHtml(
 
     if (!lmsCourseId) return;
 
+    const headers = element
+      .closest('table')
+      .find('thead th')
+      .toArray()
+      .map((header) => normalizeFieldName($(header).text()));
+    const departmentIndex = headers.findIndex(
+      (header) => header === 'department' || header === 'category',
+    );
+    const courseIndex = headers.findIndex(
+      (header) =>
+        header === 'course' ||
+        header === 'coursename' ||
+        header === 'level',
+    );
+    const department =
+      cells[departmentIndex >= 0 ? departmentIndex : 1]?.trim();
+    const catalogCourseName = readMultilineCell(
+      $,
+      cellElements[courseIndex >= 0 ? courseIndex : 2],
+    );
     const linkedName = links
       .map((link) => cleanText($(link).text()))
       .find((value) => isCourseName(value));
-    const name = linkedName ?? cells.find((value) => isCourseName(value));
+    const name =
+      catalogCourseName ??
+      linkedName ??
+      cells.find((value) => isCourseName(value));
 
     if (!name) return;
 
     courses.set(lmsCourseId, {
       lmsCourseId,
       name,
-      category: cells.find((value) => value !== lmsCourseId && value !== name),
+      category: department,
       keyPersonLmsUserId,
       keyPersonName,
     });
@@ -250,6 +272,21 @@ function isCourseName(value: string): boolean {
 
 function cleanText(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
+}
+
+function readMultilineCell(
+  $: CheerioRoot,
+  cell: AnyNode | undefined,
+): string | undefined {
+  if (!cell) return undefined;
+
+  const clone = $(cell).clone();
+  clone.find('br').replaceWith(' | ');
+  const value = cleanText(clone.text())
+    .replace(/\s*\|\s*/g, ' - ')
+    .replace(/\s+-\s+-\s+/g, ' - ');
+
+  return isCourseName(value) ? value : undefined;
 }
 
 function readControlText($: CheerioRoot, selector: string): string | undefined {

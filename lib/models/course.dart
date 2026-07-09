@@ -46,11 +46,23 @@ class Course {
 
   factory Course.fromBackendJson(Map<String, dynamic> json) {
     final students = json['students'] as List<dynamic>? ?? [];
+    final id = json['lmsCourseId'] as String;
+    final rawName = (json['name'] as String?)?.trim() ?? '';
     final category = (json['category'] as String?) ?? 'Course';
+    final genericName = RegExp(
+      '^course\\s+${RegExp.escape(id.trim())}\$',
+      caseSensitive: false,
+    ).hasMatch(rawName);
+    final resolvedName =
+        genericName &&
+            category.trim().isNotEmpty &&
+            category.trim().toLowerCase() != 'course'
+        ? category.trim()
+        : rawName;
 
     return Course(
-      id: json['lmsCourseId'] as String,
-      name: json['name'] as String,
+      id: id,
+      name: resolvedName.isEmpty ? 'Course $id' : resolvedName,
       category: category,
       teacherName: _readTeacherName(json) ?? _extractTeacherName(category),
       keyPersonLmsUserId: _readKeyPersonLmsUserId(json),

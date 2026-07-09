@@ -49,20 +49,32 @@ class LmsUser {
   final String role;
   final String name;
   final bool isSuperAdmin;
+  final bool isManagerOperation;
+  final bool canViewAllCourses;
 
   const LmsUser({
     required this.lmsUserId,
     required this.role,
     required this.name,
     this.isSuperAdmin = false,
+    this.isManagerOperation = false,
+    this.canViewAllCourses = false,
   });
 
   factory LmsUser.fromJson(Map<String, dynamic> json) {
+    final isSuperAdmin = json['isSuperAdmin'] == true;
+    final isManagerOperation = json['isManagerOperation'] == true;
+
     return LmsUser(
       lmsUserId: json['lmsUserId'] as String,
       role: json['role'] as String,
       name: json['name'] as String,
-      isSuperAdmin: json['isSuperAdmin'] == true,
+      isSuperAdmin: isSuperAdmin,
+      isManagerOperation: isManagerOperation,
+      canViewAllCourses:
+          json['canViewAllCourses'] == true ||
+          isSuperAdmin ||
+          isManagerOperation,
     );
   }
 
@@ -72,6 +84,8 @@ class LmsUser {
       'role': role,
       'name': name,
       'isSuperAdmin': isSuperAdmin,
+      'isManagerOperation': isManagerOperation,
+      'canViewAllCourses': canViewAllCourses,
     };
   }
 }
@@ -82,6 +96,8 @@ class AppUser {
   final String name;
   final String? email;
   final bool isSuperAdmin;
+  final bool isManagerOperation;
+  final bool canViewAllCourses;
 
   const AppUser({
     required this.id,
@@ -89,17 +105,26 @@ class AppUser {
     required this.name,
     this.email,
     this.isSuperAdmin = false,
+    this.isManagerOperation = false,
+    this.canViewAllCourses = false,
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json) {
     final email = json['email'];
+    final isSuperAdmin = json['isSuperAdmin'] == true;
+    final isManagerOperation = json['isManagerOperation'] == true;
 
     return AppUser(
       id: json['id'] as String,
       role: json['role'] as String,
       name: json['name'] as String,
       email: email is String && email.isNotEmpty ? email : null,
-      isSuperAdmin: json['isSuperAdmin'] == true,
+      isSuperAdmin: isSuperAdmin,
+      isManagerOperation: isManagerOperation,
+      canViewAllCourses:
+          json['canViewAllCourses'] == true ||
+          isSuperAdmin ||
+          isManagerOperation,
     );
   }
 
@@ -110,6 +135,8 @@ class AppUser {
       'name': name,
       'email': email,
       'isSuperAdmin': isSuperAdmin,
+      'isManagerOperation': isManagerOperation,
+      'canViewAllCourses': canViewAllCourses,
     };
   }
 }

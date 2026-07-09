@@ -20,6 +20,11 @@ export interface LmsLoginCredentials {
      * LMS response fields must not promote an admin independently.
      */
     hasFullAccess?: boolean;
+    /**
+     * Allows non-super-admin manager accounts to load every course/chat while
+     * keeping destructive super-admin permissions disabled.
+     */
+    canViewAllCourses?: boolean;
   };
 }
 
@@ -43,5 +48,7 @@ export interface NormalizedLmsUser {
   name: string;
   email?: string;
   isSuperAdmin?: boolean;
+  isManagerOperation?: boolean;
+  canViewAllCourses?: boolean;
   courses: NormalizedLmsCourse[];
 }

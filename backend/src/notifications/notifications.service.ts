@@ -88,6 +88,7 @@ export class NotificationsService {
     }
 
     // Only super admins bypass course scope; key-person admins use courseIds.
+    // Manager-operation accounts are view-only and do not send notifications.
     if (
       !(senderRole === 'admin' && senderIsSuperAdmin) &&
       !senderCourseIds.includes(input.courseId)

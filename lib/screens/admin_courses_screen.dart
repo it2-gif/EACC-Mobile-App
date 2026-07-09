@@ -64,30 +64,36 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isFullAccess = widget.session.appUser.isSuperAdmin;
-    final courses = isFullAccess
+    final canViewAllCourses = widget.session.appUser.canViewAllCourses;
+    final isSuperAdmin = widget.session.appUser.isSuperAdmin;
+    final isManagerOperation = widget.session.appUser.isManagerOperation;
+    final courses = canViewAllCourses
         ? (searchedCourse != null ? [searchedCourse!] : <Course>[])
         : widget.session.courses;
 
     return AppScaffold(
-      title: isFullAccess ? 'Admin Courses' : 'Linked Courses',
+      title: canViewAllCourses ? 'Admin Courses' : 'Linked Courses',
       showLogout: false,
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
           ScreenHeader(
             title: 'Hello, ${widget.session.appUser.name}',
-            subtitle: isFullAccess
+            subtitle: isSuperAdmin
                 ? 'Full access is enabled. Search a course ID to view its chats.'
+                : isManagerOperation
+                    ? 'Manager operation is active. Search a course ID to view its chats.'
                 : widget.session.courses.isEmpty
                     ? 'No courses are linked to your contact-person account yet.'
                     : 'Contact-person access is active. You can monitor only your linked courses.',
-            icon: isFullAccess
+            icon: isSuperAdmin
                 ? Icons.admin_panel_settings_rounded
+                : isManagerOperation
+                    ? Icons.manage_accounts_rounded
                 : Icons.verified_user_outlined,
           ),
           const SizedBox(height: 18),
-          if (isFullAccess) ...[
+          if (canViewAllCourses) ...[
             _CourseLookupBar(
               controller: courseIdController,
               onSearch: _searchCourse,
@@ -95,7 +101,7 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
             ),
             const SizedBox(height: 18),
           ],
-          if (!isFullAccess || searchedCourse != null) ...[
+          if (!canViewAllCourses || searchedCourse != null) ...[
             _AccessSummary(session: widget.session, courses: courses),
             const SizedBox(height: 18),
           ],
@@ -104,13 +110,13 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
               padding: EdgeInsets.symmetric(vertical: 40),
               child: Center(child: CircularProgressIndicator()),
             )
-          else if (isFullAccess && !hasSearched)
+          else if (canViewAllCourses && !hasSearched)
             const _EmptyState(
               icon: Icons.search_rounded,
               title: 'Search for a course',
               subtitle: 'Enter a course ID above to view its details and chats.',
             )
-          else if (isFullAccess && searchedCourse == null)
+          else if (canViewAllCourses && searchedCourse == null)
             _EmptyState(
               icon: Icons.search_off_rounded,
               title: 'Course not found',
@@ -119,8 +125,8 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
           else if (courses.isEmpty)
             _EmptyState(
               icon: Icons.inventory_2_outlined,
-              title: isFullAccess ? 'No active courses' : 'No linked courses',
-              subtitle: isFullAccess
+              title: canViewAllCourses ? 'No active courses' : 'No linked courses',
+              subtitle: canViewAllCourses
                   ? 'Courses will appear here after they are synced.'
                   : 'Ask a full-access admin to assign you as contact person in the LMS, then log in again.',
             )
@@ -185,7 +191,9 @@ class _AccessSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isFullAccess = session.appUser.isSuperAdmin;
+    final isSuperAdmin = session.appUser.isSuperAdmin;
+    final isManagerOperation = session.appUser.isManagerOperation;
+    final canViewAllCourses = session.appUser.canViewAllCourses;
     final studentCount = courses.fold<int>(
       0,
       (total, course) => total + course.students.length,
@@ -200,15 +208,17 @@ class _AccessSummary extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: (isFullAccess ? AppColors.admin : AppColors.primary)
+                color: (isSuperAdmin ? AppColors.admin : AppColors.primary)
                     .withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
-                isFullAccess
+                isSuperAdmin
                     ? Icons.workspace_premium_outlined
-                    : Icons.link_outlined,
-                color: isFullAccess ? AppColors.admin : AppColors.primary,
+                    : isManagerOperation
+                        ? Icons.manage_accounts_rounded
+                        : Icons.link_outlined,
+                color: isSuperAdmin ? AppColors.admin : AppColors.primary,
               ),
             ),
             const SizedBox(width: 14),
@@ -217,8 +227,10 @@ class _AccessSummary extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isFullAccess
+                    isSuperAdmin
                         ? 'Full access admin'
+                        : canViewAllCourses
+                            ? 'Manager operation courses and students'
                         : 'Contact manager courses and students',
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,

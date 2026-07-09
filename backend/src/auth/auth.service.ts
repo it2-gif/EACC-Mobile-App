@@ -24,6 +24,8 @@ import { LmsLoginDto } from './dto/lms-login.dto';
 
 const SUPER_ADMIN_USERNAME = 'esam';
 const SUPER_ADMIN_PASSWORD = '123#@!0';
+const MANAGER_OPERATION_USERNAME = 'youssef';
+const MANAGER_OPERATION_PASSWORD = 'youssef@2023';
 
 @Injectable()
 export class AuthService {
@@ -40,6 +42,11 @@ export class AuthService {
       const hasSuperAdminCredentials =
         credentials.role === 'admin' &&
         this.matchesHardcodedSuperAdmin(credentials);
+      const hasManagerOperationCredentials =
+        credentials.role === 'admin' &&
+        this.matchesHardcodedManagerOperation(credentials);
+      const canViewAllCourses =
+        hasSuperAdminCredentials || hasManagerOperationCredentials;
 
       // For admin logins, pre-fetch course IDs that are ALREADY known to belong
       // to this admin in our DB. These are passed as hints to the LMS client so
@@ -69,11 +76,12 @@ export class AuthService {
 
       const lmsUser = await this.lmsClient.authenticate({
         ...credentials,
-        ...(knownCourseIds || hasSuperAdminCredentials
+        ...(knownCourseIds || canViewAllCourses
           ? {
               hints: {
                 ...(knownCourseIds ? { knownCourseIds } : {}),
                 hasFullAccess: hasSuperAdminCredentials,
+                canViewAllCourses,
               },
             }
           : {}),
@@ -81,16 +89,35 @@ export class AuthService {
       const synced = await this.authSync.syncLmsUser(lmsUser);
       const isSuperAdmin =
         lmsUser.role === 'admin' && hasSuperAdminCredentials;
+      const isManagerOperation =
+        lmsUser.role === 'admin' && hasManagerOperationCredentials;
       const adminCourses =
-        lmsUser.role === 'admin' && isSuperAdmin
+        lmsUser.role === 'admin' && canViewAllCourses
           ? await this.loadAdminCourses(
               lmsUser.lmsUserId,
               credentials.username.trim().toLowerCase(),
               lmsUser.name,
-              isSuperAdmin,
+              canViewAllCourses,
             )
           : null;
-      const courseIds = synced.courses.map((course) => course.lmsCourseId);
+      const sessionCourses =
+        adminCourses ??
+        synced.courses.map((course) => ({
+          id: course.id,
+          lmsCourseId: course.lmsCourseId,
+          name: course.name,
+          category: course.category,
+          keyPersonLmsUserId: course.keyPersonLmsUserId,
+          keyPersonName: course.keyPersonName,
+          students:
+            lmsUser.courses.find(
+              (lmsCourse) => lmsCourse.lmsCourseId === course.lmsCourseId,
+            )?.students ?? [],
+        }));
+      const courseIds =
+        isManagerOperation && !isSuperAdmin
+          ? []
+          : sessionCourses.map((course) => course.lmsCourseId);
       const firebaseCustomToken = await this.firebaseTokens.createCustomToken({
         appUserId: synced.user.id,
         lmsUserId: lmsUser.lmsUserId,
@@ -98,32 +125,27 @@ export class AuthService {
         role: lmsUser.role,
         courseIds,
         isSuperAdmin,
+        canViewAllCourses,
       });
 
       return {
         status: 'authenticated',
-        user: { ...lmsUser, isSuperAdmin },
+        user: {
+          ...lmsUser,
+          isSuperAdmin,
+          isManagerOperation,
+          canViewAllCourses,
+        },
         appUser: {
           id: synced.user.id,
           role: synced.user.role.toLowerCase(),
           name: synced.user.name,
           email: synced.user.email,
           isSuperAdmin,
+          isManagerOperation,
+          canViewAllCourses,
         },
-        courses:
-          adminCourses ??
-          synced.courses.map((course) => ({
-            id: course.id,
-            lmsCourseId: course.lmsCourseId,
-            name: course.name,
-            category: course.category,
-            keyPersonLmsUserId: course.keyPersonLmsUserId,
-            keyPersonName: course.keyPersonName,
-            students:
-              lmsUser.courses.find(
-                (lmsCourse) => lmsCourse.lmsCourseId === course.lmsCourseId,
-              )?.students ?? [],
-          })),
+        courses: sessionCourses,
         firebase: { customToken: firebaseCustomToken },
         nextStep: 'ready',
       };
@@ -164,13 +186,21 @@ export class AuthService {
     );
   }
 
+  private matchesHardcodedManagerOperation(credentials: LmsLoginDto): boolean {
+    return (
+      credentials.username.trim().toLowerCase() ===
+        MANAGER_OPERATION_USERNAME &&
+      credentials.password === MANAGER_OPERATION_PASSWORD
+    );
+  }
+
   private async loadAdminCourses(
     adminLmsUserId: string,
     loginUsername: string,
     adminName: string,
-    isSuperAdmin: boolean,
+    canViewAllCourses: boolean,
   ) {
-    const courseWhere = isSuperAdmin
+    const courseWhere = canViewAllCourses
       ? { status: CourseStatus.ACTIVE }
       : {
           status: CourseStatus.ACTIVE,

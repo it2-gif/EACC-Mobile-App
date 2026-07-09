@@ -22,6 +22,7 @@ class ChatScreen extends StatefulWidget {
   final String senderName;
   final String? threadStudentName;
   final bool isSuperAdmin;
+  final bool readOnly;
 
   const ChatScreen({
     super.key,
@@ -32,6 +33,7 @@ class ChatScreen extends StatefulWidget {
     required this.senderName,
     this.threadStudentName,
     this.isSuperAdmin = false,
+    this.readOnly = false,
   });
 
   @override
@@ -86,7 +88,8 @@ class _ChatScreenState extends State<ChatScreen> {
       FirestoreChatService.isKeyPersonStudentThreadId(widget.threadId);
 
   bool get canSendInThread =>
-      !isAnnouncementThread || widget.currentUserRole != 'student';
+      !widget.readOnly &&
+      (!isAnnouncementThread || widget.currentUserRole != 'student');
 
   @override
   void dispose() {
@@ -805,10 +808,12 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   bool get canForwardMessages =>
-      widget.currentUserRole == 'teacher' || widget.currentUserRole == 'admin';
+      !widget.readOnly &&
+      (widget.currentUserRole == 'teacher' || widget.currentUserRole == 'admin');
 
   bool get canPinMessages =>
-      widget.currentUserRole == 'teacher' || widget.currentUserRole == 'admin';
+      !widget.readOnly &&
+      (widget.currentUserRole == 'teacher' || widget.currentUserRole == 'admin');
 
   void toggleMessageSearch() {
     setState(() {
@@ -821,6 +826,8 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> reactToMessage(String messageId) async {
+    if (widget.readOnly) return;
+
     const emojis = ['👍', '❤️', '✅', '👏', '🙏'];
 
     final emoji = await showModalBottomSheet<String>(
@@ -2106,7 +2113,11 @@ class _ChatScreenState extends State<ChatScreen> {
                       ],
                     ),
                   )
-                : const _ReadOnlyAnnouncementBar(),
+                : _ReadOnlyChatBar(
+                    message: widget.readOnly
+                        ? 'Manager operation is view-only for this chat.'
+                        : 'Announcements are read-only. Reply in your teacher chat.',
+                  ),
           ),
         ],
       ),
@@ -2150,6 +2161,7 @@ class _ChatScreenState extends State<ChatScreen> {
     required String senderRole,
     required String senderName,
   }) {
+    if (widget.readOnly) return false;
     if (widget.isSuperAdmin) return true;
 
     return senderRole == widget.currentUserRole &&
@@ -2999,8 +3011,10 @@ class _RecordingComposerPill extends StatelessWidget {
   }
 }
 
-class _ReadOnlyAnnouncementBar extends StatelessWidget {
-  const _ReadOnlyAnnouncementBar();
+class _ReadOnlyChatBar extends StatelessWidget {
+  final String message;
+
+  const _ReadOnlyChatBar({required this.message});
 
   @override
   Widget build(BuildContext context) {
@@ -3013,14 +3027,14 @@ class _ReadOnlyAnnouncementBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.campaign_rounded, color: AppColors.primary, size: 20),
-          SizedBox(width: 10),
+          const Icon(Icons.visibility_rounded, color: AppColors.primary, size: 20),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Announcements are read-only. Reply in your teacher chat.',
-              style: TextStyle(
+              message,
+              style: const TextStyle(
                 color: AppColors.primaryDark,
                 fontWeight: FontWeight.w700,
                 fontSize: 13,

@@ -30,6 +30,8 @@ class AdminDashboardScreen extends StatelessWidget {
           _WelcomeHeader(
             name: session.appUser.name,
             isSuperAdmin: session.appUser.isSuperAdmin,
+            isManagerOperation: session.appUser.isManagerOperation,
+            canViewAllCourses: session.appUser.canViewAllCourses,
           ),
           const SizedBox(height: 14),
           if (session.appUser.isSuperAdmin) ...[
@@ -64,7 +66,7 @@ class AdminDashboardScreen extends StatelessWidget {
           _NavTile(
             icon: Icons.menu_book_rounded,
             title: 'Courses',
-            subtitle: session.appUser.isSuperAdmin
+            subtitle: session.appUser.canViewAllCourses
                 ? 'Browse all courses and student chats'
                 : 'Open your linked courses and student chats',
             color: AppColors.primary,
@@ -91,19 +93,21 @@ class AdminDashboardScreen extends StatelessWidget {
              ),
             const SizedBox(height: 10),
           ],
-          _NavTile(
-            icon: Icons.campaign_rounded,
-            title: 'Announcements',
-            subtitle: 'Send course announcements or private broadcasts',
-            color: AppColors.admin,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => AdminAnnouncementsScreen(session: session),
+          if (!session.appUser.isManagerOperation) ...[
+            _NavTile(
+              icon: Icons.campaign_rounded,
+              title: 'Announcements',
+              subtitle: 'Send course announcements or private student messages',
+              color: AppColors.admin,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AdminAnnouncementsScreen(session: session),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 10),
+            const SizedBox(height: 10),
+          ],
           if (session.appUser.isSuperAdmin) ...[
             _NavTile(
               icon: Icons.admin_panel_settings_rounded,
@@ -144,8 +148,15 @@ class AdminDashboardScreen extends StatelessWidget {
 class _WelcomeHeader extends StatelessWidget {
   final String name;
   final bool isSuperAdmin;
+  final bool isManagerOperation;
+  final bool canViewAllCourses;
 
-  const _WelcomeHeader({required this.name, required this.isSuperAdmin});
+  const _WelcomeHeader({
+    required this.name,
+    required this.isSuperAdmin,
+    required this.isManagerOperation,
+    required this.canViewAllCourses,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -191,7 +202,9 @@ class _WelcomeHeader extends StatelessWidget {
                 Text(
                   isSuperAdmin
                       ? 'EACC Super Administrator'
-                      : 'EACC Contact-Person Administrator',
+                      : isManagerOperation
+                          ? 'EACC Manager Operation'
+                          : 'EACC Contact-Person Administrator',
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 13,
@@ -217,7 +230,9 @@ class _WelcomeHeader extends StatelessWidget {
                       Icon(
                         isSuperAdmin
                             ? Icons.verified_user_rounded
-                            : Icons.link_rounded,
+                            : canViewAllCourses
+                                ? Icons.manage_accounts_rounded
+                                : Icons.link_rounded,
                         size: 15,
                         color: Colors.white,
                       ),
@@ -225,6 +240,8 @@ class _WelcomeHeader extends StatelessWidget {
                       Text(
                         isSuperAdmin
                             ? 'Full access enabled'
+                            : canViewAllCourses
+                                ? 'All courses visible'
                             : 'Linked courses only',
                         style: const TextStyle(
                           color: Colors.white,
@@ -449,7 +466,7 @@ class _CourseActivityPanelState extends State<_CourseActivityPanel> {
         ? null
         : matchingCourses.first;
     final hasAccess =
-        widget.session.appUser.isSuperAdmin || matchedCourse != null;
+        widget.session.appUser.canViewAllCourses || matchedCourse != null;
     if (!hasAccess) {
       setState(() {
         loadedCourseId = courseId;

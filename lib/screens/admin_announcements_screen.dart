@@ -24,8 +24,12 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
 
   final courseMessageController = TextEditingController();
   final privateMessageController = TextEditingController();
+  final courseFilterController = TextEditingController();
+  final studentFilterController = TextEditingController();
   final selectedCourseIds = <String>{};
   final selectedStudentKeys = <String>{};
+  String courseFilter = '';
+  String studentFilter = '';
   DateTime? scheduledCourseAnnouncementAt;
   bool pinCourseAnnouncements = true;
   bool sendingCourseAnnouncement = false;
@@ -40,7 +44,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
         targets.add(
           _StudentTarget(
             courseId: course.id,
-            courseName: course.name,
+            courseName: course.displayName,
             studentId: student.id,
             studentName: student.name,
           ),
@@ -58,15 +62,11 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    selectedCourseIds.addAll(courses.map((course) => course.id));
-  }
-
-  @override
   void dispose() {
     courseMessageController.dispose();
     privateMessageController.dispose();
+    courseFilterController.dispose();
+    studentFilterController.dispose();
     super.dispose();
   }
 
@@ -80,18 +80,26 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
         children: [
           const ScreenHeader(
             title: 'Announcements',
-            subtitle: 'Send course updates or targeted private broadcasts.',
+            subtitle: 'Send course updates or direct messages to students.',
             icon: Icons.campaign_rounded,
           ),
           const SizedBox(height: 18),
           _CourseAnnouncementPanel(
             courses: courses,
             controller: courseMessageController,
+            filterController: courseFilterController,
+            filter: courseFilter,
             selectedCourseIds: selectedCourseIds,
             scheduledAt: scheduledCourseAnnouncementAt,
             pinAnnouncements: pinCourseAnnouncements,
             isSending: sendingCourseAnnouncement,
             onChanged: () => setState(() {}),
+            onFilterChanged: (value) =>
+                setState(() => courseFilter = value.trim().toLowerCase()),
+            onClearFilter: () {
+              courseFilterController.clear();
+              setState(() => courseFilter = '');
+            },
             onPickSchedule: pickCourseAnnouncementSchedule,
             onClearSchedule: () =>
                 setState(() => scheduledCourseAnnouncementAt = null),
@@ -109,9 +117,17 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
           _PrivateBroadcastPanel(
             targets: studentTargets,
             controller: privateMessageController,
+            filterController: studentFilterController,
+            filter: studentFilter,
             selectedStudentKeys: selectedStudentKeys,
             isSending: sendingPrivateBroadcast,
             onChanged: () => setState(() {}),
+            onFilterChanged: (value) =>
+                setState(() => studentFilter = value.trim().toLowerCase()),
+            onClearFilter: () {
+              studentFilterController.clear();
+              setState(() => studentFilter = '');
+            },
             onSend: sendPrivateBroadcasts,
           ),
         ],
@@ -285,7 +301,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Private broadcast sent to $sentCount student${sentCount == 1 ? '' : 's'}.',
+              'Private message sent to $sentCount student${sentCount == 1 ? '' : 's'}.',
             ),
           ),
         );
@@ -293,7 +309,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Private broadcast failed: $error')),
+          SnackBar(content: Text('Private message failed: $error')),
         );
       }
     } finally {
@@ -311,11 +327,15 @@ class _CourseAnnouncementPanel extends StatelessWidget {
 
   final List<Course> courses;
   final TextEditingController controller;
+  final TextEditingController filterController;
+  final String filter;
   final Set<String> selectedCourseIds;
   final DateTime? scheduledAt;
   final bool pinAnnouncements;
   final bool isSending;
   final VoidCallback onChanged;
+  final ValueChanged<String> onFilterChanged;
+  final VoidCallback onClearFilter;
   final VoidCallback onPickSchedule;
   final VoidCallback onClearSchedule;
   final ValueChanged<bool> onPinChanged;
@@ -325,11 +345,15 @@ class _CourseAnnouncementPanel extends StatelessWidget {
   const _CourseAnnouncementPanel({
     required this.courses,
     required this.controller,
+    required this.filterController,
+    required this.filter,
     required this.selectedCourseIds,
     required this.scheduledAt,
     required this.pinAnnouncements,
     required this.isSending,
     required this.onChanged,
+    required this.onFilterChanged,
+    required this.onClearFilter,
     required this.onPickSchedule,
     required this.onClearSchedule,
     required this.onPinChanged,
@@ -339,6 +363,16 @@ class _CourseAnnouncementPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleCourses = courses.where((course) {
+      if (filter.isEmpty) return true;
+      final searchable = [
+        course.id,
+        course.displayName,
+        course.category,
+      ].join(' ').toLowerCase();
+      return searchable.contains(filter);
+    }).toList(growable: false);
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -348,7 +382,19 @@ class _CourseAnnouncementPanel extends StatelessWidget {
             const _PanelTitle(
               icon: Icons.campaign_rounded,
               title: 'Course announcements',
-              subtitle: 'Posts into the pinned announcement chat.',
+              subtitle: 'Send one update to selected course announcement chats.',
+            ),
+            const SizedBox(height: 14),
+            _FilterField(
+              controller: filterController,
+              query: filter,
+              label: 'Find a course',
+              hint: 'Search by course name, department, or ID',
+              icon: Icons.menu_book_rounded,
+              resultLabel:
+                  '${visibleCourses.length} course${visibleCourses.length == 1 ? '' : 's'} shown',
+              onChanged: onFilterChanged,
+              onClear: onClearFilter,
             ),
             const SizedBox(height: 14),
             Wrap(
@@ -418,10 +464,11 @@ class _CourseAnnouncementPanel extends StatelessWidget {
             _SelectionToolbar(
               selected: selectedCourseIds.length,
               total: courses.length,
+              visible: visibleCourses.length,
               onSelectAll: () {
-                selectedCourseIds
-                  ..clear()
-                  ..addAll(courses.map((course) => course.id));
+                selectedCourseIds.addAll(
+                  visibleCourses.map((course) => course.id),
+                );
                 onChanged();
               },
               onClear: () {
@@ -429,19 +476,32 @@ class _CourseAnnouncementPanel extends StatelessWidget {
                 onChanged();
               },
             ),
-            ...courses.map(
-              (course) => _CourseSelectionTile(
-                course: course,
-                selected: selectedCourseIds.contains(course.id),
-                onChanged: (value) {
-                  if (value == true) {
-                    selectedCourseIds.add(course.id);
-                  } else {
-                    selectedCourseIds.remove(course.id);
-                  }
-                  onChanged();
-                },
-              ),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 420),
+              child: visibleCourses.isEmpty
+                  ? const _FilteredEmptyState(
+                      icon: Icons.search_off_rounded,
+                      message: 'No courses match this filter.',
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: visibleCourses.length,
+                      itemBuilder: (context, index) {
+                        final course = visibleCourses[index];
+                        return _CourseSelectionTile(
+                          course: course,
+                          selected: selectedCourseIds.contains(course.id),
+                          onChanged: (value) {
+                            if (value == true) {
+                              selectedCourseIds.add(course.id);
+                            } else {
+                              selectedCourseIds.remove(course.id);
+                            }
+                            onChanged();
+                          },
+                        );
+                      },
+                    ),
             ),
             const SizedBox(height: 10),
             SizedBox(
@@ -494,12 +554,17 @@ class _CourseSelectionTile extends StatelessWidget {
         return CheckboxListTile(
           value: selected,
           dense: true,
-          title: Text(course.name),
+          title: Text(
+            course.displayName,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
           subtitle: Wrap(
             spacing: 8,
             runSpacing: 4,
             children: [
               Text('Course ${course.id}'),
+              if (course.displayCategory != null)
+                Text(course.displayCategory!),
               Text('$readCount read'),
               Text(pinned ? 'Pinned' : 'Unpinned'),
             ],
@@ -518,22 +583,41 @@ class _CourseSelectionTile extends StatelessWidget {
 class _PrivateBroadcastPanel extends StatelessWidget {
   final List<_StudentTarget> targets;
   final TextEditingController controller;
+  final TextEditingController filterController;
+  final String filter;
   final Set<String> selectedStudentKeys;
   final bool isSending;
   final VoidCallback onChanged;
+  final ValueChanged<String> onFilterChanged;
+  final VoidCallback onClearFilter;
   final VoidCallback onSend;
 
   const _PrivateBroadcastPanel({
     required this.targets,
     required this.controller,
+    required this.filterController,
+    required this.filter,
     required this.selectedStudentKeys,
     required this.isSending,
     required this.onChanged,
+    required this.onFilterChanged,
+    required this.onClearFilter,
     required this.onSend,
   });
 
   @override
   Widget build(BuildContext context) {
+    final visibleTargets = targets.where((target) {
+      if (filter.isEmpty) return true;
+      final searchable = [
+        target.studentName,
+        target.studentId,
+        target.courseName,
+        target.courseId,
+      ].join(' ').toLowerCase();
+      return searchable.contains(filter);
+    }).toList(growable: false);
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -541,9 +625,21 @@ class _PrivateBroadcastPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _PanelTitle(
-              icon: Icons.mark_email_unread_rounded,
-              title: 'Private broadcast',
-              subtitle: 'Sends the same message into selected private chats.',
+              icon: Icons.person_rounded,
+              title: 'Private message to student',
+              subtitle: 'Send a direct message to selected student chats.',
+            ),
+            const SizedBox(height: 14),
+            _FilterField(
+              controller: filterController,
+              query: filter,
+              label: 'Find a student',
+              hint: 'Search by student name or ID',
+              icon: Icons.person_search_rounded,
+              resultLabel:
+                  '${visibleTargets.length} student${visibleTargets.length == 1 ? '' : 's'} shown',
+              onChanged: onFilterChanged,
+              onClear: onClearFilter,
             ),
             const SizedBox(height: 14),
             TextField(
@@ -559,10 +655,11 @@ class _PrivateBroadcastPanel extends StatelessWidget {
             _SelectionToolbar(
               selected: selectedStudentKeys.length,
               total: targets.length,
+              visible: visibleTargets.length,
               onSelectAll: () {
-                selectedStudentKeys
-                  ..clear()
-                  ..addAll(targets.map((target) => target.key));
+                selectedStudentKeys.addAll(
+                  visibleTargets.map((target) => target.key),
+                );
                 onChanged();
               },
               onClear: () {
@@ -572,28 +669,36 @@ class _PrivateBroadcastPanel extends StatelessWidget {
             ),
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 360),
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: targets.length,
-                itemBuilder: (context, index) {
-                  final target = targets[index];
-                  final selected = selectedStudentKeys.contains(target.key);
-                  return _StudentTargetSelectionTile(
-                    name: target.studentName,
-                    subtitle:
-                        '${target.courseName} - Course ${target.courseId}',
-                    selected: selected,
-                    onTap: () {
-                      if (selected) {
-                        selectedStudentKeys.remove(target.key);
-                      } else {
-                        selectedStudentKeys.add(target.key);
-                      }
-                      onChanged();
-                    },
-                  );
-                },
-              ),
+              child: visibleTargets.isEmpty
+                  ? const _FilteredEmptyState(
+                      icon: Icons.person_off_outlined,
+                      message: 'No students match this filter.',
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: visibleTargets.length,
+                      itemBuilder: (context, index) {
+                        final target = visibleTargets[index];
+                        final selected = selectedStudentKeys.contains(
+                          target.key,
+                        );
+                        return _StudentTargetSelectionTile(
+                          name: target.studentName,
+                          studentId: target.studentId,
+                          subtitle:
+                              '${target.courseName} - Course ${target.courseId}',
+                          selected: selected,
+                          onTap: () {
+                            if (selected) {
+                              selectedStudentKeys.remove(target.key);
+                            } else {
+                              selectedStudentKeys.add(target.key);
+                            }
+                            onChanged();
+                          },
+                        );
+                      },
+                    ),
             ),
             const SizedBox(height: 10),
             SizedBox(
@@ -610,7 +715,7 @@ class _PrivateBroadcastPanel extends StatelessWidget {
                         ),
                       )
                     : const Icon(Icons.send_rounded),
-                label: const Text('Send private broadcast'),
+                label: const Text('Send private message'),
               ),
             ),
           ],
@@ -667,15 +772,87 @@ class _PanelTitle extends StatelessWidget {
   }
 }
 
+class _FilterField extends StatelessWidget {
+  final TextEditingController controller;
+  final String query;
+  final String label;
+  final String hint;
+  final IconData icon;
+  final String resultLabel;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  const _FilterField({
+    required this.controller,
+    required this.query,
+    required this.label,
+    required this.hint,
+    required this.icon,
+    required this.resultLabel,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: controller,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              labelText: label,
+              hintText: hint,
+              prefixIcon: Icon(icon),
+              suffixIcon: query.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Clear filter',
+                      onPressed: onClear,
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+              filled: true,
+              fillColor: Colors.white,
+            ),
+            onChanged: onChanged,
+          ),
+          const SizedBox(height: 7),
+          Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Text(
+              resultLabel,
+              style: const TextStyle(
+                color: AppColors.muted,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SelectionToolbar extends StatelessWidget {
   final int selected;
   final int total;
+  final int visible;
   final VoidCallback onSelectAll;
   final VoidCallback onClear;
 
   const _SelectionToolbar({
     required this.selected,
     required this.total,
+    required this.visible,
     required this.onSelectAll,
     required this.onClear,
   });
@@ -684,7 +861,10 @@ class _SelectionToolbar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        TextButton(onPressed: onSelectAll, child: const Text('Select all')),
+        TextButton(
+          onPressed: visible == 0 ? null : onSelectAll,
+          child: const Text('Select visible'),
+        ),
         TextButton(onPressed: onClear, child: const Text('Clear')),
         const Spacer(),
         Text(
@@ -696,6 +876,37 @@ class _SelectionToolbar extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _FilteredEmptyState extends StatelessWidget {
+  final IconData icon;
+  final String message;
+
+  const _FilteredEmptyState({required this.icon, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 34, color: AppColors.muted),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.muted,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -718,12 +929,14 @@ class _StudentTarget {
 
 class _StudentTargetSelectionTile extends StatelessWidget {
   final String name;
+  final String studentId;
   final String subtitle;
   final bool selected;
   final VoidCallback onTap;
 
   const _StudentTargetSelectionTile({
     required this.name,
+    required this.studentId,
     required this.subtitle,
     required this.selected,
     required this.onTap,
@@ -778,14 +991,40 @@ class _StudentTargetSelectionTile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.ink,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.ink,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: BorderRadius.circular(7),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Text(
+                              'ID $studentId',
+                              style: const TextStyle(
+                                color: AppColors.muted,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 3),
                       Text(
