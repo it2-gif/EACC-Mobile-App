@@ -39,10 +39,7 @@ service cloud.firestore {
 
     function isCourseAdmin(courseId) {
       return isAdmin()
-        && (
-          isSuperAdmin()
-          || (!canViewAllCourses() && hasCourseClaim(courseId))
-        );
+        && (isSuperAdmin() || canViewAllCourses() || hasCourseClaim(courseId));
     }
 
     function canReadCourseAsAdmin(courseId) {

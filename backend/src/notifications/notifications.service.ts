@@ -79,6 +79,8 @@ export class NotificationsService {
     const senderRole = this.readSenderRole(identity);
     const senderCourseIds = this.readCourseIds(identity);
     const senderIsSuperAdmin = identity.isSuperAdmin === true;
+    const senderCanViewAllCourses =
+      senderRole === 'admin' && identity.canViewAllCourses === true;
 
     if (senderRole !== input.senderRole) {
       throw new UnauthorizedException({
@@ -87,10 +89,10 @@ export class NotificationsService {
       });
     }
 
-    // Only super admins bypass course scope; key-person admins use courseIds.
-    // Manager-operation accounts are view-only and do not send notifications.
+    // Super admins and manager-operation accounts bypass course scope;
+    // key-person admins use courseIds.
     if (
-      !(senderRole === 'admin' && senderIsSuperAdmin) &&
+      !(senderRole === 'admin' && (senderIsSuperAdmin || senderCanViewAllCourses)) &&
       !senderCourseIds.includes(input.courseId)
     ) {
       throw new UnauthorizedException({

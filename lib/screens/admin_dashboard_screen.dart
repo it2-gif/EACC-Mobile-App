@@ -49,8 +49,10 @@ class AdminDashboardScreen extends StatelessWidget {
           // Live stat cards
           _StatsRow(session: session),
           const SizedBox(height: 24),
-          _CourseActivityPanel(session: session),
-          const SizedBox(height: 24),
+          if (!session.appUser.isManagerOperation) ...[
+            _CourseActivityPanel(session: session),
+            const SizedBox(height: 24),
+          ],
 
           // Navigation tiles
           Text(
@@ -93,21 +95,19 @@ class AdminDashboardScreen extends StatelessWidget {
              ),
             const SizedBox(height: 10),
           ],
-          if (!session.appUser.isManagerOperation) ...[
-            _NavTile(
-              icon: Icons.campaign_rounded,
-              title: 'Announcements',
-              subtitle: 'Send course announcements or private student messages',
-              color: AppColors.admin,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AdminAnnouncementsScreen(session: session),
-                ),
+          _NavTile(
+            icon: Icons.campaign_rounded,
+            title: 'Announcements',
+            subtitle: 'Send course announcements or private student messages',
+            color: AppColors.admin,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AdminAnnouncementsScreen(session: session),
               ),
             ),
-            const SizedBox(height: 10),
-          ],
+          ),
+          const SizedBox(height: 10),
           if (session.appUser.isSuperAdmin) ...[
             _NavTile(
               icon: Icons.admin_panel_settings_rounded,
