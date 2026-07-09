@@ -89,6 +89,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
             controller: courseMessageController,
             filterController: courseFilterController,
             filter: courseFilter,
+            searchRequired: widget.session.appUser.canViewAllCourses,
             selectedCourseIds: selectedCourseIds,
             scheduledAt: scheduledCourseAnnouncementAt,
             pinAnnouncements: pinCourseAnnouncements,
@@ -119,6 +120,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
             controller: privateMessageController,
             filterController: studentFilterController,
             filter: studentFilter,
+            searchRequired: widget.session.appUser.canViewAllCourses,
             selectedStudentKeys: selectedStudentKeys,
             isSending: sendingPrivateBroadcast,
             onChanged: () => setState(() {}),
@@ -329,6 +331,7 @@ class _CourseAnnouncementPanel extends StatelessWidget {
   final TextEditingController controller;
   final TextEditingController filterController;
   final String filter;
+  final bool searchRequired;
   final Set<String> selectedCourseIds;
   final DateTime? scheduledAt;
   final bool pinAnnouncements;
@@ -347,6 +350,7 @@ class _CourseAnnouncementPanel extends StatelessWidget {
     required this.controller,
     required this.filterController,
     required this.filter,
+    required this.searchRequired,
     required this.selectedCourseIds,
     required this.scheduledAt,
     required this.pinAnnouncements,
@@ -363,15 +367,18 @@ class _CourseAnnouncementPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visibleCourses = courses.where((course) {
-      if (filter.isEmpty) return true;
-      final searchable = [
-        course.id,
-        course.displayName,
-        course.category,
-      ].join(' ').toLowerCase();
-      return searchable.contains(filter);
-    }).toList(growable: false);
+    final shouldShowMatches = !searchRequired || filter.isNotEmpty;
+    final visibleCourses = shouldShowMatches
+        ? courses.where((course) {
+            if (filter.isEmpty) return true;
+            final searchable = [
+              course.id,
+              course.displayName,
+              course.category,
+            ].join(' ').toLowerCase();
+            return searchable.contains(filter);
+          }).toList(growable: false)
+        : <Course>[];
 
     return Card(
       child: Padding(
@@ -391,8 +398,9 @@ class _CourseAnnouncementPanel extends StatelessWidget {
               label: 'Find a course',
               hint: 'Search by course name, department, or ID',
               icon: Icons.menu_book_rounded,
-              resultLabel:
-                  '${visibleCourses.length} course${visibleCourses.length == 1 ? '' : 's'} shown',
+              resultLabel: searchRequired && filter.isEmpty
+                  ? 'Search to show courses. ${courses.length} courses are available.'
+                  : '${visibleCourses.length} course${visibleCourses.length == 1 ? '' : 's'} shown',
               onChanged: onFilterChanged,
               onClear: onClearFilter,
             ),
@@ -479,9 +487,13 @@ class _CourseAnnouncementPanel extends StatelessWidget {
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 420),
               child: visibleCourses.isEmpty
-                  ? const _FilteredEmptyState(
-                      icon: Icons.search_off_rounded,
-                      message: 'No courses match this filter.',
+                  ? _FilteredEmptyState(
+                      icon: searchRequired && filter.isEmpty
+                          ? Icons.manage_search_rounded
+                          : Icons.search_off_rounded,
+                      message: searchRequired && filter.isEmpty
+                          ? 'Search by course name, department, or ID to choose targets.'
+                          : 'No courses match this filter.',
                     )
                   : ListView.builder(
                       shrinkWrap: true,
@@ -585,6 +597,7 @@ class _PrivateBroadcastPanel extends StatelessWidget {
   final TextEditingController controller;
   final TextEditingController filterController;
   final String filter;
+  final bool searchRequired;
   final Set<String> selectedStudentKeys;
   final bool isSending;
   final VoidCallback onChanged;
@@ -597,6 +610,7 @@ class _PrivateBroadcastPanel extends StatelessWidget {
     required this.controller,
     required this.filterController,
     required this.filter,
+    required this.searchRequired,
     required this.selectedStudentKeys,
     required this.isSending,
     required this.onChanged,
@@ -607,16 +621,19 @@ class _PrivateBroadcastPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visibleTargets = targets.where((target) {
-      if (filter.isEmpty) return true;
-      final searchable = [
-        target.studentName,
-        target.studentId,
-        target.courseName,
-        target.courseId,
-      ].join(' ').toLowerCase();
-      return searchable.contains(filter);
-    }).toList(growable: false);
+    final shouldShowMatches = !searchRequired || filter.isNotEmpty;
+    final visibleTargets = shouldShowMatches
+        ? targets.where((target) {
+            if (filter.isEmpty) return true;
+            final searchable = [
+              target.studentName,
+              target.studentId,
+              target.courseName,
+              target.courseId,
+            ].join(' ').toLowerCase();
+            return searchable.contains(filter);
+          }).toList(growable: false)
+        : <_StudentTarget>[];
 
     return Card(
       child: Padding(
@@ -636,8 +653,9 @@ class _PrivateBroadcastPanel extends StatelessWidget {
               label: 'Find a student',
               hint: 'Search by student name or ID',
               icon: Icons.person_search_rounded,
-              resultLabel:
-                  '${visibleTargets.length} student${visibleTargets.length == 1 ? '' : 's'} shown',
+              resultLabel: searchRequired && filter.isEmpty
+                  ? 'Search to show students. ${targets.length} students are available.'
+                  : '${visibleTargets.length} student${visibleTargets.length == 1 ? '' : 's'} shown',
               onChanged: onFilterChanged,
               onClear: onClearFilter,
             ),
@@ -670,9 +688,13 @@ class _PrivateBroadcastPanel extends StatelessWidget {
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 360),
               child: visibleTargets.isEmpty
-                  ? const _FilteredEmptyState(
-                      icon: Icons.person_off_outlined,
-                      message: 'No students match this filter.',
+                  ? _FilteredEmptyState(
+                      icon: searchRequired && filter.isEmpty
+                          ? Icons.person_search_rounded
+                          : Icons.person_off_outlined,
+                      message: searchRequired && filter.isEmpty
+                          ? 'Search by student name, student ID, course name, or course ID to choose targets.'
+                          : 'No students match this filter.',
                     )
                   : ListView.builder(
                       shrinkWrap: true,
