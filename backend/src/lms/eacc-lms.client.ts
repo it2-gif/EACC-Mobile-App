@@ -243,7 +243,6 @@ export class EaccLmsClient implements LmsClient {
           credentials!,
         ),
       };
-
     }
 
     throw new LmsUnavailableError();
@@ -373,7 +372,10 @@ export class EaccLmsClient implements LmsClient {
             students: parseAdminCourseStudentsHtml(detailsHtml),
           };
         } catch (error) {
-          console.error(`[KeyPerson] Failed to load students for course ${course.lmsCourseId}:`, error);
+          console.error(
+            `[KeyPerson] Failed to load students for course ${course.lmsCourseId}:`,
+            error,
+          );
           if (detailsHtml) {
             try {
               require('fs').writeFileSync('lms_details_dump.html', detailsHtml);
@@ -451,7 +453,9 @@ export class EaccLmsClient implements LmsClient {
         timeout,
       );
       const courseIds = parseAdminCourseIdsHtml(html);
-      console.log(`[AdminCourses] /courses.php -> ${courseIds.length} course IDs found`);
+      console.log(
+        `[AdminCourses] /courses.php -> ${courseIds.length} course IDs found`,
+      );
       return courseIds;
     } catch (error) {
       console.log('[AdminCourses] /courses.php failed:', error);
@@ -474,12 +478,18 @@ export class EaccLmsClient implements LmsClient {
         batch.map(async (courseId) => {
           const url = new URL('/edit_course.php', baseUrl);
           url.searchParams.set('wcid', courseId);
-          const html = await this.loadAuthenticatedHtml(url, sessionCookie, timeout);
+          const html = await this.loadAuthenticatedHtml(
+            url,
+            sessionCookie,
+            timeout,
+          );
 
-          return parseAdminCourseEditHtml(html, courseId) ?? {
-            lmsCourseId: courseId,
-            name: `Course ${courseId}`,
-          };
+          return (
+            parseAdminCourseEditHtml(html, courseId) ?? {
+              lmsCourseId: courseId,
+              name: `Course ${courseId}`,
+            }
+          );
         }),
       );
 
@@ -494,7 +504,6 @@ export class EaccLmsClient implements LmsClient {
   }
 
   private async loadAdminKeyPersonCourses(
-
     baseUrl: string,
     sessionCookie: string,
     timeout: number,
@@ -512,7 +521,9 @@ export class EaccLmsClient implements LmsClient {
         timeout,
       );
       allCourseIds = parseAdminCourseIdsHtml(html);
-      console.log(`[KeyPerson] /courses.php → ${allCourseIds.length} course IDs found`);
+      console.log(
+        `[KeyPerson] /courses.php → ${allCourseIds.length} course IDs found`,
+      );
     } catch (err) {
       console.log(`[KeyPerson] /courses.php FAILED:`, err);
     }
@@ -521,25 +532,30 @@ export class EaccLmsClient implements LmsClient {
     // Strategy A (most reliable): fetch /hr/view_users.php and find the row
     // where username = loginUsername. Gives exact numeric ID + short name
     // directly from the admin table without any fuzzy matching.
-    let adminNumericId: string | undefined =
-      /^\d+$/.test(admin.lmsUserId.trim()) ? admin.lmsUserId.trim() : undefined;
+    let adminNumericId: string | undefined = /^\d+$/.test(
+      admin.lmsUserId.trim(),
+    )
+      ? admin.lmsUserId.trim()
+      : undefined;
     let resolvedDisplayName = admin.name;
 
     if (!adminNumericId) {
       try {
-      const hrHtml = await this.loadAuthenticatedHtml(
-        new URL('/hr/view_users.php', baseUrl),
-        sessionCookie,
-        timeout,
-      );
-      const hrAdmin = parseAdminFromUserList(hrHtml, loginUsername);
-      if (hrAdmin) {
-        adminNumericId = hrAdmin.id;
-        resolvedDisplayName = hrAdmin.shortName;
-        console.log(`[KeyPerson] /hr/view_users.php → id="${adminNumericId}" shortName="${resolvedDisplayName}"`);
-      }
+        const hrHtml = await this.loadAuthenticatedHtml(
+          new URL('/hr/view_users.php', baseUrl),
+          sessionCookie,
+          timeout,
+        );
+        const hrAdmin = parseAdminFromUserList(hrHtml, loginUsername);
+        if (hrAdmin) {
+          adminNumericId = hrAdmin.id;
+          resolvedDisplayName = hrAdmin.shortName;
+          console.log(
+            `[KeyPerson] /hr/view_users.php → id="${adminNumericId}" shortName="${resolvedDisplayName}"`,
+          );
+        }
       } catch {
-      // /hr/view_users.php not accessible for this admin role — use fallback.
+        // /hr/view_users.php not accessible for this admin role — use fallback.
       }
     }
 
@@ -550,15 +566,27 @@ export class EaccLmsClient implements LmsClient {
         extraCandidateIds.length > 0 ? extraCandidateIds : allCourseIds
       ).slice(0, 5);
 
-      console.log(`[KeyPerson] username="${loginUsername}" name="${resolvedDisplayName}" — trying ${sampleIds.length} sample courses...`);
+      console.log(
+        `[KeyPerson] username="${loginUsername}" name="${resolvedDisplayName}" — trying ${sampleIds.length} sample courses...`,
+      );
 
       for (const sampleId of sampleIds) {
         try {
           const url = new URL('/edit_course.php', baseUrl);
           url.searchParams.set('wcid', sampleId);
-          const html = await this.loadAuthenticatedHtml(url, sessionCookie, timeout);
-          adminNumericId = findAdminKeypersonId(html, loginUsername, resolvedDisplayName);
-          console.log(`[KeyPerson] course ${sampleId} → discovered numericId="${adminNumericId}"`);
+          const html = await this.loadAuthenticatedHtml(
+            url,
+            sessionCookie,
+            timeout,
+          );
+          adminNumericId = findAdminKeypersonId(
+            html,
+            loginUsername,
+            resolvedDisplayName,
+          );
+          console.log(
+            `[KeyPerson] course ${sampleId} → discovered numericId="${adminNumericId}"`,
+          );
           if (adminNumericId) break;
         } catch {
           // Try the next sample.
@@ -567,7 +595,9 @@ export class EaccLmsClient implements LmsClient {
     }
 
     if (!adminNumericId) {
-      console.log(`[KeyPerson] WARNING: could not discover numeric ID — will use fallback string matching`);
+      console.log(
+        `[KeyPerson] WARNING: could not discover numeric ID — will use fallback string matching`,
+      );
     }
 
     // ── Step 3: Verify candidate courses against admin's identity ──
@@ -602,7 +632,11 @@ export class EaccLmsClient implements LmsClient {
         batch.map(async (courseId) => {
           const url = new URL('/edit_course.php', baseUrl);
           url.searchParams.set('wcid', courseId);
-          const html = await this.loadAuthenticatedHtml(url, sessionCookie, timeout);
+          const html = await this.loadAuthenticatedHtml(
+            url,
+            sessionCookie,
+            timeout,
+          );
           return { courseId, course: parseAdminCourseEditHtml(html, courseId) };
         }),
       );
@@ -610,8 +644,15 @@ export class EaccLmsClient implements LmsClient {
       for (const result of results) {
         if (result.status !== 'fulfilled') continue;
         const { courseId, course } = result.value;
-        const match = isAdminKeyPerson(course, admin, loginUsername, adminNumericId);
-        console.log(`[KeyPerson] course ${courseId}: keypersonId="${course?.keyPersonLmsUserId}" name="${course?.keyPersonName}" → match=${match}`);
+        const match = isAdminKeyPerson(
+          course,
+          admin,
+          loginUsername,
+          adminNumericId,
+        );
+        console.log(
+          `[KeyPerson] course ${courseId}: keypersonId="${course?.keyPersonLmsUserId}" name="${course?.keyPersonName}" → match=${match}`,
+        );
         if (match) {
           verifiedCourses.push({
             lmsCourseId: courseId,
@@ -624,7 +665,9 @@ export class EaccLmsClient implements LmsClient {
       }
     }
 
-    console.log(`[KeyPerson] RESULT: ${verifiedCourses.length} courses matched for "${loginUsername}"`);
+    console.log(
+      `[KeyPerson] RESULT: ${verifiedCourses.length} courses matched for "${loginUsername}"`,
+    );
 
     // If we successfully discovered the numeric ID the verification was reliable:
     // return only matched courses (even if empty). Do NOT fall back to
@@ -643,7 +686,6 @@ export class EaccLmsClient implements LmsClient {
 }
 
 function readConfiguredKeyPersonCourseIds(lmsUserId: string): string[] {
-
   const raw = process.env.LMS_KEY_PERSON_COURSE_IDS;
   if (!raw) {
     return [];
@@ -702,7 +744,6 @@ function isAdminKeyPerson(
   return false;
 }
 
-
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }
@@ -758,7 +799,6 @@ function parseAdminIdentity(username: string, html: string): NormalizedLmsUser {
 
   const displayName = jsDisplayName ?? sidebarName ?? trimmed;
 
-
   return {
     lmsUserId,
     role: 'admin',
@@ -795,11 +835,11 @@ function readAdminIdentityValue(
     const escapedKey = escapeRegex(key);
     const patterns = [
       new RegExp(`["']${escapedKey}["']\\s*:\\s*["']?([^"',}\\s]+)`, 'i'),
-      new RegExp(`\\b${escapedKey}\\b\\s*(?:=|:|=>)\\s*["']?([^"',}\\s<>]+)`, 'i'),
       new RegExp(
-        `name=["']${escapedKey}["'][^>]*value=["']?([^"'>\\s]+)`,
+        `\\b${escapedKey}\\b\\s*(?:=|:|=>)\\s*["']?([^"',}\\s<>]+)`,
         'i',
       ),
+      new RegExp(`name=["']${escapedKey}["'][^>]*value=["']?([^"'>\\s]+)`, 'i'),
     ];
 
     for (const pattern of patterns) {
@@ -820,18 +860,12 @@ function escapeRegex(value: string): string {
 function hasAdminFullAccess(html: string): boolean {
   const normalized = html.toLowerCase();
 
-  const truthyValue = '(?:1|true|yes|y|on)';
-  const fullAccessKeys = [
-    'full[_-]?access',
-    'fullaccess',
-    'is[_-]?super[_-]?admin',
-    'super[_-]?admin',
-  ];
+  const fullAccessKeys = ['full[_-]?access', 'fullaccess', 'fullaccese'];
 
   const directPatterns = fullAccessKeys.flatMap((key) => [
-    new RegExp(`\\b${key}\\b\\s*(?:=|:|=>)\\s*["']?${truthyValue}["']?`),
-    new RegExp(`["']${key}["']\\s*:\\s*["']?${truthyValue}["']?`),
-    new RegExp(`${key}["'\\s:=]+${truthyValue}`),
+    new RegExp(`\\b${key}\\b\\s*(?:=|:|=>)\\s*["']?1["']?(?!\\d)`),
+    new RegExp(`["']${key}["']\\s*:\\s*["']?1["']?(?!\\d)`),
+    new RegExp(`${key}["'\\s:=]+1(?!\\d)`),
   ]);
 
   if (directPatterns.some((pattern) => pattern.test(normalized))) {
@@ -845,10 +879,7 @@ function hasAdminFullAccess(html: string): boolean {
     const key = match[1].replace(/[-_\s]/g, '');
     const value = match[2].trim();
 
-    if (
-      ['fullaccess', 'issuperadmin', 'superadmin'].includes(key) &&
-      ['1', 'true', 'yes', 'y', 'on'].includes(value)
-    ) {
+    if (['fullaccess', 'fullaccese'].includes(key) && value === '1') {
       return true;
     }
   }

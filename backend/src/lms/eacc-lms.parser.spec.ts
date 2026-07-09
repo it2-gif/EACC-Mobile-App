@@ -41,6 +41,55 @@ describe('parseLmsResponse', () => {
     expect(user.lmsUserId).toBe('12');
   });
 
+  it('grants super-admin access only when the LMS full-access value is 1', () => {
+    const fullAccessAdmin = parseLmsResponse(
+      {
+        admin_name: [
+          {
+            Admin_id: 92,
+            Admin_shortname: 'developer',
+            Fullaccess: '1',
+          },
+        ],
+      },
+      'admin',
+    );
+    const limitedAdmin = parseLmsResponse(
+      {
+        admin_name: [
+          {
+            Admin_id: 76,
+            Admin_shortname: 'course admin',
+            Fullaccess: '0',
+          },
+        ],
+      },
+      'admin',
+    );
+
+    expect(fullAccessAdmin.isSuperAdmin).toBe(true);
+    expect(limitedAdmin.isSuperAdmin).toBe(false);
+  });
+
+  it('does not grant super-admin access for other truthy access values', () => {
+    for (const Fullaccess of [2, 'true', true]) {
+      const admin = parseLmsResponse(
+        {
+          admin_name: [
+            {
+              Admin_id: 92,
+              Admin_shortname: 'developer',
+              Fullaccess,
+            },
+          ],
+        },
+        'admin',
+      );
+
+      expect(admin.isSuperAdmin).toBe(false);
+    }
+  });
+
   it('rejects a mismatched response role', () => {
     expect(() =>
       parseLmsResponse(

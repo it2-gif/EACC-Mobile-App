@@ -22,9 +22,6 @@ import {
 import { AuthSyncService } from './auth-sync.service';
 import { LmsLoginDto } from './dto/lms-login.dto';
 
-const SUPER_ADMIN_USERNAME = 'esam';
-const SUPER_ADMIN_PASSWORD = '123#@!0';
-
 @Injectable()
 export class AuthService {
   constructor(
@@ -69,9 +66,7 @@ export class AuthService {
       });
       const synced = await this.authSync.syncLmsUser(lmsUser);
       const isSuperAdmin =
-        lmsUser.role === 'admin' &&
-        (lmsUser.isSuperAdmin === true ||
-          this.matchesHardcodedSuperAdmin(credentials));
+        lmsUser.role === 'admin' && lmsUser.isSuperAdmin === true;
       const adminCourses =
         lmsUser.role === 'admin' && isSuperAdmin
           ? await this.loadAdminCourses(
@@ -146,13 +141,6 @@ export class AuthService {
 
       throw error;
     }
-  }
-
-  private matchesHardcodedSuperAdmin(credentials: LmsLoginDto): boolean {
-    return (
-      credentials.username.trim().toLowerCase() === SUPER_ADMIN_USERNAME &&
-      credentials.password === SUPER_ADMIN_PASSWORD
-    );
   }
 
   private async loadAdminCourses(

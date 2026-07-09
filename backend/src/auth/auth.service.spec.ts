@@ -3,6 +3,9 @@ import { ConfigService } from '@nestjs/config';
 jest.mock('../firebase/firebase-token.service', () => ({
   FirebaseTokenService: class FirebaseTokenService {},
 }));
+jest.mock('../database/prisma.service', () => ({
+  PrismaService: class PrismaService {},
+}));
 jest.mock('../lms/eacc-lms.client', () => ({
   EaccLmsClient: class EaccLmsClient {},
 }));
@@ -76,5 +79,55 @@ describe('AuthService', () => {
     });
     expect(result.firebase).toEqual({ customToken: 'firebase-token' });
     expect(result.nextStep).toBe('ready');
+  });
+
+  it('does not grant super-admin access from login credentials', async () => {
+    const lmsUser = {
+      lmsUserId: '92',
+      role: 'admin' as const,
+      name: 'Developer',
+      isSuperAdmin: false,
+      courses: [],
+    };
+    const synced = {
+      user: {
+        id: 'admin-uuid',
+        role: 'ADMIN',
+        name: 'Developer',
+        email: null,
+      },
+      courses: [],
+    };
+    const lmsClient = { authenticate: jest.fn().mockResolvedValue(lmsUser) };
+    const authSync = { syncLmsUser: jest.fn().mockResolvedValue(synced) };
+    const prisma = {
+      course: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const firebaseTokens = {
+      createCustomToken: jest.fn().mockResolvedValue('firebase-token'),
+    };
+    const config = {
+      get: jest.fn().mockReturnValue('test'),
+    } as unknown as ConfigService;
+    const service = new AuthService(
+      lmsClient as never,
+      authSync as never,
+      prisma as never,
+      firebaseTokens as never,
+      config as never,
+    );
+
+    const result = await service.login({
+      role: 'admin',
+      username: 'legacy-admin',
+      password: 'legacy-password',
+    });
+
+    expect(result.appUser.isSuperAdmin).toBe(false);
+    expect(firebaseTokens.createCustomToken).toHaveBeenCalledWith(
+      expect.objectContaining({ isSuperAdmin: false }),
+    );
   });
 });
