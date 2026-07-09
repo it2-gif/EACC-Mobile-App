@@ -74,6 +74,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String messageSearchQuery = '';
   Timer? typingStopTimer;
   bool typingStateSent = false;
+  int? lastScheduledAnnouncementReadAt;
 
   bool get isAnnouncementThread =>
       widget.threadId == FirestoreChatService.announcementThreadId;
@@ -107,9 +108,11 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     messageController.addListener(handleTypingChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(markThreadAsRead());
-    });
+    if (!isAnnouncementThread) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(markThreadAsRead());
+      });
+    }
   }
 
   void handleTypingChanged() {
@@ -224,13 +227,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> markThreadAsRead() async {
     if (isAnnouncementThread) {
+      if (widget.currentUserRole != 'student') return;
       try {
         await FirestoreChatService.markAnnouncementRead(
           courseId: widget.courseId,
           readerRole: widget.currentUserRole,
           readerName: widget.senderName,
         );
-      } catch (_) {}
+      } catch (error) {
+        debugPrint('Could not mark announcement as read: $error');
+      }
       return;
     }
 
@@ -248,6 +254,21 @@ class _ChatScreenState extends State<ChatScreen> {
         studentName: _resolvedStudentName,
       );
     } catch (_) {}
+  }
+
+  void scheduleAnnouncementRead(Map<String, dynamic>? threadData) {
+    if (!isAnnouncementThread || widget.currentUserRole != 'student') return;
+
+    final lastMessageAt = threadData?['last_message_at'];
+    if (lastMessageAt is! Timestamp) return;
+
+    final marker = lastMessageAt.toDate().microsecondsSinceEpoch;
+    if (lastScheduledAnnouncementReadAt == marker) return;
+    lastScheduledAnnouncementReadAt = marker;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(markThreadAsRead());
+    });
   }
 
   void loadOlderMessages() {
@@ -1555,6 +1576,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     }
 
                     final threadData = threadSnapshot.data?.data();
+                    scheduleAnnouncementRead(threadData);
                     final typingLabel = _typingLabel(threadData);
                     final docs = sortMessages(snapshot.data?.docs ?? []);
                     final allVisibleDocs = docs.reversed.toList();
@@ -1680,10 +1702,10 @@ class _ChatScreenState extends State<ChatScreen> {
                             preview: _messagePreview(pinnedMessage.data()),
                             onTap: () => _jumpToBottomIfPossible(animate: true),
                           ),
-                        if (isAnnouncementThread)
+                        if (isAnnouncementThread &&
+                            widget.currentUserRole != 'student')
                           _AnnouncementReadReceiptsBar(
                             reads: _announcementReads(threadData),
-                            canOpenDetails: widget.currentUserRole != 'student',
                           ),
                         if (typingLabel != null)
                           _TypingIndicatorBar(label: typingLabel),
@@ -2214,22 +2236,47 @@ class _ChatScreenState extends State<ChatScreen> {
     final reads = threadData?['announcement_reads'];
     if (reads is! Map) return const [];
 
-    final entries = reads.entries.map((entry) {
+    final entriesByReader = <String, _AnnouncementRead>{};
+    for (final entry in reads.entries) {
       final key = entry.key.toString();
-      final rawTime = entry.value;
-      final readAt = rawTime is Timestamp ? rawTime.toDate() : null;
-      final parts = key.split('_');
-      final role = parts.isNotEmpty ? parts.first : 'reader';
-      final displayName = parts.length > 1
-          ? parts.skip(1).join(' ')
-          : key.replaceAll('_', ' ');
+      final value = entry.value;
 
-      return _AnnouncementRead(
+      String role;
+      String displayName;
+      DateTime? readAt;
+
+      if (value is Map) {
+        role = value['role']?.toString().trim().toLowerCase() ?? '';
+        displayName = value['display_name']?.toString().trim() ?? '';
+        final rawTime = value['read_at'];
+        readAt = rawTime is Timestamp ? rawTime.toDate() : null;
+      } else {
+        final parts = key.split('_');
+        role = parts.isNotEmpty ? parts.first.toLowerCase() : '';
+        displayName = parts.length > 1
+            ? parts.skip(1).join(' ').trim()
+            : key.replaceAll('_', ' ').trim();
+        readAt = value is Timestamp ? value.toDate() : null;
+      }
+
+      if (role != 'student' || displayName.isEmpty) continue;
+
+      final reader = _AnnouncementRead(
         role: role,
-        displayName: displayName.trim().isEmpty ? key : displayName.trim(),
+        displayName: displayName,
         readAt: readAt,
       );
-    }).toList();
+      final identity = displayName.toLowerCase();
+      final existing = entriesByReader[identity];
+      if (existing == null ||
+          (reader.readAt != null &&
+              (existing.readAt == null ||
+                  reader.readAt!.isAfter(existing.readAt!)))) {
+        entriesByReader[identity] = reader;
+      }
+    }
+
+    final entries = entriesByReader.values.toList();
 
     entries.sort((a, b) {
       final aTime = a.readAt;
@@ -2489,11 +2536,9 @@ class _TypingIndicatorBar extends StatelessWidget {
 
 class _AnnouncementReadReceiptsBar extends StatelessWidget {
   final List<_AnnouncementRead> reads;
-  final bool canOpenDetails;
 
   const _AnnouncementReadReceiptsBar({
     required this.reads,
-    required this.canOpenDetails,
   });
 
   @override
@@ -2502,10 +2547,11 @@ class _AnnouncementReadReceiptsBar extends StatelessWidget {
     return Material(
       color: Colors.white,
       child: InkWell(
-        onTap: canOpenDetails ? () => _showDetails(context) : null,
+        onTap: () => _showDetails(context),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+          padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
           decoration: const BoxDecoration(
             border: Border(bottom: BorderSide(color: AppColors.border)),
           ),
@@ -2526,19 +2572,32 @@ class _AnnouncementReadReceiptsBar extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  count == 1 ? 'Read by 1 person' : 'Read by $count people',
-                  style: const TextStyle(
-                    color: AppColors.ink,
-                    fontWeight: FontWeight.w800,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      count == 0
+                          ? 'No student reads yet'
+                          : count == 1
+                          ? 'Read by 1 student'
+                          : 'Read by $count students',
+                      style: const TextStyle(
+                        color: AppColors.ink,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'For the latest announcement',
+                      style: TextStyle(color: AppColors.muted, fontSize: 11),
+                    ),
+                  ],
                 ),
               ),
-              if (canOpenDetails)
-                const Icon(
-                  Icons.keyboard_arrow_up_rounded,
-                  color: AppColors.muted,
-                ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.muted,
+              ),
             ],
           ),
         ),
@@ -2565,8 +2624,8 @@ class _AnnouncementReadReceiptsBar extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   reads.isEmpty
-                      ? 'No readers yet.'
-                      : '${reads.length} reader${reads.length == 1 ? '' : 's'} confirmed',
+                      ? 'No students have opened the latest announcement yet.'
+                      : '${reads.length} student${reads.length == 1 ? '' : 's'} read the latest announcement',
                   style: const TextStyle(color: AppColors.muted),
                 ),
                 const SizedBox(height: 14),
@@ -2575,7 +2634,7 @@ class _AnnouncementReadReceiptsBar extends StatelessWidget {
                     padding: EdgeInsets.symmetric(vertical: 24),
                     child: Center(
                       child: Text(
-                        'Students will appear here after opening the announcement.',
+                        'Readers will appear here as students open the announcement chat.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: AppColors.muted),
                       ),
@@ -2613,7 +2672,7 @@ class _AnnouncementReadReceiptsBar extends StatelessWidget {
                           trailing: Text(
                             read.readAt == null
                                 ? ''
-                                : formatClockTime(read.readAt!),
+                                : formatThreadTime(read.readAt!),
                             style: const TextStyle(
                               color: AppColors.muted,
                               fontWeight: FontWeight.w700,

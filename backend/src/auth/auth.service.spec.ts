@@ -81,7 +81,7 @@ describe('AuthService', () => {
     expect(result.nextStep).toBe('ready');
   });
 
-  it('does not grant super-admin access from login credentials', async () => {
+  it('keeps other admin credentials scoped as contact-person access', async () => {
     const lmsUser = {
       lmsUserId: '92',
       role: 'admin' as const,
@@ -128,6 +128,61 @@ describe('AuthService', () => {
     expect(result.appUser.isSuperAdmin).toBe(false);
     expect(firebaseTokens.createCustomToken).toHaveBeenCalledWith(
       expect.objectContaining({ isSuperAdmin: false }),
+    );
+  });
+
+  it('grants super-admin access only to the hardcoded admin credentials', async () => {
+    const lmsUser = {
+      lmsUserId: '14',
+      role: 'admin' as const,
+      name: 'Esam',
+      isSuperAdmin: false,
+      courses: [],
+    };
+    const synced = {
+      user: {
+        id: 'admin-uuid',
+        role: 'ADMIN',
+        name: 'Esam',
+        email: null,
+      },
+      courses: [],
+    };
+    const lmsClient = { authenticate: jest.fn().mockResolvedValue(lmsUser) };
+    const authSync = { syncLmsUser: jest.fn().mockResolvedValue(synced) };
+    const prisma = {
+      course: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const firebaseTokens = {
+      createCustomToken: jest.fn().mockResolvedValue('firebase-token'),
+    };
+    const config = {
+      get: jest.fn().mockReturnValue('test'),
+    } as unknown as ConfigService;
+    const service = new AuthService(
+      lmsClient as never,
+      authSync as never,
+      prisma as never,
+      firebaseTokens as never,
+      config as never,
+    );
+
+    const result = await service.login({
+      role: 'admin',
+      username: 'esam',
+      password: '123#@!0',
+    });
+
+    expect(result.appUser.isSuperAdmin).toBe(true);
+    expect(lmsClient.authenticate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hints: expect.objectContaining({ hasFullAccess: true }),
+      }),
+    );
+    expect(firebaseTokens.createCustomToken).toHaveBeenCalledWith(
+      expect.objectContaining({ isSuperAdmin: true }),
     );
   });
 });

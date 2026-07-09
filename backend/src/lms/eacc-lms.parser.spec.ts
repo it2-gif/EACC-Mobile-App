@@ -71,6 +71,23 @@ describe('parseLmsResponse', () => {
     expect(limitedAdmin.isSuperAdmin).toBe(false);
   });
 
+  it('reads full access from the response root when admin identity is nested', () => {
+    const admin = parseLmsResponse(
+      {
+        admin_name: [
+          {
+            Admin_id: 92,
+            Admin_shortname: 'developer',
+          },
+        ],
+        Fullaccess: '1',
+      },
+      'admin',
+    );
+
+    expect(admin.isSuperAdmin).toBe(true);
+  });
+
   it('does not grant super-admin access for other truthy access values', () => {
     for (const Fullaccess of [2, 'true', true]) {
       const admin = parseLmsResponse(

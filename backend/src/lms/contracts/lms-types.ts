@@ -15,6 +15,11 @@ export interface LmsLoginCredentials {
      * listed on the admin's LMS dashboard page.
      */
     knownCourseIds?: string[];
+    /**
+     * Authorization decision made by AuthService before LMS course discovery.
+     * LMS response fields must not promote an admin independently.
+     */
+    hasFullAccess?: boolean;
   };
 }
 

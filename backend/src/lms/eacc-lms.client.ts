@@ -92,7 +92,14 @@ export class EaccLmsClient implements LmsClient {
     const dashboardUrl = new URL(dashboardPaths[credentials.role], baseUrl);
     const jsonPayload = tryParseJson(responseText);
     if (jsonPayload !== undefined) {
-      const user = parseLmsResponse(jsonPayload.value, credentials.role);
+      const parsedUser = parseLmsResponse(jsonPayload.value, credentials.role);
+      const user =
+        credentials.role === 'admin'
+          ? {
+              ...parsedUser,
+              isSuperAdmin: credentials.hints?.hasFullAccess === true,
+            }
+          : parsedUser;
 
       if (credentials.role === 'teacher') {
         return {
@@ -227,9 +234,19 @@ export class EaccLmsClient implements LmsClient {
     }
 
     if (role === 'admin') {
-      const admin = parseAdminIdentity(
+      const parsedAdmin = {
+        ...parseAdminIdentity(
+          credentials!.username,
+          `${loginResponseHtml}\n${html}`,
+        ),
+        isSuperAdmin: credentials!.hints?.hasFullAccess === true,
+      };
+      const admin = await this.resolveAdminIdentity(
+        url.origin,
+        sessionCookie,
+        timeout,
+        parsedAdmin,
         credentials!.username,
-        `${loginResponseHtml}\n${html}`,
       );
 
       return {
@@ -260,18 +277,55 @@ export class EaccLmsClient implements LmsClient {
       sessionCookie,
       timeout,
     );
+    const verifiedAdmin = await this.resolveAdminIdentity(
+      dashboardUrl.origin,
+      sessionCookie,
+      timeout,
+      admin,
+      credentials.username,
+    );
 
     return {
-      ...admin,
+      ...verifiedAdmin,
       courses: await this.loadAdminCoursesForAccess(
         dashboardUrl.origin,
         sessionCookie,
         timeout,
         dashboardHtml,
-        admin,
+        verifiedAdmin,
         credentials,
       ),
     };
+  }
+
+  private async resolveAdminIdentity(
+    baseUrl: string,
+    sessionCookie: string,
+    timeout: number,
+    admin: NormalizedLmsUser,
+    loginUsername: string,
+  ): Promise<NormalizedLmsUser> {
+    try {
+      const usersHtml = await this.loadAuthenticatedHtml(
+        new URL('/hr/view_users.php', baseUrl),
+        sessionCookie,
+        timeout,
+      );
+      const matchedAdmin = parseAdminFromUserList(usersHtml, loginUsername);
+      if (!matchedAdmin) return admin;
+
+      console.log(
+        `[AdminAccess] user="${loginUsername}" id="${matchedAdmin.id}" fullAccess=${admin.isSuperAdmin ? 1 : 0}`,
+      );
+
+      return {
+        ...admin,
+        lmsUserId: matchedAdmin.id,
+        name: matchedAdmin.shortName,
+      };
+    } catch {
+      return admin;
+    }
   }
 
   private async loadAdminCoursesForAccess(
@@ -860,12 +914,19 @@ function escapeRegex(value: string): string {
 function hasAdminFullAccess(html: string): boolean {
   const normalized = html.toLowerCase();
 
-  const fullAccessKeys = ['full[_-]?access', 'fullaccess', 'fullaccese'];
+  const fullAccessKeys = [
+    'full[_\\s-]?access',
+    'fullaccess',
+    'fullaccese',
+  ];
 
   const directPatterns = fullAccessKeys.flatMap((key) => [
     new RegExp(`\\b${key}\\b\\s*(?:=|:|=>)\\s*["']?1["']?(?!\\d)`),
     new RegExp(`["']${key}["']\\s*:\\s*["']?1["']?(?!\\d)`),
     new RegExp(`${key}["'\\s:=]+1(?!\\d)`),
+    new RegExp(
+      `(?:\\[\\s*)?["']?${key}["']?\\s*\\]?\\s*(?:=|:|=>)\\s*["']?1["']?(?!\\d)`,
+    ),
   ]);
 
   if (directPatterns.some((pattern) => pattern.test(normalized))) {
@@ -884,7 +945,22 @@ function hasAdminFullAccess(html: string): boolean {
     }
   }
 
-  return false;
+  const reversedInputPattern =
+    /<input[^>]+value\s*=\s*["']?([^"'\s>]+)["']?[^>]*name\s*=\s*["']([^"']+)["'][^>]*>/g;
+
+  for (const match of normalized.matchAll(reversedInputPattern)) {
+    const value = match[1].trim();
+    const key = match[2].replace(/[-_\s]/g, '');
+
+    if (['fullaccess', 'fullaccese'].includes(key) && value === '1') {
+      return true;
+    }
+  }
+
+  const selectPattern =
+    /<select[^>]+name\s*=\s*["'](?:full[_\s-]?access|fullaccese)["'][^>]*>[\s\S]*?<option[^>]+value\s*=\s*["']?1["']?[^>]*selected[^>]*>/;
+
+  return selectPattern.test(normalized);
 }
 
 function extractSessionCookie(headers: Headers): string | undefined {

@@ -157,7 +157,12 @@ service cloud.firestore {
     }
 
     function isAnnouncementReadUpdate(threadId) {
+      let previousReads = resource.data.get('announcement_reads', {});
+      let nextReads = request.resource.data.announcement_reads;
+      let readerId = request.auth.uid;
+      let receipt = nextReads[readerId];
       return isAnnouncementThread(threadId)
+        && request.auth.token.role == 'student'
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'thread_id',
           'is_announcement',
@@ -166,7 +171,13 @@ service cloud.firestore {
         ])
         && request.resource.data.thread_id == threadId
         && request.resource.data.is_announcement == true
-        && request.resource.data.announcement_reads is map
+        && nextReads is map
+        && nextReads.diff(previousReads).affectedKeys().hasOnly([readerId])
+        && receipt is map
+        && receipt.keys().hasOnly(['role', 'display_name', 'read_at'])
+        && receipt.role == request.auth.token.role
+        && receipt.display_name == request.auth.token.displayName
+        && receipt.read_at == request.time
         && request.resource.data.updated_at == request.time;
     }
 

@@ -51,7 +51,9 @@ export function parseLmsResponse(
   const email = readOptionalString(data, fields.email);
   const responseRole = readOptionalString(data, ['role', 'type', 'user_type']);
   const isSuperAdmin =
-    expectedRole === 'admin' ? hasAdminFullAccess(data) : false;
+    expectedRole === 'admin'
+      ? hasAdminFullAccess(data) || hasAdminFullAccess(root)
+      : false;
 
   if (responseRole && normalizeRole(responseRole) !== expectedRole) {
     throw new InvalidLmsResponseError();

@@ -9,6 +9,13 @@ interface SelectedOption {
   text?: string;
 }
 
+export interface AdminUserListEntry {
+  id: string;
+  shortName: string;
+  isSuperAdmin?: boolean;
+  detailsPath?: string;
+}
+
 export function parseAdminCoursesHtml(
   html: string,
   keyPersonLmsUserId: string,
@@ -90,11 +97,11 @@ export function parseAdminSidebarName(html: string): string | undefined {
 export function parseAdminFromUserList(
   html: string,
   loginUsername: string,
-): { id: string; shortName: string } | undefined {
+): AdminUserListEntry | undefined {
   const $ = cheerio.load(html);
   const username = loginUsername.toLowerCase().trim();
 
-  let found: { id: string; shortName: string } | undefined;
+  let found: AdminUserListEntry | undefined;
 
   $('table tbody tr').each((_, row) => {
     const cells = $(row).find('td');
@@ -105,12 +112,72 @@ export function parseAdminFromUserList(
     const rowUsername = $(cells[2]).text().trim().toLowerCase();
 
     if (rowUsername === username && id && shortName) {
-      found = { id, shortName };
+      const headers = $(row)
+        .closest('table')
+        .find('thead th')
+        .toArray()
+        .map((header) => normalizeFieldName($(header).text()));
+      const fullAccessIndex = headers.findIndex(isFullAccessField);
+      const fullAccessCell =
+        fullAccessIndex >= 0 ? $(cells[fullAccessIndex]) : undefined;
+      const isSuperAdmin =
+        readFullAccessControl($, $(row)) ??
+        (fullAccessCell ? readExactFullAccess(fullAccessCell.text()) : undefined);
+      const detailsPath = $(row)
+        .find('a[href]')
+        .toArray()
+        .map((link) => $(link).attr('href')?.trim())
+        .find(
+          (href): href is string =>
+            Boolean(href) &&
+            !/delete|remove/i.test(href!) &&
+            /edit|update|details?|add[_-]?user|(?:user|admin)[^?]*\?[^#]*(?:id|admin_id|ad_id)=/i.test(
+              href!,
+            ),
+        );
+
+      found = {
+        id,
+        shortName,
+        ...(isSuperAdmin === undefined ? {} : { isSuperAdmin }),
+        ...(detailsPath ? { detailsPath } : {}),
+      };
       return false; // break $.each
     }
   });
 
   return found;
+}
+
+function readFullAccessControl(
+  $: CheerioRoot,
+  element: ReturnType<CheerioRoot>,
+): boolean | undefined {
+  let result: boolean | undefined;
+
+  element.find('[name]').each((_, control) => {
+    const fieldName = normalizeFieldName($(control).attr('name') ?? '');
+    if (!isFullAccessField(fieldName)) return;
+
+    result = readExactFullAccess(String($(control).val() ?? ''));
+    return false;
+  });
+
+  return result;
+}
+
+function readExactFullAccess(value: string): boolean | undefined {
+  const normalized = value.trim();
+  if (!normalized) return undefined;
+  return normalized === '1';
+}
+
+function normalizeFieldName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z]/g, '');
+}
+
+function isFullAccessField(value: string): boolean {
+  return value === 'fullaccess' || value === 'fullaccese';
 }
 
 export function parseAdminCourseIdsHtml(html: string): string[] {

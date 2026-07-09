@@ -620,7 +620,9 @@ class _AnnouncementThreadCard extends StatelessWidget {
         final lastMessage =
             data?['last_message']?.toString() ?? 'Post a course announcement';
         final reads = data?['announcement_reads'];
-        final readCount = reads is Map ? reads.length : 0;
+        final readCount = FirestoreChatService.announcementStudentReadCount(
+          reads,
+        );
         final pinned = data?['pinned'] != false;
         final lastTime = formatThreadTime(
           data?['last_message_at'] ?? data?['updated_at'],

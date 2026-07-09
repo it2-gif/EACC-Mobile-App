@@ -486,7 +486,9 @@ class _CourseSelectionTile extends StatelessWidget {
       builder: (context, snapshot) {
         final data = snapshot.data?.data();
         final reads = data?['announcement_reads'];
-        final readCount = reads is Map ? reads.length : 0;
+        final readCount = FirestoreChatService.announcementStudentReadCount(
+          reads,
+        );
         final pinned = data?['pinned'] != false;
 
         return CheckboxListTile(

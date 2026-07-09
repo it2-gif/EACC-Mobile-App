@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 class ChatUploadException implements Exception {
@@ -457,15 +458,53 @@ class FirestoreChatService {
     required String readerRole,
     required String readerName,
   }) async {
-    final readerKey = _safeMapKey('$readerRole:$readerName');
-    if (readerKey.isEmpty) return;
+    if (readerRole != 'student') return;
 
-    await _threadsRef(courseId: courseId).doc(announcementThreadId).set({
-      'thread_id': announcementThreadId,
-      'is_announcement': true,
-      'announcement_reads.$readerKey': FieldValue.serverTimestamp(),
-      'updated_at': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    final user = FirebaseAuth.instance.currentUser;
+    final normalizedName = readerName.trim();
+    if (user == null || normalizedName.isEmpty) return;
+
+    final threadRef = _threadsRef(
+      courseId: courseId,
+    ).doc(announcementThreadId);
+
+    await _db.runTransaction((transaction) async {
+      final snapshot = await transaction.get(threadRef);
+      if (!snapshot.exists) return;
+
+      final currentReads = snapshot.data()?['announcement_reads'];
+      final nextReads = <String, dynamic>{};
+      if (currentReads is Map) {
+        for (final entry in currentReads.entries) {
+          nextReads[entry.key.toString()] = entry.value;
+        }
+      }
+
+      nextReads[user.uid] = {
+        'role': readerRole,
+        'display_name': normalizedName,
+        'read_at': FieldValue.serverTimestamp(),
+      };
+
+      transaction.update(threadRef, {
+        'thread_id': announcementThreadId,
+        'is_announcement': true,
+        'announcement_reads': nextReads,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  static int announcementStudentReadCount(dynamic reads) {
+    if (reads is! Map) return 0;
+
+    return reads.entries.where((entry) {
+      final value = entry.value;
+      if (value is Map) {
+        return value['role']?.toString().toLowerCase() == 'student';
+      }
+      return entry.key.toString().toLowerCase().startsWith('student_');
+    }).length;
   }
 
   static Future<void> setTypingState({
@@ -1098,6 +1137,7 @@ class FirestoreChatService {
       'last_sender_name': senderName,
       'last_sender_role': senderRole,
       'last_message_at': FieldValue.serverTimestamp(),
+      'announcement_reads': <String, dynamic>{},
       'updated_at': FieldValue.serverTimestamp(),
     };
   }
@@ -1263,13 +1303,6 @@ class FirestoreChatService {
     return fileName.substring(separatorIndex + 1).toLowerCase();
   }
 
-  static String _safeMapKey(String input) {
-    return input
-        .trim()
-        .replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')
-        .replaceAll(RegExp(r'_+'), '_');
-  }
-
   static String? _participantPrefix(String role) {
     switch (role) {
       case 'student':
@@ -1293,4 +1326,3 @@ class AdminUnreadCounts {
     required this.studentUnread,
   });
 }
-

@@ -1,20 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../models/auth_session.dart';
-import '../services/auth_session_manager.dart';
 import '../services/firestore_chat_service.dart';
-import '../services/push_notification_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/action_feedback.dart';
 import '../widgets/app_scaffold.dart';
 import 'admin_analysis_screen.dart';
 import 'admin_announcements_screen.dart';
 import 'admin_audit_screen.dart';
-import 'admin_chats_screen.dart';
 import 'admin_courses_screen.dart';
 import 'admin_moderation_screen.dart';
 import 'admin_users_screen.dart';
-import 'login_screen.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
   final AuthSession session;
@@ -426,21 +421,8 @@ class _CourseActivityPanelState extends State<_CourseActivityPanel> {
   final courseIdController = TextEditingController();
   Future<CourseActivitySummary>? summaryFuture;
   String loadedCourseId = '';
+  String loadedCourseName = '';
   String? statusMessage;
-
-  @override
-  void initState() {
-    super.initState();
-
-    if (widget.session.courses.length == 1) {
-      final courseId = widget.session.courses.first.id;
-      courseIdController.text = courseId;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _loadSummary();
-      });
-    }
-  }
 
   @override
   void dispose() {
@@ -453,17 +435,25 @@ class _CourseActivityPanelState extends State<_CourseActivityPanel> {
     if (courseId.isEmpty) {
       setState(() {
         loadedCourseId = '';
+        loadedCourseName = '';
         summaryFuture = null;
-        statusMessage = 'Please enter a course id first.';
+        statusMessage = 'Enter a course ID to search.';
       });
       return;
     }
 
-    final hasAccess = widget.session.appUser.isSuperAdmin ||
-        widget.session.courses.any((course) => course.id == courseId);
+    final matchingCourses = widget.session.courses.where(
+      (course) => course.id.toLowerCase() == courseId.toLowerCase(),
+    );
+    final matchedCourse = matchingCourses.isEmpty
+        ? null
+        : matchingCourses.first;
+    final hasAccess =
+        widget.session.appUser.isSuperAdmin || matchedCourse != null;
     if (!hasAccess) {
       setState(() {
         loadedCourseId = courseId;
+        loadedCourseName = '';
         summaryFuture = null;
         statusMessage =
             'Course $courseId is not available in this admin session.';
@@ -473,6 +463,7 @@ class _CourseActivityPanelState extends State<_CourseActivityPanel> {
 
     setState(() {
       loadedCourseId = courseId;
+      loadedCourseName = matchedCourse?.name ?? '';
       statusMessage = null;
       summaryFuture = FirestoreChatService.getCourseActivitySummary(
         courseId: courseId,
@@ -519,7 +510,7 @@ class _CourseActivityPanelState extends State<_CourseActivityPanel> {
                           ),
                           SizedBox(height: 2),
                           Text(
-                            'Load one course to count recent messages and uploads.',
+                            'Search by course ID to load only that course.',
                             style: TextStyle(
                               color: AppColors.muted,
                               fontSize: 12,
@@ -537,41 +528,27 @@ class _CourseActivityPanelState extends State<_CourseActivityPanel> {
                     Expanded(
                       child: TextField(
                         controller: courseIdController,
-                        keyboardType: TextInputType.number,
+                        keyboardType: TextInputType.text,
                         textInputAction: TextInputAction.search,
                         decoration: const InputDecoration(
                           labelText: 'Course ID',
-                          hintText: 'Enter course ID',
-                          prefixIcon: Icon(Icons.filter_alt_rounded),
+                          hintText: 'Example: 2329',
+                          prefixIcon: Icon(Icons.search_rounded),
                         ),
                         onSubmitted: (_) => _loadSummary(),
                       ),
                     ),
                     const SizedBox(width: 10),
                     FilledButton.icon(
-                      onPressed: _loadSummary,
-                      icon: const Icon(Icons.insights_rounded),
-                      label: const Text('Show'),
+                      onPressed:
+                          snapshot.connectionState == ConnectionState.waiting
+                          ? null
+                          : _loadSummary,
+                      icon: const Icon(Icons.search_rounded),
+                      label: const Text('Search'),
                     ),
                   ],
                 ),
-                if (widget.session.courses.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: widget.session.courses.map((course) {
-                      return ActionChip(
-                        label: Text(course.id),
-                        avatar: const Icon(Icons.tag_rounded, size: 18),
-                        onPressed: () {
-                          courseIdController.text = course.id;
-                          _loadSummary();
-                        },
-                      );
-                    }).toList(growable: false),
-                  ),
-                ],
                 const SizedBox(height: 14),
                 if (statusMessage != null)
                   Container(
@@ -597,7 +574,7 @@ class _CourseActivityPanelState extends State<_CourseActivityPanel> {
                   )
                 else if (summaryFuture == null)
                   const Text(
-                    'No course loaded yet. Tap a course chip above or enter a course ID.',
+                    'No course loaded. Enter its ID above when you need a summary.',
                     style: TextStyle(
                       color: AppColors.muted,
                       fontWeight: FontWeight.w700,
@@ -613,8 +590,31 @@ class _CourseActivityPanelState extends State<_CourseActivityPanel> {
                       fontWeight: FontWeight.w700,
                     ),
                   )
-                else
+                else ...[
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.menu_book_rounded,
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          loadedCourseName.isEmpty
+                              ? 'Course $loadedCourseId'
+                              : '$loadedCourseName  -  $loadedCourseId',
+                          style: const TextStyle(
+                            color: AppColors.ink,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                   _CourseSummaryGrid(summary: snapshot.data!),
+                ],
               ],
             ),
           ),
