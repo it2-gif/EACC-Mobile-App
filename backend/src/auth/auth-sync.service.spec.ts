@@ -2,6 +2,7 @@ import {
   CourseStatus,
   MembershipStatus,
   UserRole,
+  UserStatus,
 } from '../../generated/prisma/enums';
 
 jest.mock('../database/prisma.service', () => ({
@@ -11,6 +12,10 @@ jest.mock('../database/prisma.service', () => ({
 import { AuthSyncService } from './auth-sync.service';
 
 describe('AuthSyncService', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('upserts the LMS user, active courses, and memberships', async () => {
     const now = new Date('2026-06-18T12:00:00.000Z');
     jest.spyOn(global, 'Date').mockImplementation(() => now);
@@ -82,6 +87,92 @@ describe('AuthSyncService', () => {
     expect(tx.courseMembership.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         create: activeMembershipCreate,
+      }),
+    );
+  });
+
+  it('syncs LMS course students as active student memberships', async () => {
+    const teacher = {
+      id: 'teacher-1',
+      role: UserRole.TEACHER,
+      name: 'Teacher One',
+      email: null,
+    };
+    const student = {
+      id: 'student-1',
+      role: UserRole.STUDENT,
+      name: 'Student One',
+      email: null,
+    };
+    const course = {
+      id: 'course-1',
+      lmsCourseId: '2203',
+      name: 'Preparation IELTS - IELTS',
+      category: 'Preparation',
+    };
+    const tx = {
+      user: {
+        upsert: jest
+          .fn()
+          .mockResolvedValueOnce(teacher)
+          .mockResolvedValueOnce(student),
+      },
+      course: { upsert: jest.fn().mockResolvedValue(course) },
+      courseMembership: { upsert: jest.fn().mockResolvedValue({}) },
+    };
+    const prisma = {
+      $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+
+    const service = new AuthSyncService(prisma as never);
+    await service.syncLmsUser({
+      lmsUserId: 'teacher-lms-id',
+      role: 'teacher',
+      name: 'Teacher One',
+      courses: [
+        {
+          lmsCourseId: '2203',
+          name: 'Preparation IELTS - IELTS',
+          category: 'Preparation',
+          students: [{ lmsUserId: '9001', name: 'Student One' }],
+        },
+      ],
+    });
+
+    expect(tx.user.upsert).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: {
+          lmsSource_lmsUserId_role: {
+            lmsSource: 'eacc_lms',
+            lmsUserId: '9001',
+            role: UserRole.STUDENT,
+          },
+        },
+        create: expect.objectContaining({
+          lmsUserId: '9001',
+          role: UserRole.STUDENT,
+          name: 'Student One',
+          status: UserStatus.ACTIVE,
+        }),
+      }),
+    );
+    expect(tx.courseMembership.upsert).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: {
+          courseId_userId_role: {
+            courseId: 'course-1',
+            userId: 'student-1',
+            role: UserRole.STUDENT,
+          },
+        },
+        create: expect.objectContaining({
+          role: UserRole.STUDENT,
+          status: MembershipStatus.ACTIVE,
+        }),
       }),
     );
   });

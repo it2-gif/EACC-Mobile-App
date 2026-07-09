@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 
@@ -42,9 +43,19 @@ class AuthApi {
   }
 
   Future<Course> fetchCourse(String courseId) async {
+    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+    if (idToken == null) {
+      throw const AuthApiException(
+        'Your secure session expired. Please log in again.',
+      );
+    }
+
     final response = await _client.get(
       Uri.parse('$baseUrl/v1/admin/courses/${Uri.encodeComponent(courseId)}'),
-      headers: const {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
     );
 
     final body = _decodeResponseBody(response.body);
@@ -54,7 +65,6 @@ class AuthApi {
 
     return Course.fromBackendJson(body);
   }
-
 
   Map<String, dynamic> _decodeResponseBody(String rawBody) {
     final trimmed = rawBody.trim();

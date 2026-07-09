@@ -45,7 +45,8 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
     });
 
     try {
-      final course = await AuthApi().fetchCourse(courseId);
+      final sessionCourse = _findSessionCourse(courseId);
+      final course = sessionCourse ?? await AuthApi().fetchCourse(courseId);
       if (mounted) {
         setState(() {
           searchedCourse = course;
@@ -60,6 +61,19 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
         });
       }
     }
+  }
+
+  Course? _findSessionCourse(String courseId) {
+    final normalized = courseId.trim().toLowerCase();
+    if (normalized.isEmpty) return null;
+
+    for (final course in widget.session.courses) {
+      if (course.id.trim().toLowerCase() == normalized) {
+        return course;
+      }
+    }
+
+    return null;
   }
 
   @override
