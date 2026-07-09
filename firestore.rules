@@ -21,6 +21,10 @@ service cloud.firestore {
         && request.auth.token.canViewAllCourses == true;
     }
 
+    function canManageAllChatMessages() {
+      return isSuperAdmin() || canViewAllCourses();
+    }
+
     function isSupportedRole() {
       return isSignedIn()
         && request.auth.token.role in ['student', 'teacher'];
@@ -358,7 +362,7 @@ service cloud.firestore {
           allow update: if isCourseAdmin(courseId)
               ? (
                 (
-                  (isSuperAdmin() || isMessageOwner())
+                  (canManageAllChatMessages() || isMessageOwner())
                   && (isTextMessageEdit() || isSoftMessageDelete())
                 )
                 || isMessageReactionUpdate()

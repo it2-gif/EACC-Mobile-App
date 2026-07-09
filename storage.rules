@@ -12,6 +12,11 @@ service firebase.storage {
         && request.auth.token.isSuperAdmin == true;
     }
 
+    function canViewAllCourses() {
+      return isAdmin()
+        && request.auth.token.canViewAllCourses == true;
+    }
+
     function isSupportedRole() {
       return request.auth != null
         && request.auth.token.role in ['student', 'teacher'];
@@ -30,7 +35,7 @@ service firebase.storage {
 
     function isCourseAdmin(courseId) {
       return isAdmin()
-        && (isSuperAdmin() || hasCourseClaim(courseId));
+        && (isSuperAdmin() || canViewAllCourses() || hasCourseClaim(courseId));
     }
 
     function canAccessThread(courseId, threadId) {

@@ -399,6 +399,7 @@ class PushNotificationService {
           senderName: session.appUser.name,
           threadStudentName: threadStudentName,
           isSuperAdmin: session.appUser.isSuperAdmin,
+          canManageAllMessages: session.appUser.canViewAllCourses,
         ),
       ),
     );

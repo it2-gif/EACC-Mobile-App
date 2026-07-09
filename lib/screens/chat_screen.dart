@@ -22,6 +22,7 @@ class ChatScreen extends StatefulWidget {
   final String senderName;
   final String? threadStudentName;
   final bool isSuperAdmin;
+  final bool canManageAllMessages;
   final bool readOnly;
 
   const ChatScreen({
@@ -33,6 +34,7 @@ class ChatScreen extends StatefulWidget {
     required this.senderName,
     this.threadStudentName,
     this.isSuperAdmin = false,
+    this.canManageAllMessages = false,
     this.readOnly = false,
   });
 
@@ -2162,7 +2164,7 @@ class _ChatScreenState extends State<ChatScreen> {
     required String senderName,
   }) {
     if (widget.readOnly) return false;
-    if (widget.isSuperAdmin) return true;
+    if (widget.isSuperAdmin || widget.canManageAllMessages) return true;
 
     return senderRole == widget.currentUserRole &&
         senderName == widget.senderName;
@@ -2442,6 +2444,7 @@ class _ChatScreenState extends State<ChatScreen> {
         'studentName=$_resolvedStudentName\n'
         'firebaseUid=${user?.uid}, firebaseRole=${token?.claims?['role']}, '
         'firebaseIsSuperAdmin=${token?.claims?['isSuperAdmin']}, '
+        'firebaseCanViewAllCourses=${token?.claims?['canViewAllCourses']}, '
         'firebaseLmsUserId=${token?.claims?['lmsUserId']}, '
         'firebaseDisplayName=${token?.claims?['displayName']}, '
         'firebaseCourseIds=${token?.claims?['courseIds']}',

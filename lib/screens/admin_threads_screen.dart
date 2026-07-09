@@ -78,7 +78,8 @@ class AdminThreadsScreen extends StatelessWidget {
                           threadId: FirestoreChatService.announcementThreadId,
                           senderName: session.appUser.name,
                           isSuperAdmin: session.appUser.isSuperAdmin,
-                          readOnly: session.appUser.isManagerOperation,
+                          canManageAllMessages:
+                              session.appUser.canViewAllCourses,
                         ),
                       ),
                     ),
@@ -104,7 +105,8 @@ class AdminThreadsScreen extends StatelessWidget {
                           threadId: FirestoreChatService.adminTeacherThreadId,
                           senderName: session.appUser.name,
                           isSuperAdmin: session.appUser.isSuperAdmin,
-                          readOnly: session.appUser.isManagerOperation,
+                          canManageAllMessages:
+                              session.appUser.canViewAllCourses,
                         ),
                       ),
                     ),
@@ -134,7 +136,8 @@ class AdminThreadsScreen extends StatelessWidget {
                           senderName: session.appUser.name,
                           threadStudentName: student.name,
                           isSuperAdmin: session.appUser.isSuperAdmin,
-                          readOnly: session.appUser.isManagerOperation,
+                          canManageAllMessages:
+                              session.appUser.canViewAllCourses,
                         ),
                       ),
                     ),
@@ -158,7 +161,8 @@ class AdminThreadsScreen extends StatelessWidget {
                           senderName: session.appUser.name,
                           threadStudentName: student.name,
                           isSuperAdmin: session.appUser.isSuperAdmin,
-                          readOnly: session.appUser.isManagerOperation,
+                          canManageAllMessages:
+                              session.appUser.canViewAllCourses,
                         ),
                       ),
                     ),
