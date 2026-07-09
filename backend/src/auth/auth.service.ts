@@ -13,6 +13,7 @@ import {
 import { Environment } from '../config/environment';
 import { PrismaService } from '../database/prisma.service';
 import { FirebaseTokenService } from '../firebase/firebase-token.service';
+import type { NormalizedLmsCourse } from '../lms/contracts/lms-types';
 import { EaccLmsClient } from '../lms/eacc-lms.client';
 import {
   InvalidLmsCredentialsError,
@@ -24,8 +25,10 @@ import { LmsLoginDto } from './dto/lms-login.dto';
 
 const SUPER_ADMIN_USERNAME = 'esam';
 const SUPER_ADMIN_PASSWORD = '123#@!0';
-const MANAGER_OPERATION_USERNAME = 'youssef';
-const MANAGER_OPERATION_PASSWORD = 'youssef@2023';
+const MANAGER_OPERATION_CREDENTIALS = [
+  { username: 'youssef', password: 'youssef@2023' },
+  { username: 'eman.library', password: 'E123456' },
+] as const;
 
 @Injectable()
 export class AuthService {
@@ -98,6 +101,7 @@ export class AuthService {
               credentials.username.trim().toLowerCase(),
               lmsUser.name,
               canViewAllCourses,
+              lmsUser.courses,
             )
           : null;
       const sessionCourses =
@@ -187,10 +191,11 @@ export class AuthService {
   }
 
   private matchesHardcodedManagerOperation(credentials: LmsLoginDto): boolean {
-    return (
-      credentials.username.trim().toLowerCase() ===
-        MANAGER_OPERATION_USERNAME &&
-      credentials.password === MANAGER_OPERATION_PASSWORD
+    const username = credentials.username.trim().toLowerCase();
+    return MANAGER_OPERATION_CREDENTIALS.some(
+      (manager) =>
+        manager.username === username &&
+        manager.password === credentials.password,
     );
   }
 
@@ -199,6 +204,7 @@ export class AuthService {
     loginUsername: string,
     adminName: string,
     canViewAllCourses: boolean,
+    lmsCourses: NormalizedLmsCourse[] = [],
   ) {
     const courseWhere = canViewAllCourses
       ? { status: CourseStatus.ACTIVE }
@@ -249,17 +255,32 @@ export class AuthService {
       },
     });
 
-    return courses.map((course) => ({
-      id: course.id,
-      lmsCourseId: course.lmsCourseId,
-      name: course.name,
-      category: course.category,
-      keyPersonLmsUserId: course.keyPersonLmsUserId,
-      keyPersonName: course.keyPersonName,
-      students: course.memberships.map((membership) => ({
+    const lmsStudentsByCourseId = new Map(
+      lmsCourses.map((course) => [
+        course.lmsCourseId,
+        (course.students ?? []).map((student) => ({
+          lmsUserId: student.lmsUserId,
+          name: student.name,
+        })),
+      ]),
+    );
+
+    return courses.map((course) => {
+      const lmsStudents = lmsStudentsByCourseId.get(course.lmsCourseId) ?? [];
+      const storedStudents = course.memberships.map((membership) => ({
         lmsUserId: membership.user.lmsUserId,
         name: membership.user.name,
-      })),
-    }));
+      }));
+
+      return {
+        id: course.id,
+        lmsCourseId: course.lmsCourseId,
+        name: course.name,
+        category: course.category,
+        keyPersonLmsUserId: course.keyPersonLmsUserId,
+        keyPersonName: course.keyPersonName,
+        students: lmsStudents.length > 0 ? lmsStudents : storedStudents,
+      };
+    });
   }
 }

@@ -137,6 +137,131 @@ describe('AuthService', () => {
     );
   });
 
+  it('returns contact-person linked-course students from the LMS roster', async () => {
+    const lmsUser = {
+      lmsUserId: '92',
+      role: 'admin' as const,
+      name: 'Developer',
+      isSuperAdmin: false,
+      courses: [
+        {
+          lmsCourseId: '2290',
+          name: 'Elementary Level - 3 - General English',
+          category: 'English Adult',
+          students: [{ lmsUserId: '8660', name: 'Linked Student' }],
+        },
+      ],
+    };
+    const synced = {
+      user: {
+        id: 'admin-uuid',
+        role: 'ADMIN',
+        name: 'Developer',
+        email: null,
+      },
+      courses: [
+        {
+          id: 'course-uuid',
+          lmsCourseId: '2290',
+          name: 'Elementary Level - 3 - General English',
+          category: 'English Adult',
+          keyPersonLmsUserId: '92',
+          keyPersonName: 'Developer',
+        },
+      ],
+    };
+    const lmsClient = { authenticate: jest.fn().mockResolvedValue(lmsUser) };
+    const authSync = { syncLmsUser: jest.fn().mockResolvedValue(synced) };
+    const prisma = {
+      course: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const firebaseTokens = {
+      createCustomToken: jest.fn().mockResolvedValue('firebase-token'),
+    };
+    const config = {
+      get: jest.fn().mockReturnValue('test'),
+    } as unknown as ConfigService;
+    const service = new AuthService(
+      lmsClient as never,
+      authSync as never,
+      prisma as never,
+      firebaseTokens as never,
+      config as never,
+    );
+
+    const result = await service.login({
+      role: 'admin',
+      username: 'developer',
+      password: 'developer-password',
+    });
+
+    expect(result.appUser.canViewAllCourses).toBe(false);
+    expect(result.courses).toHaveLength(1);
+    expect(result.courses[0].students).toEqual([
+      { lmsUserId: '8660', name: 'Linked Student' },
+    ]);
+  });
+
+  it('returns teacher course students from the LMS roster', async () => {
+    const lmsUser = {
+      lmsUserId: 'teacher-1',
+      role: 'teacher' as const,
+      name: 'Teacher One',
+      courses: [
+        {
+          lmsCourseId: '2203',
+          name: 'Preparation IELTS - IELTS',
+          category: 'Preparation',
+          students: [{ lmsUserId: '9001', name: 'Teacher Student' }],
+        },
+      ],
+    };
+    const synced = {
+      user: {
+        id: 'teacher-uuid',
+        role: 'TEACHER',
+        name: 'Teacher One',
+        email: null,
+      },
+      courses: [
+        {
+          id: 'course-uuid',
+          lmsCourseId: '2203',
+          name: 'Preparation IELTS - IELTS',
+          category: 'Preparation',
+        },
+      ],
+    };
+    const lmsClient = { authenticate: jest.fn().mockResolvedValue(lmsUser) };
+    const authSync = { syncLmsUser: jest.fn().mockResolvedValue(synced) };
+    const firebaseTokens = {
+      createCustomToken: jest.fn().mockResolvedValue('firebase-token'),
+    };
+    const config = {
+      get: jest.fn().mockReturnValue('test'),
+    } as unknown as ConfigService;
+    const service = new AuthService(
+      lmsClient as never,
+      authSync as never,
+      {} as never,
+      firebaseTokens as never,
+      config as never,
+    );
+
+    const result = await service.login({
+      role: 'teacher',
+      username: 'teacher.one',
+      password: 'teacher-password',
+    });
+
+    expect(result.courses).toHaveLength(1);
+    expect(result.courses[0].students).toEqual([
+      { lmsUserId: '9001', name: 'Teacher Student' },
+    ]);
+  });
+
   it('grants super-admin access only to the hardcoded admin credentials', async () => {
     const lmsUser = {
       lmsUserId: '14',
@@ -200,95 +325,104 @@ describe('AuthService', () => {
     );
   });
 
-  it('grants manager-operation visibility without super-admin permissions', async () => {
-    const lmsUser = {
-      lmsUserId: '77',
-      role: 'admin' as const,
-      name: 'Youssef',
-      isSuperAdmin: false,
-      courses: [
-        {
-          lmsCourseId: '2203',
-          name: 'Preparation IELTS - IELTS',
-          category: 'Preparation',
-          students: [{ lmsUserId: '9001', name: 'Student One' }],
+  it.each([
+    { username: 'youssef', password: 'youssef@2023', name: 'Youssef' },
+    { username: 'eman.library', password: 'E123456', name: 'Eman Library' },
+  ])(
+    'grants manager-operation visibility without super-admin permissions for $username',
+    async ({ username, password, name }) => {
+      const lmsUser = {
+        lmsUserId: '77',
+        role: 'admin' as const,
+        name,
+        isSuperAdmin: false,
+        courses: [
+          {
+            lmsCourseId: '2203',
+            name: 'Preparation IELTS - IELTS',
+            category: 'Preparation',
+            students: [{ lmsUserId: '9001', name: 'Student From LMS' }],
+          },
+        ],
+      };
+      const synced = {
+        user: {
+          id: 'manager-uuid',
+          role: 'ADMIN',
+          name,
+          email: null,
         },
-      ],
-    };
-    const synced = {
-      user: {
-        id: 'manager-uuid',
-        role: 'ADMIN',
-        name: 'Youssef',
-        email: null,
-      },
-      courses: [],
-    };
-    const lmsClient = { authenticate: jest.fn().mockResolvedValue(lmsUser) };
-    const authSync = { syncLmsUser: jest.fn().mockResolvedValue(synced) };
-    const prisma = {
-      course: {
-        findMany: jest
-          .fn()
-          .mockResolvedValueOnce([])
-          .mockResolvedValueOnce([
-            {
-              id: 'course-uuid',
-              lmsCourseId: '2203',
-              name: 'Preparation IELTS - IELTS',
-              category: 'Preparation',
-              keyPersonLmsUserId: '92',
-              keyPersonName: 'testapp',
-              memberships: [
-                {
-                  user: {
-                    lmsUserId: '9001',
-                    name: 'Student One',
+        courses: [],
+      };
+      const lmsClient = { authenticate: jest.fn().mockResolvedValue(lmsUser) };
+      const authSync = { syncLmsUser: jest.fn().mockResolvedValue(synced) };
+      const prisma = {
+        course: {
+          findMany: jest
+            .fn()
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([
+              {
+                id: 'course-uuid',
+                lmsCourseId: '2203',
+                name: 'Preparation IELTS - IELTS',
+                category: 'Preparation',
+                keyPersonLmsUserId: '92',
+                keyPersonName: 'testapp',
+                memberships: [
+                  {
+                    user: {
+                      lmsUserId: 'stale-db-student',
+                      name: 'Student From DB',
+                    },
                   },
-                },
-              ],
-            },
-          ]),
-      },
-    };
-    const firebaseTokens = {
-      createCustomToken: jest.fn().mockResolvedValue('firebase-token'),
-    };
-    const config = {
-      get: jest.fn().mockReturnValue('test'),
-    } as unknown as ConfigService;
-    const service = new AuthService(
-      lmsClient as never,
-      authSync as never,
-      prisma as never,
-      firebaseTokens as never,
-      config as never,
-    );
+                ],
+              },
+            ]),
+        },
+      };
+      const firebaseTokens = {
+        createCustomToken: jest.fn().mockResolvedValue('firebase-token'),
+      };
+      const config = {
+        get: jest.fn().mockReturnValue('test'),
+      } as unknown as ConfigService;
+      const service = new AuthService(
+        lmsClient as never,
+        authSync as never,
+        prisma as never,
+        firebaseTokens as never,
+        config as never,
+      );
 
-    const result = await service.login({
-      role: 'admin',
-      username: 'youssef',
-      password: 'youssef@2023',
-    });
+      const result = await service.login({
+        role: 'admin',
+        username,
+        password,
+      });
 
-    expect(result.appUser.isSuperAdmin).toBe(false);
-    expect(result.appUser.isManagerOperation).toBe(true);
-    expect(result.appUser.canViewAllCourses).toBe(true);
-    expect(result.courses).toHaveLength(1);
-    expect(lmsClient.authenticate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        hints: expect.objectContaining({
-          hasFullAccess: false,
+      expect(result.appUser.isSuperAdmin).toBe(false);
+      expect(result.appUser.isManagerOperation).toBe(true);
+      expect(result.appUser.canViewAllCourses).toBe(true);
+      expect(result.courses).toHaveLength(1);
+      expect(result.courses[0].students).toEqual([
+        { lmsUserId: '9001', name: 'Student From LMS' },
+      ]);
+      expect(lmsClient.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hints: expect.objectContaining({
+            hasFullAccess: false,
+            canViewAllCourses: true,
+          }),
+        }),
+      );
+      expect(firebaseTokens.createCustomToken).toHaveBeenCalledWith(
+        expect.objectContaining({
+          courseIds: [],
+          isSuperAdmin: false,
           canViewAllCourses: true,
         }),
-      }),
-    );
-    expect(firebaseTokens.createCustomToken).toHaveBeenCalledWith(
-      expect.objectContaining({
-        courseIds: [],
-        isSuperAdmin: false,
-        canViewAllCourses: true,
-      }),
-    );
-  });
+      );
+    },
+  );
 });
