@@ -239,9 +239,9 @@ class FirestoreChatService {
   static Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
   getRecentCourseMessagesForModeration({
     required String courseId,
-    int maxThreads = 60,
-    int messagesPerThread = 12,
-    int limit = 80,
+    int maxThreads = 20,
+    int messagesPerThread = 5,
+    int limit = 100,
   }) async {
     final normalizedCourseId = courseId.trim();
     if (normalizedCourseId.isEmpty) return [];

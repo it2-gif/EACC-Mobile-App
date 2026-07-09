@@ -62,7 +62,7 @@ class CourseCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            course.name,
+                            course.displayName,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -76,17 +76,19 @@ class CourseCard extends StatelessWidget {
                         const Icon(Icons.chevron_right, color: AppColors.muted),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      course.category,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 13,
-                        height: 1.2,
+                    if (course.displayCategory != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        course.displayCategory!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 13,
+                          height: 1.2,
+                        ),
                       ),
-                    ),
+                    ],
                     const SizedBox(height: 10),
                     Wrap(
                       spacing: 8,

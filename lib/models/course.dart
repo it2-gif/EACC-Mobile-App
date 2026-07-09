@@ -17,6 +17,33 @@ class Course {
     this.students = const [],
   });
 
+  String get displayName {
+    final normalizedName = name.trim();
+    final normalizedCategory = category.trim();
+    final genericName = RegExp(
+      '^course\\s+${RegExp.escape(id.trim())}\$',
+      caseSensitive: false,
+    ).hasMatch(normalizedName);
+
+    if (genericName &&
+        normalizedCategory.isNotEmpty &&
+        normalizedCategory.toLowerCase() != 'course') {
+      return normalizedCategory;
+    }
+
+    return normalizedName.isEmpty ? 'Course $id' : normalizedName;
+  }
+
+  String? get displayCategory {
+    final normalizedCategory = category.trim();
+    if (normalizedCategory.isEmpty ||
+        normalizedCategory.toLowerCase() == 'course' ||
+        normalizedCategory.toLowerCase() == displayName.toLowerCase()) {
+      return null;
+    }
+    return normalizedCategory;
+  }
+
   factory Course.fromBackendJson(Map<String, dynamic> json) {
     final students = json['students'] as List<dynamic>? ?? [];
     final category = (json['category'] as String?) ?? 'Course';

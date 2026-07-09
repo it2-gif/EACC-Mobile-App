@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../models/auth_session.dart';
-import '../services/admin_api.dart';
 import '../services/firestore_chat_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
@@ -17,39 +16,44 @@ class AdminAnalysisScreen extends StatefulWidget {
 }
 
 class _AdminAnalysisScreenState extends State<AdminAnalysisScreen> {
-  late Future<_AnalysisData> analysisFuture;
+  static const analysisCacheDuration = Duration(minutes: 15);
+  static _AnalysisData? cachedAnalysis;
+  static DateTime? cachedAnalysisAt;
 
-  @override
-  void initState() {
-    super.initState();
-    analysisFuture = _loadAnalysis();
-  }
+  Future<_AnalysisData>? analysisFuture;
 
-  Future<_AnalysisData> _loadAnalysis() async {
-    List<AdminUser>? users;
-    String? usersError;
-
-    try {
-      users = await AdminApi().listUsers();
-    } catch (error) {
-      usersError = error.toString();
+  Future<_AnalysisData> _loadAnalysis({bool forceRefresh = false}) async {
+    final cached = cachedAnalysis;
+    final cachedAt = cachedAnalysisAt;
+    if (!forceRefresh &&
+        cached != null &&
+        cachedAt != null &&
+        DateTime.now().difference(cachedAt) < analysisCacheDuration) {
+      return cached;
     }
 
     final activity = await FirestoreChatService.getApplicationActivitySummary(
       courseIds: widget.session.courses.map((course) => course.id),
     );
 
-    return _AnalysisData.fromSession(
+    final analysis = _AnalysisData.fromSession(
       session: widget.session,
       activity: activity,
-      users: users,
-      usersError: usersError,
     );
+    cachedAnalysis = analysis;
+    cachedAnalysisAt = DateTime.now();
+    return analysis;
+  }
+
+  void _generate() {
+    setState(() {
+      analysisFuture = _loadAnalysis();
+    });
   }
 
   void _refresh() {
     setState(() {
-      analysisFuture = _loadAnalysis();
+      analysisFuture = _loadAnalysis(forceRefresh: true);
     });
   }
 
@@ -67,11 +71,13 @@ class _AdminAnalysisScreenState extends State<AdminAnalysisScreen> {
               ScreenHeader(
                 title: 'Application analysis',
                 subtitle:
-                    'A clean overview of LMS users, courses, chats, messages, and uploads.',
+                    'Live totals load only when requested to avoid repeated Firestore reads.',
                 icon: Icons.analytics_rounded,
               ),
               const SizedBox(height: 18),
-              if (snapshot.connectionState == ConnectionState.waiting)
+              if (analysisFuture == null)
+                _AnalysisIdle(onLoad: _generate)
+              else if (snapshot.connectionState == ConnectionState.waiting)
                 const _AnalysisLoading()
               else if (snapshot.hasError)
                 _AnalysisError(error: '${snapshot.error}', onRetry: _refresh)
@@ -98,7 +104,6 @@ class _AnalysisData {
   final int documents;
   final int voiceMessages;
   final int uploadedBytes;
-  final String? usersError;
 
   const _AnalysisData({
     required this.courses,
@@ -113,14 +118,11 @@ class _AnalysisData {
     required this.documents,
     required this.voiceMessages,
     required this.uploadedBytes,
-    this.usersError,
   });
 
   factory _AnalysisData.fromSession({
     required AuthSession session,
     required ApplicationActivitySummary activity,
-    required List<AdminUser>? users,
-    required String? usersError,
   }) {
     final uniqueStudents = <String>{};
     final uniqueTeachers = <String>{};
@@ -136,22 +138,12 @@ class _AnalysisData {
       }
     }
 
-    final students = users != null
-        ? users.where((user) => user.role == 'student').length
-        : uniqueStudents.length;
-    final teachers = users != null
-        ? users.where((user) => user.role == 'teacher').length
-        : uniqueTeachers.length;
-    final admins = users != null
-        ? users.where((user) => user.role == 'admin').length
-        : 1;
-
     return _AnalysisData(
       courses: session.courses.length,
       chats: activity.chats,
-      students: students,
-      teachers: teachers,
-      admins: admins,
+      students: uniqueStudents.length,
+      teachers: uniqueTeachers.length,
+      admins: 1,
       messages: activity.messages,
       uploads: activity.uploads,
       images: activity.images,
@@ -159,7 +151,6 @@ class _AnalysisData {
       documents: activity.documents,
       voiceMessages: activity.voiceMessages,
       uploadedBytes: activity.uploadedBytes,
-      usersError: usersError,
     );
   }
 
@@ -178,10 +169,6 @@ class _AnalysisContent extends StatelessWidget {
       children: [
         _OverviewHero(data: data, onRefresh: onRefresh),
         const SizedBox(height: 14),
-        if (data.usersError != null) ...[
-          _WarningBanner(message: data.usersError!),
-          const SizedBox(height: 14),
-        ],
         _CostUsagePanel(data: data),
         const SizedBox(height: 18),
         _SectionTitle(
@@ -850,40 +837,6 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-class _WarningBanner extends StatelessWidget {
-  final String message;
-
-  const _WarningBanner({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.admin.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.admin.withValues(alpha: 0.22)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.info_outline_rounded, color: AppColors.admin),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'User counts used the LMS session fallback. Backend users could not load: $message',
-              style: const TextStyle(
-                color: AppColors.ink,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 double _safeRatio(int value, int limit) {
   if (limit <= 0) return 0;
   return (value / limit).clamp(0.0, 1.0);
@@ -915,6 +868,56 @@ _UsageStatus _usageStatus(double ratio) {
   }
 
   return const _UsageStatus(label: 'Healthy', color: AppColors.success);
+}
+
+class _AnalysisIdle extends StatelessWidget {
+  final VoidCallback onLoad;
+
+  const _AnalysisIdle({required this.onLoad});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(
+                Icons.query_stats_rounded,
+                color: AppColors.primary,
+                size: 30,
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Generate a live report when you need it',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Opening this screen uses no Firestore message reads. A live report scans current app activity once.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.muted, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: onLoad,
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: const Text('Generate live report'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _AnalysisLoading extends StatelessWidget {

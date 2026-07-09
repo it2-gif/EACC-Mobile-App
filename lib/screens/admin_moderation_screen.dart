@@ -57,7 +57,7 @@ class _AdminModerationScreenState extends State<AdminModerationScreen> {
                 icon: Icons.filter_alt_rounded,
                 title: 'Choose a course first',
                 message:
-                    'Enter a course ID to review and moderate messages from that course only.',
+                    'Enter a course ID to load its 100 most recent messages only.',
               ),
             );
           }
@@ -434,7 +434,7 @@ class _ModerationToolbar extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            '$visibleCount messages shown from course $loadedCourseId',
+            '$visibleCount recent messages from course $loadedCourseId',
             style: const TextStyle(
               color: AppColors.muted,
               fontWeight: FontWeight.w700,

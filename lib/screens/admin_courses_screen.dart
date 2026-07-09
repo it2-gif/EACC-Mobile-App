@@ -335,7 +335,7 @@ class _AdminCourseCardState extends State<_AdminCourseCard> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       PushNotificationService.instance.showInAppNotification(
-        title: widget.course.name,
+        title: widget.course.displayName,
         body: 'You have new unread messages in this course.',
         onOpen: _openThreads,
       );
@@ -348,7 +348,7 @@ class _AdminCourseCardState extends State<_AdminCourseCard> {
       MaterialPageRoute(
         builder: (_) => AdminThreadsScreen(
           courseId: widget.course.id,
-          courseName: widget.course.name,
+          courseName: widget.course.displayName,
           teacherName: widget.course.teacherName,
           students: widget.course.students,
           session: widget.session,
