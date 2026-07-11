@@ -78,3 +78,4 @@ app.*.map.json
 /android/app/release
 /android/build/
 /android/hs_err_pid*.log
+/notepad .gitignore

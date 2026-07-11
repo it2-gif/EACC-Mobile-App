@@ -23,6 +23,7 @@
     "prisma:validate": "prisma validate",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
+    "wipe:chat-data": "ts-node scripts/wipe-chat-data.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

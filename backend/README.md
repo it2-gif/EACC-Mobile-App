@@ -61,6 +61,16 @@ Request:
 }
 ```
 
+Chat wipe command:
+
+```powershell
+$env:CONFIRM_WIPE='DELETE_CHAT_DATA_NOW'
+npm.cmd run wipe:chat-data
+```
+
+This deletes Firestore chat threads/messages under `courses/*/threads/*` and
+all Firebase Storage files under `chat_uploads/`.
+
 ## Current Scope
 
 Implemented:
