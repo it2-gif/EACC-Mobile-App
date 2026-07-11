@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/course_card.dart';
 import '../widgets/screen_header.dart';
+import '../widgets/support_entry_card.dart';
 import 'teacher_threads_screen.dart';
 
 class TeacherCoursesScreen extends StatelessWidget {
@@ -19,6 +20,7 @@ class TeacherCoursesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppScaffold(
       title: 'Teacher Courses',
+      floatingActionButton: SupportHelpButton(session: session),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [

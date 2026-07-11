@@ -77,6 +77,7 @@ describe('AuthService', () => {
       courseIds: ['2191'],
       isSuperAdmin: false,
       canViewAllCourses: false,
+      isTechnicalSupport: false,
     });
     expect(result.firebase).toEqual({ customToken: 'firebase-token' });
     expect(result.nextStep).toBe('ready');

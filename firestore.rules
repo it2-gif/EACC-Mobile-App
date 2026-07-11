@@ -25,6 +25,11 @@ service cloud.firestore {
       return isSuperAdmin() || canViewAllCourses();
     }
 
+    function isTechnicalSupport() {
+      return isSignedIn()
+        && request.auth.token.isTechnicalSupport == true;
+    }
+
     function isSupportedRole() {
       return isSignedIn()
         && request.auth.token.role in ['student', 'teacher'];
@@ -215,6 +220,65 @@ service cloud.firestore {
         && resource.data.sender_name == request.auth.token.displayName;
     }
 
+    function isOwnSupportThread(threadId) {
+      return isSignedIn()
+        && threadId == 'support_' + request.auth.token.role + '_' + request.auth.token.lmsUserId;
+    }
+
+    function canAccessSupportThread(threadId) {
+      return isTechnicalSupport() || isOwnSupportThread(threadId);
+    }
+
+    function isSupportThreadMessageWrite(threadId) {
+      return canAccessSupportThread(threadId)
+        && request.resource.data.thread_id == threadId
+        && request.resource.data.last_message is string
+        && request.resource.data.last_message.size() > 0
+        && request.resource.data.last_sender_name == request.auth.token.displayName
+        && request.resource.data.last_message_at == request.time
+        && request.resource.data.updated_at == request.time
+        && (
+          (
+            isTechnicalSupport()
+            && request.resource.data.last_sender_role == 'support'
+            && request.resource.data.support_unread_count == 0
+          )
+          ||
+          (
+            !isTechnicalSupport()
+            && request.resource.data.last_sender_role == request.auth.token.role
+            && request.resource.data.user_unread_count == 0
+          )
+        );
+    }
+
+    function isSupportThreadReadUpdate(threadId) {
+      return canAccessSupportThread(threadId)
+        && request.resource.data.thread_id == threadId
+        && request.resource.data.updated_at == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'thread_id',
+          'support_unread_count',
+          'support_last_read_at',
+          'user_unread_count',
+          'user_last_read_at',
+          'updated_at'
+        ])
+        && (
+          (
+            isTechnicalSupport()
+            && request.resource.data.support_unread_count == 0
+            && request.resource.data.support_last_read_at == request.time
+          )
+          ||
+          (
+            !isTechnicalSupport()
+            && request.resource.data.user_unread_count == 0
+            && request.resource.data.user_last_read_at == request.time
+          )
+        );
+    }
+
     function isTextMessageEdit() {
       return resource.data.type == 'text'
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -379,6 +443,36 @@ service cloud.firestore {
                 );
           allow delete: if false;
         }
+      }
+    }
+
+    match /support_threads/{threadId} {
+      allow read: if canAccessSupportThread(threadId);
+      allow create: if isSupportThreadMessageWrite(threadId);
+      allow update: if isSupportThreadMessageWrite(threadId)
+        || isSupportThreadReadUpdate(threadId);
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if canAccessSupportThread(threadId);
+        allow create: if canAccessSupportThread(threadId)
+          && request.resource.data.type == 'text'
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.sender_name == request.auth.token.displayName
+          && request.resource.data.created_at == request.time
+          && (
+            (
+              isTechnicalSupport()
+              && request.resource.data.sender_role == 'support'
+            )
+            ||
+            (
+              !isTechnicalSupport()
+              && request.resource.data.sender_role == request.auth.token.role
+            )
+          );
+        allow update, delete: if false;
       }
     }
 

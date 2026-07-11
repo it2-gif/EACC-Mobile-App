@@ -10,6 +10,7 @@ class AppScaffold extends StatelessWidget {
   final String title;
   final Widget body;
   final List<Widget>? actions;
+  final Widget? floatingActionButton;
   final bool showLogout;
 
   const AppScaffold({
@@ -17,6 +18,7 @@ class AppScaffold extends StatelessWidget {
     required this.title,
     required this.body,
     this.actions,
+    this.floatingActionButton,
     this.showLogout = true,
   });
 
@@ -107,6 +109,7 @@ class AppScaffold extends StatelessWidget {
           ),
         ),
       ),
+      floatingActionButton: floatingActionButton,
     );
   }
 }

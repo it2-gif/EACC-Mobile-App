@@ -24,6 +24,7 @@ export interface FirebaseIdentity {
   courseIds: string[];
   isSuperAdmin?: boolean;
   canViewAllCourses?: boolean;
+  isTechnicalSupport?: boolean;
 }
 
 @Injectable()
@@ -44,6 +45,7 @@ export class FirebaseAuthService {
       isSuperAdmin: identity.role === 'admin' && identity.isSuperAdmin === true,
       canViewAllCourses:
         identity.role === 'admin' && identity.canViewAllCourses === true,
+      isTechnicalSupport: identity.isTechnicalSupport === true,
     });
   }
 

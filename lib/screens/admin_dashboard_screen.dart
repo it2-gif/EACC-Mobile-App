@@ -4,6 +4,7 @@ import '../models/auth_session.dart';
 import '../services/firestore_chat_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/support_entry_card.dart';
 import 'admin_analysis_screen.dart';
 import 'admin_announcements_screen.dart';
 import 'admin_audit_screen.dart';
@@ -23,6 +24,7 @@ class AdminDashboardScreen extends StatelessWidget {
     return AppScaffold(
       title: 'EACC Admin',
       showLogout: true,
+      floatingActionButton: SupportHelpButton(session: session),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [

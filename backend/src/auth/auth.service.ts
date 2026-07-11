@@ -25,6 +25,8 @@ import { LmsLoginDto } from './dto/lms-login.dto';
 
 const SUPER_ADMIN_USERNAME = 'esam';
 const SUPER_ADMIN_PASSWORD = '123#@!0';
+const TECHNICAL_SUPPORT_USERNAME = 'abdelrahman';
+const TECHNICAL_SUPPORT_PASSWORD = 'Casillas2004';
 const MANAGER_OPERATION_CREDENTIALS = [
   { username: 'youssef', password: 'youssef@2023' },
   { username: 'eman.library', password: 'E123456' },
@@ -48,8 +50,13 @@ export class AuthService {
       const hasManagerOperationCredentials =
         credentials.role === 'admin' &&
         this.matchesHardcodedManagerOperation(credentials);
+      const hasTechnicalSupportCredentials =
+        credentials.role === 'admin' &&
+        this.matchesHardcodedTechnicalSupport(credentials);
       const canViewAllCourses =
-        hasSuperAdminCredentials || hasManagerOperationCredentials;
+        hasSuperAdminCredentials ||
+        hasManagerOperationCredentials ||
+        hasTechnicalSupportCredentials;
 
       // For admin logins, pre-fetch course IDs that are ALREADY known to belong
       // to this admin in our DB. These are passed as hints to the LMS client so
@@ -83,7 +90,8 @@ export class AuthService {
           ? {
               hints: {
                 ...(knownCourseIds ? { knownCourseIds } : {}),
-                hasFullAccess: hasSuperAdminCredentials,
+                hasFullAccess:
+                  hasSuperAdminCredentials || hasTechnicalSupportCredentials,
                 canViewAllCourses,
               },
             }
@@ -94,6 +102,7 @@ export class AuthService {
         lmsUser.role === 'admin' && hasSuperAdminCredentials;
       const isManagerOperation =
         lmsUser.role === 'admin' && hasManagerOperationCredentials;
+      const isTechnicalSupport = hasTechnicalSupportCredentials;
       const adminCourses =
         lmsUser.role === 'admin' && canViewAllCourses
           ? await this.loadAdminCourses(
@@ -130,6 +139,7 @@ export class AuthService {
         courseIds,
         isSuperAdmin,
         canViewAllCourses,
+        isTechnicalSupport,
       });
 
       return {
@@ -139,6 +149,7 @@ export class AuthService {
           isSuperAdmin,
           isManagerOperation,
           canViewAllCourses,
+          isTechnicalSupport,
         },
         appUser: {
           id: synced.user.id,
@@ -148,6 +159,7 @@ export class AuthService {
           isSuperAdmin,
           isManagerOperation,
           canViewAllCourses,
+          isTechnicalSupport,
         },
         courses: sessionCourses,
         firebase: { customToken: firebaseCustomToken },
@@ -196,6 +208,14 @@ export class AuthService {
       (manager) =>
         manager.username === username &&
         manager.password === credentials.password,
+    );
+  }
+
+  private matchesHardcodedTechnicalSupport(credentials: LmsLoginDto): boolean {
+    return (
+      credentials.username.trim().toLowerCase() ===
+        TECHNICAL_SUPPORT_USERNAME &&
+      credentials.password === TECHNICAL_SUPPORT_PASSWORD
     );
   }
 

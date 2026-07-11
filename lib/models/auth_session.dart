@@ -51,6 +51,7 @@ class LmsUser {
   final bool isSuperAdmin;
   final bool isManagerOperation;
   final bool canViewAllCourses;
+  final bool isTechnicalSupport;
 
   const LmsUser({
     required this.lmsUserId,
@@ -59,6 +60,7 @@ class LmsUser {
     this.isSuperAdmin = false,
     this.isManagerOperation = false,
     this.canViewAllCourses = false,
+    this.isTechnicalSupport = false,
   });
 
   factory LmsUser.fromJson(Map<String, dynamic> json) {
@@ -71,6 +73,7 @@ class LmsUser {
       name: json['name'] as String,
       isSuperAdmin: isSuperAdmin,
       isManagerOperation: isManagerOperation,
+      isTechnicalSupport: json['isTechnicalSupport'] == true,
       canViewAllCourses:
           json['canViewAllCourses'] == true ||
           isSuperAdmin ||
@@ -86,6 +89,7 @@ class LmsUser {
       'isSuperAdmin': isSuperAdmin,
       'isManagerOperation': isManagerOperation,
       'canViewAllCourses': canViewAllCourses,
+      'isTechnicalSupport': isTechnicalSupport,
     };
   }
 }
@@ -98,6 +102,7 @@ class AppUser {
   final bool isSuperAdmin;
   final bool isManagerOperation;
   final bool canViewAllCourses;
+  final bool isTechnicalSupport;
 
   const AppUser({
     required this.id,
@@ -107,6 +112,7 @@ class AppUser {
     this.isSuperAdmin = false,
     this.isManagerOperation = false,
     this.canViewAllCourses = false,
+    this.isTechnicalSupport = false,
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json) {
@@ -121,6 +127,7 @@ class AppUser {
       email: email is String && email.isNotEmpty ? email : null,
       isSuperAdmin: isSuperAdmin,
       isManagerOperation: isManagerOperation,
+      isTechnicalSupport: json['isTechnicalSupport'] == true,
       canViewAllCourses:
           json['canViewAllCourses'] == true ||
           isSuperAdmin ||
@@ -137,6 +144,7 @@ class AppUser {
       'isSuperAdmin': isSuperAdmin,
       'isManagerOperation': isManagerOperation,
       'canViewAllCourses': canViewAllCourses,
+      'isTechnicalSupport': isTechnicalSupport,
     };
   }
 }
