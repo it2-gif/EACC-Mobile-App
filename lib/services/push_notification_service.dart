@@ -33,9 +33,11 @@ class PushNotificationService {
   bool _listenersAttached = false;
   bool _openedInitialMessage = false;
   String? _registeredToken;
+  DateTime? _suppressInAppBannersUntil;
 
   Future<void> initialize({AuthSession? initialSession}) async {
     _session = initialSession;
+    suppressInAppBanners(const Duration(seconds: 8));
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     _attachListeners();
     if (initialSession != null) {
@@ -104,6 +106,10 @@ class PushNotificationService {
     _registeredToken = null;
   }
 
+  void suppressInAppBanners(Duration duration) {
+    _suppressInAppBannersUntil = DateTime.now().add(duration);
+  }
+
   void showInAppNotification({
     required String title,
     String? body,
@@ -111,6 +117,10 @@ class PushNotificationService {
     bool playSound = true,
   }) {
     if (_session?.appUser.isSuperAdmin == true) {
+      return;
+    }
+    final suppressUntil = _suppressInAppBannersUntil;
+    if (suppressUntil != null && DateTime.now().isBefore(suppressUntil)) {
       return;
     }
     if (title.trim().isEmpty && (body == null || body.trim().isEmpty)) {

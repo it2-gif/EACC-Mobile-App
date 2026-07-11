@@ -399,5 +399,10 @@ service cloud.firestore {
         && request.resource.data.created_at == request.time;
       allow update, delete: if false;
     }
+
+    match /app_config/{configId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if false;
+    }
   }
 }

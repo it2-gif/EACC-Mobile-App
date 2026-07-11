@@ -77,6 +77,18 @@ class AuthSessionManager {
     }
   }
 
+  Future<bool> refreshFirebaseToken() async {
+    final user = _firebaseAuth.currentUser;
+    if (user == null) return false;
+
+    try {
+      await user.getIdToken(true);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     await _firebaseAuth.signOut();
     await clear();

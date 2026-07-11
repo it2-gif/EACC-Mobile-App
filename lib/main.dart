@@ -9,6 +9,7 @@ import 'screens/admin_dashboard_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/student_courses_screen.dart';
 import 'screens/teacher_courses_screen.dart';
+import 'services/app_update_policy_service.dart';
 import 'services/auth_session_manager.dart';
 import 'services/push_notification_service.dart';
 import 'theme/app_theme.dart';
@@ -29,6 +30,13 @@ Future<AuthSession?> _restoreInitialSession() async {
     final session = await AuthSessionManager().restore().timeout(
       const Duration(seconds: 10),
     );
+    if (session != null) {
+      final policy = await AppUpdatePolicyService().apply();
+      if (policy.shouldLogout) {
+        unawaited(_initializeNotifications(null));
+        return null;
+      }
+    }
     unawaited(_initializeNotifications(session));
     return session;
   } catch (error, stackTrace) {
