@@ -41,9 +41,7 @@ class AppScaffold extends StatelessWidget {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.danger,
-            ),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
             child: const Text(
               'Logout',
               style: TextStyle(fontWeight: FontWeight.bold),
@@ -76,10 +74,13 @@ class AppScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final maxContentWidth = width >= 1100 ? 1080.0 : 760.0;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        toolbarHeight: 60,
+        toolbarHeight: width >= 900 ? 68 : 60,
         title: Text(title),
         shape: const Border(bottom: BorderSide(color: AppColors.border)),
         actions: [
@@ -99,13 +100,26 @@ class AppScaffold extends StatelessWidget {
             ),
         ],
       ),
-      body: SafeArea(
-        top: false,
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 760),
-            child: body,
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppColors.sky.withValues(alpha: 0.55),
+              AppColors.background,
+              Colors.white.withValues(alpha: 0.72),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxContentWidth),
+              child: body,
+            ),
           ),
         ),
       ),

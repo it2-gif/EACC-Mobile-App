@@ -5,11 +5,12 @@ class AppColors {
   static const primary = Color(0xFF1D5DA8);
   static const primaryDark = Color(0xFF0C2E68);
   static const accent = Color(0xFF2F86C9);
+  static const sky = Color(0xFFEAF4FF);
   static const ink = Color(0xFF142238);
   static const muted = Color(0xFF64748B);
-  static const border = Color(0xFFD9E2EE);
+  static const border = Color(0xFFD7E2EF);
   static const surface = Colors.white;
-  static const background = Color(0xFFF5F7FA);
+  static const background = Color(0xFFF4F7FB);
   static const chatBackground = Color(0xFFF0F4F8);
   static const bubbleMe = Color(0xFFE2EEFC);
   static const bubbleOther = Colors.white;
@@ -66,11 +67,12 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         color: AppColors.surface,
-        elevation: 0,
+        elevation: 0.5,
+        shadowColor: AppColors.primaryDark.withValues(alpha: 0.08),
         surfaceTintColor: AppColors.surface,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(18),
           side: const BorderSide(color: AppColors.border),
         ),
       ),
@@ -78,9 +80,12 @@ class AppTheme {
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
-          minimumSize: const Size(48, 50),
+          minimumSize: const Size(48, 52),
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          textStyle: const TextStyle(fontWeight: FontWeight.w800),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -88,19 +93,25 @@ class AppTheme {
           minimumSize: const Size(48, 50),
           foregroundColor: AppColors.primaryDark,
           side: const BorderSide(color: AppColors.border),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 15,
+        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: AppColors.primary, width: 2),
         ),
       ),

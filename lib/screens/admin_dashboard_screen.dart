@@ -17,10 +17,11 @@ class AdminDashboardScreen extends StatelessWidget {
 
   const AdminDashboardScreen({super.key, required this.session});
 
-
-
   @override
   Widget build(BuildContext context) {
+    final canSeeAnalysis =
+        session.appUser.isSuperAdmin || session.appUser.isTechnicalSupport;
+
     return AppScaffold(
       title: 'EACC Admin',
       showLogout: true,
@@ -36,7 +37,7 @@ class AdminDashboardScreen extends StatelessWidget {
             canViewAllCourses: session.appUser.canViewAllCourses,
           ),
           const SizedBox(height: 14),
-          if (session.appUser.isSuperAdmin) ...[
+          if (canSeeAnalysis) ...[
             _AnalysisEntryButton(
               onTap: () => Navigator.push(
                 context,
@@ -94,7 +95,7 @@ class AdminDashboardScreen extends StatelessWidget {
                   builder: (_) => AdminUsersScreen(session: session),
                 ),
               ),
-             ),
+            ),
             const SizedBox(height: 10),
           ],
           _NavTile(
@@ -162,24 +163,35 @@ class _WelcomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final wide = width >= 720;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(wide ? 24 : 20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryDark],
+          colors: [Color(0xFF286FBE), AppColors.primaryDark],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryDark.withValues(alpha: 0.18),
+            blurRadius: 28,
+            offset: const Offset(0, 16),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: wide ? 58 : 52,
+            height: wide ? 58 : 52,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(10),
+              color: Colors.white.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
             ),
             child: const Icon(
               Icons.admin_panel_settings_rounded,
@@ -194,10 +206,10 @@ class _WelcomeHeader extends StatelessWidget {
               children: [
                 Text(
                   'Welcome, $name',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
+                    fontSize: wide ? 22 : 18,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -205,8 +217,8 @@ class _WelcomeHeader extends StatelessWidget {
                   isSuperAdmin
                       ? 'EACC Super Administrator'
                       : isManagerOperation
-                          ? 'EACC Manager Operation'
-                          : 'EACC Contact-Person Administrator',
+                      ? 'EACC Manager Operation'
+                      : 'EACC Contact-Person Administrator',
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 13,
@@ -233,8 +245,8 @@ class _WelcomeHeader extends StatelessWidget {
                         isSuperAdmin
                             ? Icons.verified_user_rounded
                             : canViewAllCourses
-                                ? Icons.manage_accounts_rounded
-                                : Icons.link_rounded,
+                            ? Icons.manage_accounts_rounded
+                            : Icons.link_rounded,
                         size: 15,
                         color: Colors.white,
                       ),
@@ -243,7 +255,7 @@ class _WelcomeHeader extends StatelessWidget {
                         isSuperAdmin
                             ? 'Full access enabled'
                             : canViewAllCourses
-                                ? 'All courses visible'
+                            ? 'All courses visible'
                             : 'Linked courses only',
                         style: const TextStyle(
                           color: Colors.white,
@@ -355,26 +367,37 @@ class _StatsRow extends StatelessWidget {
       (total, course) => total + course.students.length,
     );
 
-    return Row(
-      children: [
-        Expanded(
-          child: _StatCard(
-            icon: Icons.menu_book_rounded,
-            label: 'Courses',
-            value: courseCount,
-            color: AppColors.primary,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _StatCard(
-            icon: Icons.chat_bubble_rounded,
-            label: 'Chats',
-            value: threadCount,
-            color: const Color(0xFF6A3DE8),
-          ),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = constraints.maxWidth >= 720
+            ? (constraints.maxWidth - 12) / 2
+            : constraints.maxWidth;
+
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            SizedBox(
+              width: cardWidth,
+              child: _StatCard(
+                icon: Icons.menu_book_rounded,
+                label: 'Courses',
+                value: courseCount,
+                color: AppColors.primary,
+              ),
+            ),
+            SizedBox(
+              width: cardWidth,
+              child: _StatCard(
+                icon: Icons.chat_bubble_rounded,
+                label: 'Chats',
+                value: threadCount,
+                color: const Color(0xFF6A3DE8),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -396,26 +419,40 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.all(18),
+        child: Row(
           children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 8),
-            Text(
-              '$value',
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w900,
-                color: color,
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
               ),
+              child: Icon(icon, color: color, size: 22),
             ),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.muted,
-                fontWeight: FontWeight.w600,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$value',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      color: color,
+                    ),
+                  ),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -764,32 +801,64 @@ class _NavTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: ListTile(
+      child: InkWell(
         onTap: onTap,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 10,
-        ),
-        leading: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: color.withValues(alpha: 0.12)),
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 12,
+                        height: 1.3,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Icon(
+                  Icons.chevron_right_rounded,
+                  color: color.withValues(alpha: 0.72),
+                  size: 22,
+                ),
+              ),
+            ],
           ),
-          child: Icon(icon, color: color, size: 22),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: const TextStyle(color: AppColors.muted, fontSize: 12),
-        ),
-        trailing: Icon(
-          Icons.chevron_right_rounded,
-          color: color.withValues(alpha: 0.6),
         ),
       ),
     );

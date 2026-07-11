@@ -30,7 +30,7 @@ messaging.onBackgroundMessage((payload) => {
   }
 
   const base = appBasePath();
-  const title = payload.data?.title || payload.data?.senderName || 'EACC Connection';
+  const title = payload.data?.title || payload.data?.senderName || 'EACC Connect';
   const body = payload.data?.body || payload.data?.previewText || 'New message';
 
   self.registration.showNotification(title, {

@@ -21,29 +21,39 @@ class CourseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < 420;
+    final iconSize = compact ? 48.0 : 58.0;
     final hasTeacher =
         course.teacherName != null && course.teacherName!.trim().isNotEmpty;
     final hasKeyPerson =
         course.keyPersonName != null && course.keyPersonName!.trim().isNotEmpty;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 14),
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(15),
+          padding: EdgeInsets.all(compact ? 14 : 18),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                width: 52,
-                height: 52,
+                width: iconSize,
+                height: iconSize,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary.withValues(alpha: 0.14),
+                      AppColors.accent.withValues(alpha: 0.08),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.12),
+                    color: AppColors.primary.withValues(alpha: 0.14),
                   ),
                 ),
                 child: const Icon(
@@ -73,7 +83,19 @@ class CourseCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        const Icon(Icons.chevron_right, color: AppColors.muted),
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: AppColors.background,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: const Icon(
+                            Icons.chevron_right_rounded,
+                            color: AppColors.primaryDark,
+                            size: 20,
+                          ),
+                        ),
                       ],
                     ),
                     if (course.displayCategory != null) ...[
@@ -102,7 +124,7 @@ class CourseCard extends StatelessWidget {
                           ),
                           decoration: BoxDecoration(
                             color: AppColors.background,
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(999),
                             border: Border.all(color: AppColors.border),
                           ),
                           child: Text(
@@ -123,10 +145,10 @@ class CourseCard extends StatelessWidget {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.1),
+                              color: AppColors.success.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(999),
                               border: Border.all(
-                                color: AppColors.primary.withValues(
+                                color: AppColors.success.withValues(
                                   alpha: 0.25,
                                 ),
                               ),
@@ -134,7 +156,7 @@ class CourseCard extends StatelessWidget {
                             child: Text(
                               unreadLabel ?? '$unreadCount unread',
                               style: const TextStyle(
-                                color: AppColors.primaryDark,
+                                color: AppColors.success,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w800,
                               ),

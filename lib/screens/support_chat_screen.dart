@@ -67,8 +67,7 @@ class SupportInboxScreen extends StatelessWidget {
                     return _SupportThreadTile(
                       title: requesterName.isEmpty ? 'User' : requesterName,
                       subtitle:
-                          data['last_message']?.toString() ??
-                          'No messages yet',
+                          data['last_message']?.toString() ?? 'No messages yet',
                       meta:
                           '${requesterRole.toUpperCase()} - ${formatThreadTime(data['last_message_at'] ?? data['updated_at'])}',
                       unread: unread,
@@ -80,8 +79,8 @@ class SupportInboxScreen extends StatelessWidget {
                             threadId: doc.id,
                             requesterName: requesterName,
                             requesterRole: requesterRole,
-                            requesterLmsUserId:
-                                data['requester_lms_user_id']?.toString(),
+                            requesterLmsUserId: data['requester_lms_user_id']
+                                ?.toString(),
                           ),
                         ),
                       ),
@@ -231,74 +230,86 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
           ],
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: SupportChatService.getMessages(threadId: threadId),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return _SupportState(
-                    icon: Icons.error_outline_rounded,
-                    title: 'Could not load messages',
-                    subtitle: '${snapshot.error}',
-                  );
-                }
+      body: SafeArea(
+        top: false,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 900),
+            child: Column(
+              children: [
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: SupportChatService.getMessages(threadId: threadId),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return _SupportState(
+                          icon: Icons.error_outline_rounded,
+                          title: 'Could not load messages',
+                          subtitle: '${snapshot.error}',
+                        );
+                      }
 
-                final docs = snapshot.data?.docs ?? [];
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+                      final docs = snapshot.data?.docs ?? [];
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
 
-                if (docs.isEmpty) {
-                  return const _SupportState(
-                    icon: Icons.support_agent_rounded,
-                    title: 'How can we help?',
-                    subtitle: 'Send a message and technical support will reply here.',
-                  );
-                }
+                      if (docs.isEmpty) {
+                        return const _SupportState(
+                          icon: Icons.support_agent_rounded,
+                          title: 'How can we help?',
+                          subtitle:
+                              'Send a message and technical support will reply here.',
+                        );
+                      }
 
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  unawaited(
-                    SupportChatService.markRead(
-                      session: widget.session,
-                      threadId: threadId,
-                    ),
-                  );
-                });
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        unawaited(
+                          SupportChatService.markRead(
+                            session: widget.session,
+                            threadId: threadId,
+                          ),
+                        );
+                      });
 
-                return ListView.builder(
-                  controller: scrollController,
-                  reverse: true,
-                  padding: const EdgeInsets.fromLTRB(14, 16, 14, 18),
-                  itemCount: docs.length,
-                  itemBuilder: (context, index) {
-                    final data = docs[index].data();
-                    final senderName = data['sender_name']?.toString() ?? '';
-                    final senderRole = data['sender_role']?.toString() ?? '';
-                    final isMine =
-                        senderName == widget.session.appUser.name &&
-                        (senderRole == widget.session.appUser.role ||
-                            senderRole == 'support');
+                      return ListView.builder(
+                        controller: scrollController,
+                        reverse: true,
+                        padding: const EdgeInsets.fromLTRB(14, 16, 14, 18),
+                        itemCount: docs.length,
+                        itemBuilder: (context, index) {
+                          final data = docs[index].data();
+                          final senderName =
+                              data['sender_name']?.toString() ?? '';
+                          final senderRole =
+                              data['sender_role']?.toString() ?? '';
+                          final isMine =
+                              senderName == widget.session.appUser.name &&
+                              (senderRole == widget.session.appUser.role ||
+                                  senderRole == 'support');
 
-                    return _SupportMessageBubble(
-                      text: data['text']?.toString() ?? '',
-                      senderName: senderName,
-                      senderRole: senderRole,
-                      time: formatMessageTime(data['created_at']),
-                      isMine: isMine,
-                    );
-                  },
-                );
-              },
+                          return _SupportMessageBubble(
+                            text: data['text']?.toString() ?? '',
+                            senderName: senderName,
+                            senderRole: senderRole,
+                            time: formatMessageTime(data['created_at']),
+                            isMine: isMine,
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+                _SupportInputBar(
+                  controller: messageController,
+                  isSending: isSending,
+                  onSend: sendMessage,
+                ),
+              ],
             ),
           ),
-          _SupportInputBar(
-            controller: messageController,
-            isSending: isSending,
-            onSend: sendMessage,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -324,7 +335,10 @@ class _SupportThreadTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 10,
+        ),
         leading: CircleAvatar(
           backgroundColor: AppColors.primary.withValues(alpha: 0.12),
           child: Text(

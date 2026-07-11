@@ -168,207 +168,230 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Container(
-                padding: EdgeInsets.all(compact ? 18 : 24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: AppColors.border),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Column(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.asset(
-                            'eacc-blue-logo.png',
-                            height: compact ? 88 : 110,
-                            width: compact ? 190 : 220,
-                            fit: BoxFit.contain,
-                            semanticLabel: 'Egyptian American Center',
-                          ),
-                        ),
-                        SizedBox(height: compact ? 14 : 18),
-                        const Text(
-                          'EACC Connect',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Secure course messaging for students and teachers.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: AppColors.muted,
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: compact ? 18 : 24),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.background,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.border),
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppColors.sky.withValues(alpha: 0.8),
+              AppColors.background,
+              Colors.white,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                horizontal: compact ? 16 : 24,
+                vertical: compact ? 18 : 28,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 470),
+                child: Container(
+                  padding: EdgeInsets.all(compact ? 20 : 28),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: AppColors.border),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primaryDark.withValues(alpha: 0.12),
+                        blurRadius: 34,
+                        offset: const Offset(0, 18),
                       ),
-                      child: Row(
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Column(
                         children: [
-                          Icon(
-                            selectedRole == 'student'
-                                ? Icons.school_outlined
-                                : selectedRole == 'teacher'
-                                ? Icons.menu_book_outlined
-                                : Icons.admin_panel_settings_outlined,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              selectedRole == 'student'
-                                  ? 'Student login'
-                                  : selectedRole == 'teacher'
-                                  ? 'Teacher login'
-                                  : 'Admin login',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.ink,
-                              ),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.asset(
+                              'eacc-blue-logo.png',
+                              height: compact ? 88 : 110,
+                              width: compact ? 190 : 220,
+                              fit: BoxFit.contain,
+                              semanticLabel: 'Egyptian American Center',
                             ),
                           ),
-                          const _RoleDot(label: 'LMS'),
+                          SizedBox(height: compact ? 14 : 18),
+                          const Text(
+                            'EACC Connect',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Secure course messaging for students and teachers.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppColors.muted,
+                              height: 1.35,
+                            ),
+                          ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 18),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedRole,
-                      decoration: const InputDecoration(
-                        labelText: 'Login as',
-                        prefixIcon: Icon(Icons.badge_outlined),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'student',
-                          child: Text('Student'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'teacher',
-                          child: Text('Teacher'),
-                        ),
-                        DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                      ],
-                      onChanged: (value) {
-                        setState(() => selectedRole = value!);
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: usernameController,
-                      autofillHints: const [
-                        AutofillHints.username,
-                        AutofillHints.email,
-                      ],
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'Username or email',
-                        prefixIcon: Icon(Icons.person_outline),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: passwordController,
-                      autofillHints: const [AutofillHints.password],
-                      obscureText: obscurePassword,
-                      textInputAction: TextInputAction.done,
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: IconButton(
-                          onPressed: () {
-                            setState(() => obscurePassword = !obscurePassword);
-                          },
-                          icon: Icon(
-                            obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                          ),
-                          tooltip: obscurePassword
-                              ? 'Show password'
-                              : 'Hide password',
-                        ),
-                      ),
-                      onSubmitted: (_) => login(),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      selectedRole == 'admin'
-                          ? 'Admin sign-in is verified through the EACC LMS.'
-                          : 'This sign-in is verified through the EACC LMS.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.muted,
-                        height: 1.35,
-                      ),
-                    ),
-                    if (errorMessage != null) ...[
-                      const SizedBox(height: 12),
+                      SizedBox(height: compact ? 18 : 24),
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppColors.danger.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: AppColors.danger.withValues(alpha: 0.18),
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              selectedRole == 'student'
+                                  ? Icons.school_outlined
+                                  : selectedRole == 'teacher'
+                                  ? Icons.menu_book_outlined
+                                  : Icons.admin_panel_settings_outlined,
+                              color: AppColors.primary,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                selectedRole == 'student'
+                                    ? 'Student login'
+                                    : selectedRole == 'teacher'
+                                    ? 'Teacher login'
+                                    : 'Admin login',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.ink,
+                                ),
+                              ),
+                            ),
+                            const _RoleDot(label: 'LMS'),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedRole,
+                        decoration: const InputDecoration(
+                          labelText: 'Login as',
+                          prefixIcon: Icon(Icons.badge_outlined),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'student',
+                            child: Text('Student'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'teacher',
+                            child: Text('Teacher'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'admin',
+                            child: Text('Admin'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          setState(() => selectedRole = value!);
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: usernameController,
+                        autofillHints: const [
+                          AutofillHints.username,
+                          AutofillHints.email,
+                        ],
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'Username or email',
+                          prefixIcon: Icon(Icons.person_outline),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: passwordController,
+                        autofillHints: const [AutofillHints.password],
+                        obscureText: obscurePassword,
+                        textInputAction: TextInputAction.done,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            onPressed: () {
+                              setState(
+                                () => obscurePassword = !obscurePassword,
+                              );
+                            },
+                            icon: Icon(
+                              obscurePassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                            tooltip: obscurePassword
+                                ? 'Show password'
+                                : 'Hide password',
                           ),
                         ),
-                        child: Text(
-                          errorMessage!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: AppColors.danger,
-                            fontWeight: FontWeight.w600,
-                            height: 1.35,
+                        onSubmitted: (_) => login(),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        selectedRole == 'admin'
+                            ? 'Admin sign-in is verified through the EACC LMS.'
+                            : 'This sign-in is verified through the EACC LMS.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.muted,
+                          height: 1.35,
+                        ),
+                      ),
+                      if (errorMessage != null) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.danger.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: AppColors.danger.withValues(alpha: 0.18),
+                            ),
                           ),
+                          child: Text(
+                            errorMessage!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppColors.danger,
+                              fontWeight: FontWeight.w600,
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 22),
+                      FilledButton.icon(
+                        onPressed: isLoading ? null : login,
+                        icon: isLoading
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.login),
+                        label: Text(
+                          isLoading ? 'Signing in...' : 'Login',
+                          style: const TextStyle(fontSize: 16),
                         ),
                       ),
                     ],
-                    const SizedBox(height: 22),
-                    FilledButton.icon(
-                      onPressed: isLoading ? null : login,
-                      icon: isLoading
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.login),
-                      label: Text(
-                        isLoading ? 'Signing in...' : 'Login',
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
