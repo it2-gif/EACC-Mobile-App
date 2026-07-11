@@ -4,6 +4,7 @@ const { getStorage } = require('firebase-admin/storage');
 
 initializeApp({
   credential: applicationDefault(),
+  projectId: 'eacc-mobile-app',
   storageBucket: 'eacc-mobile-app.firebasestorage.app',
 });
 
@@ -13,41 +14,58 @@ const bucket = getStorage().bucket();
 async function deleteCollection(ref, batchSize = 100) {
   while (true) {
     const snapshot = await ref.limit(batchSize).get();
-    if (snapshot.empty) return;
+    if (snapshot.empty) return 0;
 
     const batch = db.batch();
+    let count = 0;
+
     for (const doc of snapshot.docs) {
       batch.delete(doc.ref);
+      count++;
     }
+
     await batch.commit();
+
+    if (count < batchSize) return count;
   }
 }
 
+async function deleteThread(threadRef) {
+  await deleteCollection(threadRef.collection('messages'), 100);
+  await threadRef.delete();
+}
+
 async function main() {
-  console.log('Deleting all chat messages and threads...');
+  console.log('Deleting chat threads/messages from every course document...');
 
-  const courses = await db.collection('courses').get();
+  const courseDocs = await db.collection('courses').listDocuments();
 
-  for (const course of courses.docs) {
-    console.log(`Course ${course.id}`);
+  for (const courseRef of courseDocs) {
+    console.log(`Course ${courseRef.id}`);
 
-    const threads = await course.ref.collection('threads').get();
+    const threadRefs = await courseRef.collection('threads').listDocuments();
 
-    for (const thread of threads.docs) {
-      console.log(`  Deleting thread ${thread.id}`);
-
-      await deleteCollection(thread.ref.collection('messages'), 100);
-      await thread.ref.delete();
+    for (const threadRef of threadRefs) {
+      console.log(`  Thread ${threadRef.id}`);
+      await deleteThread(threadRef);
     }
   }
 
+  console.log('Deleting audit logs...');
+  await deleteCollection(db.collection('audit_logs'), 100);
+
   console.log('Deleting uploaded chat files...');
+  try {
+    await bucket.deleteFiles({ prefix: 'chat_uploads/' });
+  } catch (error) {
+    if (error.code === 404) {
+      console.log('Storage bucket or files not found. Skipping storage cleanup.');
+    } else {
+      throw error;
+    }
+  }
 
-  await bucket.deleteFiles({
-    prefix: 'chat_uploads/',
-  });
-
-  console.log('Done. All chat history and uploaded chat files deleted.');
+  console.log('Done. Chat threads/messages, audit logs, and uploaded files deleted.');
 }
 
 main().catch((error) => {
