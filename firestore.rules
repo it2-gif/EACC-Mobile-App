@@ -279,6 +279,44 @@ service cloud.firestore {
         );
     }
 
+    function hasValidSupportSender() {
+      return request.resource.data.sender_name == request.auth.token.displayName
+        && (
+          (
+            isTechnicalSupport()
+            && request.resource.data.sender_role == 'support'
+          )
+          ||
+          (
+            !isTechnicalSupport()
+            && request.resource.data.sender_role == request.auth.token.role
+          )
+        );
+    }
+
+    function isSupportTextMessage() {
+      return request.resource.data.type == 'text'
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0;
+    }
+
+    function isSupportImageMessage(threadId) {
+      return request.resource.data.type == 'image'
+        && request.resource.data.text == ''
+        && request.resource.data.media_url is string
+        && request.resource.data.media_url.size() > 0
+        && request.resource.data.file_name is string
+        && request.resource.data.file_name.size() > 0
+        && request.resource.data.file_size_bytes is int
+        && request.resource.data.file_size_bytes > 0
+        && request.resource.data.file_size_bytes <= 5 * 1024 * 1024
+        && request.resource.data.file_type is string
+        && request.resource.data.storage_path is string
+        && request.resource.data.storage_path.matches(
+          '^support_uploads/threads/' + threadId + '/.+'
+        );
+    }
+
     function isTextMessageEdit() {
       return resource.data.type == 'text'
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -456,22 +494,21 @@ service cloud.firestore {
       match /messages/{messageId} {
         allow read: if canAccessSupportThread(threadId);
         allow create: if canAccessSupportThread(threadId)
-          && request.resource.data.type == 'text'
-          && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.sender_name == request.auth.token.displayName
+          && hasValidSupportSender()
+          && (isSupportTextMessage() || isSupportImageMessage(threadId))
           && request.resource.data.created_at == request.time
-          && (
-            (
-              isTechnicalSupport()
-              && request.resource.data.sender_role == 'support'
-            )
-            ||
-            (
-              !isTechnicalSupport()
-              && request.resource.data.sender_role == request.auth.token.role
-            )
-          );
+          && request.resource.data.keys().hasOnly([
+            'type',
+            'text',
+            'media_url',
+            'file_name',
+            'file_size_bytes',
+            'file_type',
+            'storage_path',
+            'sender_name',
+            'sender_role',
+            'created_at'
+          ]);
         allow update, delete: if false;
       }
     }

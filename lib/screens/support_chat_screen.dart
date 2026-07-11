@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/auth_session.dart';
 import '../services/support_chat_service.dart';
@@ -120,6 +121,8 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   final messageController = TextEditingController();
   final scrollController = ScrollController();
   bool isSending = false;
+  bool isUploadingImage = false;
+  double uploadProgress = 0;
 
   late final String threadId =
       widget.threadId ?? SupportChatService.threadIdFor(widget.session);
@@ -158,6 +161,52 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
       messageController.text = text;
     } finally {
       if (mounted) setState(() => isSending = false);
+    }
+  }
+
+  Future<void> pickAndSendImage() async {
+    if (isSending || isUploadingImage) return;
+
+    final image = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+      maxWidth: 1920,
+    );
+    if (image == null) return;
+
+    setState(() {
+      isUploadingImage = true;
+      uploadProgress = 0;
+    });
+
+    try {
+      final imageBytes = await image.readAsBytes();
+      await SupportChatService.sendImageMessage(
+        session: widget.session,
+        threadId: threadId,
+        imageBytes: imageBytes,
+        fileName: image.name,
+        requesterName: widget.requesterName,
+        requesterRole: widget.requesterRole,
+        requesterLmsUserId: widget.requesterLmsUserId,
+        onProgress: (progress) {
+          if (!mounted) return;
+          setState(() => uploadProgress = progress);
+        },
+      );
+      scrollToBottom();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not upload image: $error')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          isUploadingImage = false;
+          uploadProgress = 0;
+        });
+      }
     }
   }
 
@@ -291,6 +340,9 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
 
                           return _SupportMessageBubble(
                             text: data['text']?.toString() ?? '',
+                            type: data['type']?.toString() ?? 'text',
+                            mediaUrl: data['media_url']?.toString(),
+                            fileName: data['file_name']?.toString(),
                             senderName: senderName,
                             senderRole: senderRole,
                             time: formatMessageTime(data['created_at']),
@@ -303,7 +355,9 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                 ),
                 _SupportInputBar(
                   controller: messageController,
-                  isSending: isSending,
+                  isSending: isSending || isUploadingImage,
+                  uploadProgress: isUploadingImage ? uploadProgress : null,
+                  onPickImage: pickAndSendImage,
                   onSend: sendMessage,
                 ),
               ],
@@ -407,6 +461,9 @@ class _SupportThreadTile extends StatelessWidget {
 
 class _SupportMessageBubble extends StatelessWidget {
   final String text;
+  final String type;
+  final String? mediaUrl;
+  final String? fileName;
   final String senderName;
   final String senderRole;
   final String time;
@@ -414,6 +471,9 @@ class _SupportMessageBubble extends StatelessWidget {
 
   const _SupportMessageBubble({
     required this.text,
+    required this.type,
+    this.mediaUrl,
+    this.fileName,
     required this.senderName,
     required this.senderRole,
     required this.time,
@@ -424,6 +484,7 @@ class _SupportMessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = isMine ? AppColors.primary : Colors.white;
     final textColor = isMine ? Colors.white : AppColors.ink;
+    final isImage = type == 'image' && mediaUrl != null && mediaUrl!.isNotEmpty;
 
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
@@ -455,10 +516,23 @@ class _SupportMessageBubble extends StatelessWidget {
                   ),
                 ),
               ),
-            Text(
-              text,
-              style: TextStyle(color: textColor, fontSize: 14.5, height: 1.35),
-            ),
+            if (isImage) ...[
+              _SupportImagePreview(
+                url: mediaUrl!,
+                fileName: fileName,
+                isMine: isMine,
+              ),
+              if (text.trim().isNotEmpty) const SizedBox(height: 8),
+            ],
+            if (text.trim().isNotEmpty)
+              Text(
+                text,
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 14.5,
+                  height: 1.35,
+                ),
+              ),
             if (time.isNotEmpty) ...[
               const SizedBox(height: 5),
               Align(
@@ -480,14 +554,89 @@ class _SupportMessageBubble extends StatelessWidget {
   }
 }
 
+class _SupportImagePreview extends StatelessWidget {
+  final String url;
+  final String? fileName;
+  final bool isMine;
+
+  const _SupportImagePreview({
+    required this.url,
+    required this.fileName,
+    required this.isMine,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => showDialog<void>(
+        context: context,
+        builder: (_) => Dialog(
+          insetPadding: const EdgeInsets.all(18),
+          child: Stack(
+            children: [
+              InteractiveViewer(child: Image.network(url, fit: BoxFit.contain)),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton.filledTonal(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          constraints: const BoxConstraints(maxHeight: 260, minWidth: 220),
+          color: isMine
+              ? Colors.white.withValues(alpha: 0.12)
+              : AppColors.background,
+          child: Image.network(
+            url,
+            fit: BoxFit.cover,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return const SizedBox(
+                height: 180,
+                child: Center(child: CircularProgressIndicator()),
+              );
+            },
+            errorBuilder: (context, error, stackTrace) => SizedBox(
+              height: 140,
+              child: Center(
+                child: Text(
+                  fileName ?? 'Could not load image',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isMine ? Colors.white : AppColors.muted,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _SupportInputBar extends StatelessWidget {
   final TextEditingController controller;
   final bool isSending;
+  final double? uploadProgress;
+  final VoidCallback onPickImage;
   final VoidCallback onSend;
 
   const _SupportInputBar({
     required this.controller,
     required this.isSending,
+    required this.uploadProgress,
+    required this.onPickImage,
     required this.onSend,
   });
 
@@ -501,37 +650,54 @@ class _SupportInputBar extends StatelessWidget {
           color: Colors.white,
           border: Border(top: BorderSide(color: AppColors.border)),
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: TextField(
-                controller: controller,
-                minLines: 1,
-                maxLines: 4,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  hintText: 'Write your support message',
-                  prefixIcon: Icon(Icons.edit_note_rounded),
+            if (uploadProgress != null) ...[
+              LinearProgressIndicator(
+                value: uploadProgress == 0 ? null : uploadProgress,
+              ),
+              const SizedBox(height: 8),
+            ],
+            Row(
+              children: [
+                IconButton.filledTonal(
+                  onPressed: isSending ? null : onPickImage,
+                  icon: const Icon(Icons.image_rounded),
+                  tooltip: 'Upload image',
                 ),
-                onSubmitted: (_) => onSend(),
-              ),
-            ),
-            const SizedBox(width: 10),
-            FilledButton(
-              onPressed: isSending ? null : onSend,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(50, 50),
-                padding: EdgeInsets.zero,
-              ),
-              child: isSending
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.send_rounded),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    minLines: 1,
+                    maxLines: 4,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: const InputDecoration(
+                      hintText: 'Write your support message',
+                      prefixIcon: Icon(Icons.edit_note_rounded),
+                    ),
+                    onSubmitted: (_) => onSend(),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                FilledButton(
+                  onPressed: isSending ? null : onSend,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(50, 50),
+                    padding: EdgeInsets.zero,
+                  ),
+                  child: isSending
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.send_rounded),
+                ),
+              ],
             ),
           ],
         ),

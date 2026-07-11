@@ -17,6 +17,11 @@ service firebase.storage {
         && request.auth.token.canViewAllCourses == true;
     }
 
+    function isTechnicalSupport() {
+      return request.auth != null
+        && request.auth.token.isTechnicalSupport == true;
+    }
+
     function isSupportedRole() {
       return request.auth != null
         && request.auth.token.role in ['student', 'teacher'];
@@ -85,11 +90,33 @@ service firebase.storage {
         );
     }
 
+    function isOwnSupportThread(threadId) {
+      return request.auth != null
+        && threadId == 'support_' + request.auth.token.role + '_' + request.auth.token.lmsUserId;
+    }
+
+    function canAccessSupportThread(threadId) {
+      return isTechnicalSupport() || isOwnSupportThread(threadId);
+    }
+
+    function isValidSupportImageUpload() {
+      return request.resource.size > 0
+        && request.resource.contentType.matches('image/.*')
+        && request.resource.size <= 5 * 1024 * 1024;
+    }
+
     match /chat_uploads/courses/{courseId}/threads/{threadId}/{fileName} {
       allow read: if isCourseAdmin(courseId) || canAccessThread(courseId, threadId);
       allow create: if isCourseAdmin(courseId)
           ? isValidUpload()
           : canAccessThread(courseId, threadId) && isValidUpload();
+      allow update, delete: if false;
+    }
+
+    match /support_uploads/threads/{threadId}/{fileName} {
+      allow read: if canAccessSupportThread(threadId);
+      allow create: if canAccessSupportThread(threadId)
+        && isValidSupportImageUpload();
       allow update, delete: if false;
     }
   }
