@@ -316,7 +316,8 @@ class MessageBubble extends StatelessWidget {
     final isVoice = type == 'voice' && mediaUrl != null && mediaUrl!.isNotEmpty;
     final isDocument =
         type == 'document' && mediaUrl != null && mediaUrl!.isNotEmpty;
-    final maxBubbleWidth = MediaQuery.sizeOf(context).width * 0.78;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final maxBubbleWidth = screenWidth * (screenWidth >= 900 ? 0.58 : 0.78);
     final bubbleColor = isMe ? AppColors.bubbleMe : AppColors.bubbleOther;
 
     return GestureDetector(
@@ -326,39 +327,39 @@ class MessageBubble extends StatelessWidget {
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxWidth: maxBubbleWidth.clamp(240, 420).toDouble(),
+            maxWidth: maxBubbleWidth.clamp(250, 520).toDouble(),
           ),
           child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(16),
-                topRight: const Radius.circular(16),
-                bottomLeft: Radius.circular(isMe ? 16 : 6),
-                bottomRight: Radius.circular(isMe ? 6 : 16),
+                topLeft: const Radius.circular(20),
+                topRight: const Radius.circular(20),
+                bottomLeft: Radius.circular(isMe ? 20 : 7),
+                bottomRight: Radius.circular(isMe ? 7 : 20),
               ),
               border: Border.all(
                 color: isMe
-                    ? AppColors.primary.withValues(alpha: 0.14)
+                    ? AppColors.primary.withValues(alpha: 0.18)
                     : AppColors.border,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
+                  color: AppColors.primaryDark.withValues(alpha: 0.05),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(16),
-                topRight: const Radius.circular(16),
-                bottomLeft: Radius.circular(isMe ? 16 : 6),
-                bottomRight: Radius.circular(isMe ? 6 : 16),
+                topLeft: const Radius.circular(20),
+                topRight: const Radius.circular(20),
+                bottomLeft: Radius.circular(isMe ? 20 : 7),
+                bottomRight: Radius.circular(isMe ? 7 : 20),
               ),
               child: Container(
                 color: bubbleColor,
-                padding: const EdgeInsets.fromLTRB(13, 11, 13, 11),
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 11),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -463,20 +464,20 @@ class MessageBubble extends StatelessWidget {
                       GestureDetector(
                         onTap: () => _openImage(context),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(14),
                           child: Stack(
                             children: [
                               Image.network(
                                 mediaUrl!,
                                 width: double.infinity,
-                                height: 200,
+                                height: screenWidth >= 700 ? 240 : 200,
                                 fit: BoxFit.cover,
                                 loadingBuilder:
                                     (context, child, loadingProgress) {
                                       if (loadingProgress == null) return child;
 
                                       return Container(
-                                        height: 200,
+                                        height: screenWidth >= 700 ? 240 : 200,
                                         alignment: Alignment.center,
                                         color: AppColors.background,
                                         child: const CircularProgressIndicator(
