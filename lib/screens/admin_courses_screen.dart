@@ -26,6 +26,7 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
   Course? searchedCourse;
   bool isSearching = false;
   bool hasSearched = false;
+  String searchQuery = '';
   String? searchError;
   String? searchNotice;
 
@@ -45,6 +46,7 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
       searchError = null;
       searchNotice = null;
       searchedCourse = null;
+      searchQuery = courseId;
     });
 
     final api = AuthApi();
@@ -112,6 +114,41 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
     return null;
   }
 
+  void _onSearchQueryChanged(String value) {
+    final normalized = value.trim().toLowerCase();
+
+    setState(() {
+      searchQuery = value;
+
+      if (searchedCourse != null &&
+          searchedCourse!.id.trim().toLowerCase() != normalized) {
+        searchedCourse = null;
+      }
+
+      if (searchError != null || searchNotice != null) {
+        searchError = null;
+        searchNotice = null;
+      }
+    });
+  }
+
+  List<Course> _filterSessionCourses(String query) {
+    final normalized = query.trim().toLowerCase();
+    if (normalized.isEmpty) return const [];
+
+    return widget.session.courses
+        .where((course) {
+          return course.id.toLowerCase().contains(normalized) ||
+              course.displayName.toLowerCase().contains(normalized) ||
+              course.category.toLowerCase().contains(normalized) ||
+              (course.teacherName?.toLowerCase().contains(normalized) ??
+                  false) ||
+              (course.keyPersonName?.toLowerCase().contains(normalized) ??
+                  false);
+        })
+        .toList(growable: false);
+  }
+
   bool _isAuthErrorMessage(String message) {
     final normalized = message.toLowerCase();
     return normalized.contains('secure session expired') ||
@@ -126,8 +163,11 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
     final isSuperAdmin = widget.session.appUser.isSuperAdmin;
     final isManagerOperation = widget.session.appUser.isManagerOperation;
     final courses = canViewAllCourses
-        ? (searchedCourse != null ? [searchedCourse!] : <Course>[])
+        ? (searchedCourse != null
+              ? [searchedCourse!]
+              : _filterSessionCourses(searchQuery))
         : widget.session.courses;
+    final hasSearchText = searchQuery.trim().isNotEmpty;
 
     return AppScaffold(
       title: canViewAllCourses ? 'Admin Courses' : 'Linked Courses',
@@ -155,11 +195,12 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
             _CourseLookupBar(
               controller: courseIdController,
               onSearch: _searchCourse,
+              onChanged: _onSearchQueryChanged,
               isSearching: isSearching,
             ),
             const SizedBox(height: 18),
           ],
-          if (!canViewAllCourses || searchedCourse != null) ...[
+          if (!canViewAllCourses || courses.isNotEmpty) ...[
             _AccessSummary(session: widget.session, courses: courses),
             const SizedBox(height: 18),
           ],
@@ -172,20 +213,23 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
               title: 'Searching course',
               message: 'Checking your session and LMS course data.',
             )
-          else if (canViewAllCourses && !hasSearched)
+          else if (canViewAllCourses && !hasSearched && !hasSearchText)
             const _EmptyState(
               icon: Icons.search_rounded,
               title: 'Search for a course',
-              subtitle:
-                  'Enter a course ID above to view its details and chats.',
+              subtitle: 'Enter a course ID, name, teacher, or key person.',
             )
-          else if (canViewAllCourses && searchedCourse == null)
+          else if (canViewAllCourses &&
+              searchedCourse == null &&
+              courses.isEmpty)
             _EmptyState(
               icon: Icons.search_off_rounded,
-              title: 'Course not found',
+              title: searchError == null
+                  ? 'No matching course'
+                  : 'Course not found',
               subtitle:
                   searchError ??
-                  'No course with that ID exists in the database.',
+                  'No loaded course matches this search. Press Search to check the backend and refresh from the LMS.',
             )
           else if (courses.isEmpty)
             _EmptyState(
@@ -244,11 +288,13 @@ class _SearchNotice extends StatelessWidget {
 class _CourseLookupBar extends StatelessWidget {
   final TextEditingController controller;
   final VoidCallback onSearch;
+  final ValueChanged<String> onChanged;
   final bool isSearching;
 
   const _CourseLookupBar({
     required this.controller,
     required this.onSearch,
+    required this.onChanged,
     required this.isSearching,
   });
 
@@ -256,56 +302,57 @@ class _CourseLookupBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final compact = MediaQuery.sizeOf(context).width < 520;
 
+    final searchField = TextField(
+      controller: controller,
+      decoration: const InputDecoration(
+        labelText: 'Course ID',
+        hintText: 'Enter LMS Course ID, for example 2297',
+        prefixIcon: Icon(Icons.search_rounded),
+      ),
+      keyboardType: TextInputType.text,
+      textInputAction: TextInputAction.search,
+      onChanged: onChanged,
+      onSubmitted: isSearching ? null : (_) => onSearch(),
+    );
+
+    final searchButton = SizedBox(
+      height: 52,
+      child: FilledButton.icon(
+        onPressed: isSearching ? null : onSearch,
+        icon: isSearching
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Icon(Icons.search_rounded),
+        label: Text(isSearching ? 'Searching' : 'Search'),
+      ),
+    );
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Flex(
-          direction: compact ? Axis.vertical : Axis.horizontal,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (compact)
-              TextField(
-                controller: controller,
-                decoration: const InputDecoration(
-                  labelText: 'Course ID',
-                  hintText: 'Enter LMS Course ID, for example 2297',
-                  prefixIcon: Icon(Icons.search_rounded),
-                ),
-                keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.search,
-                onSubmitted: isSearching ? null : (_) => onSearch(),
+        child: compact
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  searchField,
+                  const SizedBox(height: 10),
+                  searchButton,
+                ],
               )
-            else
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  decoration: const InputDecoration(
-                    labelText: 'Course ID',
-                    hintText: 'Enter LMS Course ID, for example 2297',
-                    prefixIcon: Icon(Icons.search_rounded),
-                  ),
-                  keyboardType: TextInputType.number,
-                  textInputAction: TextInputAction.search,
-                  onSubmitted: isSearching ? null : (_) => onSearch(),
-                ),
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(child: searchField),
+                  const SizedBox(width: 10),
+                  searchButton,
+                ],
               ),
-            SizedBox(width: compact ? 0 : 10, height: compact ? 10 : 0),
-            FilledButton.icon(
-              onPressed: isSearching ? null : onSearch,
-              icon: isSearching
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.search_rounded),
-              label: Text(isSearching ? 'Searching' : 'Search'),
-            ),
-          ],
-        ),
       ),
     );
   }

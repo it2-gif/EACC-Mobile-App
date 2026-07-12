@@ -1,13 +1,14 @@
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import '../models/auth_session.dart';
 
 class SupportChatService {
-  static final FirebaseFirestore _db = FirebaseFirestore.instance;
-  static final FirebaseStorage _storage = FirebaseStorage.instance;
+  static FirebaseFirestore get _db => FirebaseFirestore.instance;
+  static FirebaseStorage get _storage => FirebaseStorage.instance;
 
   static CollectionReference<Map<String, dynamic>> get _threadsRef {
     return _db.collection('support_threads');
@@ -22,6 +23,10 @@ class SupportChatService {
   }
 
   static Stream<int> getUnreadCount(AuthSession session) {
+    if (Firebase.apps.isEmpty) {
+      return Stream.value(0);
+    }
+
     if (session.appUser.isTechnicalSupport) {
       return _threadsRef.snapshots().map((snapshot) {
         return snapshot.docs.fold<int>(0, (total, doc) {
