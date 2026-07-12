@@ -92,7 +92,10 @@ export class NotificationsService {
     // Super admins and manager-operation accounts bypass course scope;
     // key-person admins use courseIds.
     if (
-      !(senderRole === 'admin' && (senderIsSuperAdmin || senderCanViewAllCourses)) &&
+      !(
+        senderRole === 'admin' &&
+        (senderIsSuperAdmin || senderCanViewAllCourses)
+      ) &&
       !senderCourseIds.includes(input.courseId)
     ) {
       throw new UnauthorizedException({
@@ -110,8 +113,7 @@ export class NotificationsService {
     const isTeachersAudience = input.audience === 'teachers';
     const isAdminsAudience = input.audience === 'admins';
     const isKeyPersonAudience = input.audience === 'keyperson';
-    const isKeyPersonStudentAudience =
-      input.audience === 'keyperson_student';
+    const isKeyPersonStudentAudience = input.audience === 'keyperson_student';
 
     if (isCourseAudience && senderRole === 'student') {
       throw new UnauthorizedException({

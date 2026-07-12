@@ -38,7 +38,14 @@ export class SendChatNotificationDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['thread', 'course', 'teachers', 'admins', 'keyperson', 'keyperson_student'])
+  @IsIn([
+    'thread',
+    'course',
+    'teachers',
+    'admins',
+    'keyperson',
+    'keyperson_student',
+  ])
   audience?:
     | 'thread'
     | 'course'

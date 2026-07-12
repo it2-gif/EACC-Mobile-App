@@ -427,10 +427,7 @@ export class EaccLmsClient implements LmsClient {
     admin: NormalizedLmsUser,
     credentials: LmsLoginCredentials,
   ): Promise<NormalizedLmsCourse[]> {
-    if (
-      admin.isSuperAdmin ||
-      credentials.hints?.canViewAllCourses === true
-    ) {
+    if (admin.isSuperAdmin || credentials.hints?.canViewAllCourses === true) {
       return this.loadAdminAllCoursesWithStudents(
         baseUrl,
         sessionCookie,
@@ -955,8 +952,8 @@ function mergeCourseCatalogData(
     (isGenericCourseName(currentName, course.lmsCourseId) ||
       Boolean(
         catalogCategory &&
-          currentName.toLowerCase() === catalogCategory.toLowerCase() &&
-          catalogName.toLowerCase() !== currentName.toLowerCase(),
+        currentName.toLowerCase() === catalogCategory.toLowerCase() &&
+        catalogName.toLowerCase() !== currentName.toLowerCase(),
       ));
 
   return {
@@ -1089,11 +1086,7 @@ function escapeRegex(value: string): string {
 function hasAdminFullAccess(html: string): boolean {
   const normalized = html.toLowerCase();
 
-  const fullAccessKeys = [
-    'full[_\\s-]?access',
-    'fullaccess',
-    'fullaccese',
-  ];
+  const fullAccessKeys = ['full[_\\s-]?access', 'fullaccess', 'fullaccese'];
 
   const directPatterns = fullAccessKeys.flatMap((key) => [
     new RegExp(`\\b${key}\\b\\s*(?:=|:|=>)\\s*["']?1["']?(?!\\d)`),
