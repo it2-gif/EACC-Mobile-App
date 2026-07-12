@@ -72,7 +72,7 @@ export class AdminService {
       include: {
         memberships: {
           where: {
-            role: UserRole.STUDENT,
+            role: { in: [UserRole.STUDENT, UserRole.TEACHER] },
             status: MembershipStatus.ACTIVE,
             user: { status: UserStatus.ACTIVE },
           },
@@ -87,14 +87,22 @@ export class AdminService {
       throw new NotFoundException(`Course ${lmsCourseId} not found`);
     }
 
+    const studentMemberships = course.memberships.filter(
+      (membership) => membership.role === UserRole.STUDENT,
+    );
+    const teacherMembership = course.memberships.find(
+      (membership) => membership.role === UserRole.TEACHER,
+    );
+
     return {
       id: course.id,
       lmsCourseId: course.lmsCourseId,
       name: course.name,
       category: course.category,
+      teacherName: teacherMembership?.user.name,
       keyPersonLmsUserId: course.keyPersonLmsUserId,
       keyPersonName: course.keyPersonName,
-      students: course.memberships.map((m) => ({
+      students: studentMemberships.map((m) => ({
         lmsUserId: m.user.lmsUserId,
         name: m.user.name,
       })),

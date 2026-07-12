@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import { UserRole } from '../../generated/prisma/enums';
 
 jest.mock('../firebase/firebase-token.service', () => ({
   FirebaseTokenService: class FirebaseTokenService {},
@@ -436,9 +437,17 @@ describe('AuthService', () => {
                 keyPersonName: 'testapp',
                 memberships: [
                   {
+                    role: UserRole.STUDENT,
                     user: {
                       lmsUserId: 'stale-db-student',
                       name: 'Student From DB',
+                    },
+                  },
+                  {
+                    role: UserRole.TEACHER,
+                    user: {
+                      lmsUserId: '721258',
+                      name: 'Mohamed El-Sayad',
                     },
                   },
                 ],
@@ -473,6 +482,7 @@ describe('AuthService', () => {
       expect(result.courses[0].students).toEqual([
         { lmsUserId: '9001', name: 'Student From LMS' },
       ]);
+      expect(result.courses[0].teacherName).toBe('Mohamed El-Sayad');
       expect(lmsClient.authenticate).toHaveBeenCalledWith(
         expect.objectContaining({
           hints: expect.objectContaining({

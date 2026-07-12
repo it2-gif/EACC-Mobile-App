@@ -266,7 +266,7 @@ export class AuthService {
       include: {
         memberships: {
           where: {
-            role: UserRole.STUDENT,
+            role: { in: [UserRole.STUDENT, UserRole.TEACHER] },
             status: MembershipStatus.ACTIVE,
             user: { status: UserStatus.ACTIVE },
           },
@@ -293,17 +293,22 @@ export class AuthService {
           lmsUserId: student.lmsUserId,
           name: student.name,
         })) ?? [];
-      const storedStudents = course.memberships.map((membership) => ({
-        lmsUserId: membership.user.lmsUserId,
-        name: membership.user.name,
-      }));
+      const teacherMembership = course.memberships.find(
+        (membership) => membership.role === UserRole.TEACHER,
+      );
+      const storedStudents = course.memberships
+        .filter((membership) => membership.role === UserRole.STUDENT)
+        .map((membership) => ({
+          lmsUserId: membership.user.lmsUserId,
+          name: membership.user.name,
+        }));
 
       return {
         id: course.id,
         lmsCourseId: course.lmsCourseId,
         name: course.name,
         category: course.category,
-        teacherName: lmsCourse?.teacherName,
+        teacherName: lmsCourse?.teacherName ?? teacherMembership?.user.name,
         keyPersonLmsUserId: course.keyPersonLmsUserId,
         keyPersonName: course.keyPersonName,
         students: lmsStudents.length > 0 ? lmsStudents : storedStudents,

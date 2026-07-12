@@ -197,7 +197,7 @@ class AdminThreadsScreen extends StatelessWidget {
 }
 
 String _studentThreadTitle(String studentName, String targetName) {
-  return 'Student: $studentName -> $targetName';
+  return '$studentName - $targetName';
 }
 
 class _AdminThreadSection extends StatelessWidget {

@@ -57,9 +57,17 @@ describe('AdminService', () => {
           keyPersonName: 'Safy',
           memberships: [
             {
+              role: UserRole.STUDENT,
               user: {
                 lmsUserId: '8680',
                 name: 'Jana ramy ahmed',
+              },
+            },
+            {
+              role: UserRole.TEACHER,
+              user: {
+                lmsUserId: '721258',
+                name: 'Mohamed El-Sayad',
               },
             },
           ],
@@ -84,7 +92,7 @@ describe('AdminService', () => {
         include: expect.objectContaining({
           memberships: expect.objectContaining({
             where: {
-              role: UserRole.STUDENT,
+              role: { in: [UserRole.STUDENT, UserRole.TEACHER] },
               status: MembershipStatus.ACTIVE,
               user: { status: UserStatus.ACTIVE },
             },
@@ -95,6 +103,7 @@ describe('AdminService', () => {
     expect(result.students).toEqual([
       { lmsUserId: '8680', name: 'Jana ramy ahmed' },
     ]);
+    expect(result.teacherName).toBe('Mohamed El-Sayad');
   });
 
   it('denies scoped admins when the course is not in their token claims', async () => {
