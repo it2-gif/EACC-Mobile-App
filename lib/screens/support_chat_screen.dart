@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -8,6 +9,7 @@ import '../models/auth_session.dart';
 import '../services/support_chat_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/time_format.dart';
+import '../widgets/message_bubble.dart';
 import '../widgets/polished_state_card.dart';
 
 class SupportInboxScreen extends StatelessWidget {
@@ -175,11 +177,79 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     }
   }
 
-  Future<void> pickAndSendImage() async {
+  void showAttachmentOptions() {
+    if (isSending || isUploadingImage) return;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 42,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                _SupportAttachmentOption(
+                  icon: Icons.photo_camera_rounded,
+                  title: 'Take photo',
+                  subtitle: 'Capture and send an image',
+                  onTap: () {
+                    Navigator.pop(context);
+                    pickAndSendImage(ImageSource.camera);
+                  },
+                ),
+                _SupportAttachmentOption(
+                  icon: Icons.image_rounded,
+                  title: 'Choose image',
+                  subtitle: 'Send a photo from this device',
+                  onTap: () {
+                    Navigator.pop(context);
+                    pickAndSendImage(ImageSource.gallery);
+                  },
+                ),
+                _SupportAttachmentOption(
+                  icon: Icons.videocam_rounded,
+                  title: 'Send video',
+                  subtitle: 'Upload a short support video',
+                  onTap: () {
+                    Navigator.pop(context);
+                    pickAndSendVideo();
+                  },
+                ),
+                _SupportAttachmentOption(
+                  icon: Icons.description_rounded,
+                  title: 'Send document',
+                  subtitle: 'PDF, Word, Excel, PowerPoint, TXT, CSV',
+                  onTap: () {
+                    Navigator.pop(context);
+                    pickAndSendDocument();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> pickAndSendImage(ImageSource source) async {
     if (isSending || isUploadingImage) return;
 
     final image = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
+      source: source,
       imageQuality: 85,
       maxWidth: 1920,
     );
@@ -211,6 +281,116 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Could not upload image: $error')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          isUploadingImage = false;
+          uploadProgress = 0;
+        });
+      }
+    }
+  }
+
+  Future<void> pickAndSendVideo() async {
+    if (isSending || isUploadingImage) return;
+
+    final video = await ImagePicker().pickVideo(
+      source: ImageSource.gallery,
+      maxDuration: const Duration(minutes: 2),
+    );
+    if (video == null) return;
+
+    setState(() {
+      isUploadingImage = true;
+      uploadProgress = 0;
+    });
+
+    try {
+      final videoBytes = await video.readAsBytes();
+      await SupportChatService.sendVideoMessage(
+        session: widget.session,
+        threadId: threadId,
+        videoBytes: videoBytes,
+        fileName: video.name,
+        requesterName: widget.requesterName,
+        requesterRole: widget.requesterRole,
+        requesterLmsUserId: widget.requesterLmsUserId,
+        onProgress: (progress) {
+          if (!mounted) return;
+          setState(() => uploadProgress = progress);
+        },
+      );
+      scrollToBottom();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not upload video: $error')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          isUploadingImage = false;
+          uploadProgress = 0;
+        });
+      }
+    }
+  }
+
+  Future<void> pickAndSendDocument() async {
+    if (isSending || isUploadingImage) return;
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: [
+        'pdf',
+        'doc',
+        'docx',
+        'ppt',
+        'pptx',
+        'xls',
+        'xlsx',
+        'txt',
+        'csv',
+      ],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    final file = result.files.single;
+    final bytes = file.bytes;
+    if (bytes == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not read the selected document.')),
+      );
+      return;
+    }
+
+    setState(() {
+      isUploadingImage = true;
+      uploadProgress = 0;
+    });
+
+    try {
+      await SupportChatService.sendDocumentMessage(
+        session: widget.session,
+        threadId: threadId,
+        documentBytes: bytes,
+        fileName: file.name,
+        requesterName: widget.requesterName,
+        requesterRole: widget.requesterRole,
+        requesterLmsUserId: widget.requesterLmsUserId,
+        onProgress: (progress) {
+          if (!mounted) return;
+          setState(() => uploadProgress = progress);
+        },
+      );
+      scrollToBottom();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not upload document: $error')),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -292,94 +472,93 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 900),
-            child: Column(
-              children: [
-                Expanded(
-                  child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: SupportChatService.getMessages(threadId: threadId),
-                    builder: (context, snapshot) {
-                      if (snapshot.hasError) {
-                        return _SupportState(
-                          icon: Icons.error_outline_rounded,
-                          title: 'Could not load messages',
-                          subtitle: '${snapshot.error}',
-                        );
-                      }
+        child: Column(
+          children: [
+            Expanded(
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: SupportChatService.getMessages(threadId: threadId),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return _SupportState(
+                      icon: Icons.error_outline_rounded,
+                      title: 'Could not load messages',
+                      subtitle: '${snapshot.error}',
+                    );
+                  }
 
-                      final docs = snapshot.data?.docs ?? [];
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: PolishedLoadingCard(
-                            title: 'Loading support chat',
-                            message: 'Preparing your support conversation.',
-                          ),
-                        );
-                      }
+                  final docs = snapshot.data?.docs ?? [];
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: PolishedLoadingCard(
+                        title: 'Loading support chat',
+                        message: 'Preparing your support conversation.',
+                      ),
+                    );
+                  }
 
-                      if (docs.isEmpty) {
-                        return const _SupportState(
-                          icon: Icons.support_agent_rounded,
-                          title: 'How can we help?',
-                          subtitle:
-                              'Send a message and technical support will reply here.',
-                        );
-                      }
+                  if (docs.isEmpty) {
+                    return const _SupportState(
+                      icon: Icons.support_agent_rounded,
+                      title: 'How can we help?',
+                      subtitle:
+                          'Send a message and technical support will reply here.',
+                    );
+                  }
 
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        unawaited(
-                          SupportChatService.markRead(
-                            session: widget.session,
-                            threadId: threadId,
-                          ),
-                        );
-                      });
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    unawaited(
+                      SupportChatService.markRead(
+                        session: widget.session,
+                        threadId: threadId,
+                      ),
+                    );
+                  });
 
-                      return ListView.builder(
-                        controller: scrollController,
-                        reverse: true,
-                        padding: const EdgeInsets.fromLTRB(14, 16, 14, 18),
-                        itemCount: docs.length,
-                        itemBuilder: (context, index) {
-                          final data = docs[index].data();
-                          final senderName =
-                              data['sender_name']?.toString() ?? '';
-                          final senderRole =
-                              data['sender_role']?.toString() ?? '';
-                          final isMine =
-                              senderName == widget.session.appUser.name &&
-                              (senderRole == widget.session.appUser.role ||
-                                  senderRole == 'support');
+                  return ListView.builder(
+                    controller: scrollController,
+                    reverse: true,
+                    padding: const EdgeInsets.fromLTRB(24, 18, 24, 20),
+                    itemCount: docs.length,
+                    itemBuilder: (context, index) {
+                      final data = docs[index].data();
+                      final senderName = data['sender_name']?.toString() ?? '';
+                      final senderRole = data['sender_role']?.toString() ?? '';
 
-                          return _SupportMessageBubble(
-                            text: data['text']?.toString() ?? '',
-                            type: data['type']?.toString() ?? 'text',
-                            mediaUrl: data['media_url']?.toString(),
-                            fileName: data['file_name']?.toString(),
-                            senderName: senderName,
-                            senderRole: senderRole,
-                            time: formatMessageTime(data['created_at']),
-                            isMine: isMine,
-                          );
-                        },
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: MessageBubble(
+                          text: data['text']?.toString() ?? '',
+                          type: data['type']?.toString() ?? 'text',
+                          mediaUrl: data['media_url']?.toString(),
+                          fileName: data['file_name']?.toString(),
+                          fileSizeBytes: (data['file_size_bytes'] as num?)
+                              ?.toInt(),
+                          fileType: data['file_type']?.toString(),
+                          senderName: senderName,
+                          senderRole: senderRole,
+                          currentUserRole: isSupportUser
+                              ? 'support'
+                              : widget.session.appUser.role,
+                          currentSenderName: widget.session.appUser.name,
+                          createdAt: data['created_at'],
+                          editedAt: null,
+                          deletedAt: null,
+                        ),
                       );
                     },
-                  ),
-                ),
-                _SupportInputBar(
-                  controller: messageController,
-                  isSending: isSending || isUploadingImage,
-                  uploadProgress: isUploadingImage ? uploadProgress : null,
-                  onPickImage: pickAndSendImage,
-                  onSend: sendMessage,
-                ),
-              ],
+                  );
+                },
+              ),
             ),
-          ),
+            _SupportInputBar(
+              controller: messageController,
+              isSending: isSending || isUploadingImage,
+              uploadProgress: isUploadingImage ? uploadProgress : null,
+              onAttach: showAttachmentOptions,
+              onSend: sendMessage,
+            ),
+          ],
         ),
       ),
     );
@@ -607,205 +786,41 @@ class _AnimatedUnreadBadge extends StatelessWidget {
   }
 }
 
-class _SupportMessageBubble extends StatelessWidget {
-  final String text;
-  final String type;
-  final String? mediaUrl;
-  final String? fileName;
-  final String senderName;
-  final String senderRole;
-  final String time;
-  final bool isMine;
+class _SupportAttachmentOption extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
 
-  const _SupportMessageBubble({
-    required this.text,
-    required this.type,
-    this.mediaUrl,
-    this.fileName,
-    required this.senderName,
-    required this.senderRole,
-    required this.time,
-    required this.isMine,
+  const _SupportAttachmentOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = isMine ? AppColors.primary : Colors.white;
-    final textColor = isMine ? Colors.white : AppColors.ink;
-    final isImage = type == 'image' && mediaUrl != null && mediaUrl!.isNotEmpty;
-
-    return Align(
-      alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 560),
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.fromLTRB(14, 11, 14, 9),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(20).copyWith(
-            bottomRight: Radius.circular(isMine ? 6 : 20),
-            bottomLeft: Radius.circular(isMine ? 20 : 6),
-          ),
-          border: isMine ? null : Border.all(color: AppColors.border),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primaryDark.withValues(alpha: 0.06),
-              blurRadius: 16,
-              offset: const Offset(0, 7),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!isMine)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  senderRole == 'support' ? 'Technical Support' : senderName,
-                  style: TextStyle(
-                    color: isMine ? Colors.white70 : AppColors.primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            if (isImage) ...[
-              _SupportImagePreview(
-                url: mediaUrl!,
-                fileName: fileName,
-                isMine: isMine,
-              ),
-              if (text.trim().isNotEmpty) const SizedBox(height: 8),
-            ],
-            if (text.trim().isNotEmpty)
-              Text(
-                text,
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: 14.5,
-                  height: 1.35,
-                ),
-              ),
-            if (time.isNotEmpty) ...[
-              const SizedBox(height: 5),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  time,
-                  style: TextStyle(
-                    color: isMine ? Colors.white70 : AppColors.muted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ],
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+        child: Icon(icon, color: AppColors.primary),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: AppColors.ink,
+          fontWeight: FontWeight.w900,
         ),
       ),
-    );
-  }
-}
-
-class _SupportImagePreview extends StatelessWidget {
-  final String url;
-  final String? fileName;
-  final bool isMine;
-
-  const _SupportImagePreview({
-    required this.url,
-    required this.fileName,
-    required this.isMine,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: () => showDialog<void>(
-        context: context,
-        builder: (_) => Dialog(
-          insetPadding: const EdgeInsets.all(18),
-          child: Stack(
-            children: [
-              InteractiveViewer(child: Image.network(url, fit: BoxFit.contain)),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: IconButton.filledTonal(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close_rounded),
-                ),
-              ),
-            ],
-          ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(
+          color: AppColors.muted,
+          fontWeight: FontWeight.w600,
         ),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          constraints: const BoxConstraints(maxHeight: 260, minWidth: 220),
-          color: isMine
-              ? Colors.white.withValues(alpha: 0.12)
-              : AppColors.background,
-          child: Image.network(
-            url,
-            fit: BoxFit.cover,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return const SizedBox(
-                height: 180,
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2.3),
-                      ),
-                      SizedBox(height: 10),
-                      Text(
-                        'Loading image',
-                        style: TextStyle(
-                          color: AppColors.muted,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-            errorBuilder: (context, error, stackTrace) => SizedBox(
-              height: 140,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.broken_image_outlined,
-                      color: isMine ? Colors.white70 : AppColors.muted,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      fileName ?? 'Could not load image',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: isMine ? Colors.white : AppColors.muted,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+      onTap: onTap,
     );
   }
 }
@@ -814,14 +829,14 @@ class _SupportInputBar extends StatelessWidget {
   final TextEditingController controller;
   final bool isSending;
   final double? uploadProgress;
-  final VoidCallback onPickImage;
+  final VoidCallback onAttach;
   final VoidCallback onSend;
 
   const _SupportInputBar({
     required this.controller,
     required this.isSending,
     required this.uploadProgress,
-    required this.onPickImage,
+    required this.onAttach,
     required this.onSend,
   });
 
@@ -830,6 +845,7 @@ class _SupportInputBar extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Container(
+        width: double.infinity,
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -854,33 +870,22 @@ class _SupportInputBar extends StatelessWidget {
             Row(
               children: [
                 IconButton.filledTonal(
-                  onPressed: isSending ? null : onPickImage,
-                  icon: const Icon(Icons.image_rounded),
-                  tooltip: 'Upload image',
+                  onPressed: isSending ? null : onAttach,
+                  icon: const Icon(Icons.add_rounded),
+                  tooltip: 'Add attachment',
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: AppColors.border),
+                  child: TextField(
+                    controller: controller,
+                    minLines: 1,
+                    maxLines: 4,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: const InputDecoration(
+                      hintText: 'Write a message',
+                      filled: true,
                     ),
-                    child: TextField(
-                      controller: controller,
-                      minLines: 1,
-                      maxLines: 4,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(
-                        hintText: 'Write your support message',
-                        prefixIcon: Icon(Icons.edit_note_rounded),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        filled: false,
-                      ),
-                      onSubmitted: (_) => onSend(),
-                    ),
+                    onSubmitted: (_) => onSend(),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -889,6 +894,9 @@ class _SupportInputBar extends StatelessWidget {
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(50, 50),
                     padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
                   ),
                   child: isSending
                       ? const SizedBox.square(

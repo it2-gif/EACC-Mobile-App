@@ -179,6 +179,111 @@ class SupportChatService {
     );
   }
 
+  static Future<void> sendVideoMessage({
+    required AuthSession session,
+    required String threadId,
+    required Uint8List videoBytes,
+    required String fileName,
+    String? requesterName,
+    String? requesterRole,
+    String? requesterLmsUserId,
+    void Function(double progress)? onProgress,
+  }) async {
+    _validateVideoUpload(fileName: fileName, fileSize: videoBytes.length);
+
+    await _sendAttachmentMessage(
+      session: session,
+      threadId: threadId,
+      bytes: videoBytes,
+      fileName: fileName,
+      type: 'video',
+      lastMessage: 'Video',
+      requesterName: requesterName,
+      requesterRole: requesterRole,
+      requesterLmsUserId: requesterLmsUserId,
+      onProgress: onProgress,
+    );
+  }
+
+  static Future<void> sendDocumentMessage({
+    required AuthSession session,
+    required String threadId,
+    required Uint8List documentBytes,
+    required String fileName,
+    String? requesterName,
+    String? requesterRole,
+    String? requesterLmsUserId,
+    void Function(double progress)? onProgress,
+  }) async {
+    _validateDocumentUpload(fileName: fileName, fileSize: documentBytes.length);
+
+    await _sendAttachmentMessage(
+      session: session,
+      threadId: threadId,
+      bytes: documentBytes,
+      fileName: fileName,
+      type: 'document',
+      lastMessage: fileName,
+      requesterName: requesterName,
+      requesterRole: requesterRole,
+      requesterLmsUserId: requesterLmsUserId,
+      onProgress: onProgress,
+    );
+  }
+
+  static Future<void> _sendAttachmentMessage({
+    required AuthSession session,
+    required String threadId,
+    required Uint8List bytes,
+    required String fileName,
+    required String type,
+    required String lastMessage,
+    String? requesterName,
+    String? requesterRole,
+    String? requesterLmsUserId,
+    void Function(double progress)? onProgress,
+  }) async {
+    final storagePath = _supportStoragePath(threadId, fileName);
+    final uploadTask = _storage
+        .ref()
+        .child(storagePath)
+        .putData(bytes, SettableMetadata(contentType: _contentType(fileName)));
+
+    final progressSubscription = onProgress == null
+        ? null
+        : uploadTask.snapshotEvents.listen((event) {
+            final totalBytes = event.totalBytes;
+            if (totalBytes <= 0) return;
+            onProgress((event.bytesTransferred / totalBytes).clamp(0.0, 1.0));
+          });
+
+    late final TaskSnapshot uploadResult;
+    try {
+      uploadResult = await uploadTask;
+    } finally {
+      await progressSubscription?.cancel();
+    }
+
+    final mediaUrl = await uploadResult.ref.getDownloadURL();
+    await _commitMessage(
+      session: session,
+      threadId: threadId,
+      lastMessage: lastMessage,
+      messageData: {
+        'type': type,
+        'text': '',
+        'media_url': mediaUrl,
+        'file_name': fileName,
+        'file_size_bytes': bytes.length,
+        'file_type': _fileExtension(fileName).toUpperCase(),
+        'storage_path': storagePath,
+      },
+      requesterName: requesterName,
+      requesterRole: requesterRole,
+      requesterLmsUserId: requesterLmsUserId,
+    );
+  }
+
   static Future<void> _commitMessage({
     required AuthSession session,
     required String threadId,
@@ -265,14 +370,73 @@ class SupportChatService {
     }
   }
 
+  static void _validateVideoUpload({
+    required String fileName,
+    required int fileSize,
+  }) {
+    final extension = _fileExtension(fileName).toLowerCase();
+    const allowed = {'mp4', 'mov', 'm4v', 'webm'};
+    if (!allowed.contains(extension)) {
+      throw ArgumentError('Only MP4, MOV, M4V, and WebM videos are supported.');
+    }
+    if (fileSize > 50 * 1024 * 1024) {
+      throw ArgumentError('Video must be 50 MB or smaller.');
+    }
+  }
+
+  static void _validateDocumentUpload({
+    required String fileName,
+    required int fileSize,
+  }) {
+    final extension = _fileExtension(fileName).toLowerCase();
+    const allowed = {
+      'pdf',
+      'doc',
+      'docx',
+      'ppt',
+      'pptx',
+      'xls',
+      'xlsx',
+      'txt',
+      'csv',
+    };
+    if (!allowed.contains(extension)) {
+      throw ArgumentError('This document type is not supported.');
+    }
+    if (fileSize > 20 * 1024 * 1024) {
+      throw ArgumentError('Document must be 20 MB or smaller.');
+    }
+  }
+
   static String _contentType(String fileName) {
     return switch (_fileExtension(fileName).toLowerCase()) {
       'jpg' || 'jpeg' => 'image/jpeg',
       'png' => 'image/png',
       'gif' => 'image/gif',
       'webp' => 'image/webp',
+      'mp4' || 'm4v' => 'video/mp4',
+      'mov' => 'video/quicktime',
+      'webm' => 'video/webm',
+      'pdf' => 'application/pdf',
+      'doc' => 'application/msword',
+      'docx' =>
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'ppt' => 'application/vnd.ms-powerpoint',
+      'pptx' =>
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'xls' => 'application/vnd.ms-excel',
+      'xlsx' =>
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'txt' => 'text/plain',
+      'csv' => 'text/csv',
       _ => 'application/octet-stream',
     };
+  }
+
+  static String _supportStoragePath(String threadId, String fileName) {
+    final safeFileName = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    return 'support_uploads/threads/$threadId/'
+        '${DateTime.now().millisecondsSinceEpoch}_$safeFileName';
   }
 
   static String _fileExtension(String fileName) {
