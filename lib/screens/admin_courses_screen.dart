@@ -8,6 +8,7 @@ import '../services/push_notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/course_card.dart';
+import '../widgets/polished_state_card.dart';
 import '../widgets/screen_header.dart';
 import 'admin_threads_screen.dart';
 
@@ -167,9 +168,9 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
             const SizedBox(height: 18),
           ],
           if (isSearching)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
-              child: Center(child: CircularProgressIndicator()),
+            const PolishedLoadingCard(
+              title: 'Searching course',
+              message: 'Checking your session and LMS course data.',
             )
           else if (canViewAllCourses && !hasSearched)
             const _EmptyState(
@@ -253,27 +254,55 @@ class _CourseLookupBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 520;
+
     return Card(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
+        padding: const EdgeInsets.all(14),
+        child: Flex(
+          direction: compact ? Axis.vertical : Axis.horizontal,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: TextField(
+            if (compact)
+              TextField(
                 controller: controller,
                 decoration: const InputDecoration(
-                  hintText: 'Enter LMS Course ID (e.g. 2297)',
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
+                  labelText: 'Course ID',
+                  hintText: 'Enter LMS Course ID, for example 2297',
+                  prefixIcon: Icon(Icons.search_rounded),
                 ),
                 keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.search,
                 onSubmitted: isSearching ? null : (_) => onSearch(),
+              )
+            else
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  decoration: const InputDecoration(
+                    labelText: 'Course ID',
+                    hintText: 'Enter LMS Course ID, for example 2297',
+                    prefixIcon: Icon(Icons.search_rounded),
+                  ),
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: isSearching ? null : (_) => onSearch(),
+                ),
               ),
-            ),
-            IconButton(
+            SizedBox(width: compact ? 0 : 10, height: compact ? 10 : 0),
+            FilledButton.icon(
               onPressed: isSearching ? null : onSearch,
-              icon: const Icon(Icons.search_rounded, color: AppColors.primary),
+              icon: isSearching
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.search_rounded),
+              label: Text(isSearching ? 'Searching' : 'Search'),
             ),
           ],
         ),
@@ -300,16 +329,28 @@ class _AccessSummary extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         child: Row(
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
-                color: (isSuperAdmin ? AppColors.admin : AppColors.primary)
-                    .withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                gradient: LinearGradient(
+                  colors: [
+                    (isSuperAdmin ? AppColors.admin : AppColors.primary)
+                        .withValues(alpha: 0.14),
+                    (isSuperAdmin ? AppColors.admin : AppColors.primary)
+                        .withValues(alpha: 0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: (isSuperAdmin ? AppColors.admin : AppColors.primary)
+                      .withValues(alpha: 0.15),
+                ),
               ),
               child: Icon(
                 isSuperAdmin
@@ -345,11 +386,77 @@ class _AccessSummary extends StatelessWidget {
                       height: 1.35,
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _SummaryChip(
+                        icon: Icons.chat_bubble_outline_rounded,
+                        label: 'Chats',
+                        color: AppColors.primary,
+                      ),
+                      _SummaryChip(
+                        icon: Icons.campaign_rounded,
+                        label: 'Announcements',
+                        color: AppColors.admin,
+                      ),
+                      _SummaryChip(
+                        icon: Icons.group_outlined,
+                        label: 'Students',
+                        color: AppColors.student,
+                      ),
+                      _SummaryChip(
+                        icon: Icons.person_outline_rounded,
+                        label: 'Teachers',
+                        color: AppColors.teacher,
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SummaryChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _SummaryChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -482,26 +589,13 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          children: [
-            Icon(icon, size: 44, color: AppColors.muted),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.muted, height: 1.35),
-            ),
-          ],
-        ),
-      ),
+    return PolishedStateCard(
+      icon: icon,
+      title: title,
+      message: subtitle,
+      color: icon == Icons.search_off_rounded
+          ? AppColors.warning
+          : AppColors.primary,
     );
   }
 }

@@ -6,6 +6,7 @@ import '../services/firestore_chat_service.dart';
 import '../services/notification_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/time_format.dart';
+import '../widgets/polished_state_card.dart';
 import 'chat_screen.dart';
 
 class TeacherThreadsScreen extends StatelessWidget {
@@ -106,26 +107,58 @@ class TeacherThreadsScreen extends StatelessWidget {
                 }
 
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: PolishedLoadingCard(
+                      title: 'Loading course chats',
+                      message:
+                          'Preparing announcements, contact chat, and student threads.',
+                    ),
+                  );
                 }
 
                 final threads = snapshot.data?.docs ?? [];
                 final items = _buildStudentChatItems(threads);
-                final totalItems =
+                final threadItemCount =
                     items.length + 1 + (hasKeyPersonChat ? 1 : 0);
+                final totalItems = threadItemCount + 2;
 
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: totalItems,
                   itemBuilder: (context, index) {
                     if (index == 0) {
+                      return _TeacherCourseHeader(
+                        courseName: courseName,
+                        courseId: courseId,
+                        studentCount: students.length,
+                        keyPersonName: keyPersonName,
+                        canManageCourse: canManageCourse,
+                        viewerRole: viewerRole,
+                      );
+                    }
+
+                    if (index == 1) {
+                      return const Padding(
+                        padding: EdgeInsets.fromLTRB(2, 8, 2, 12),
+                        child: _SectionLabel(
+                          title: 'Course conversations',
+                          subtitle:
+                              'Announcements, contact-person chat, and student threads',
+                        ),
+                      );
+                    }
+
+                    final contentIndex = index - 2;
+
+                    if (contentIndex == 0) {
                       return _AnnouncementThreadCard(
                         courseId: courseId,
                         onTap: () => _openAnnouncementChat(context),
                       );
                     }
 
-                    if (hasKeyPersonChat && index == 1) {
+                    if (hasKeyPersonChat && contentIndex == 1) {
                       return _AdminTeacherThreadCard(
                         courseId: courseId,
                         title: keyPersonDisplayName,
@@ -136,13 +169,15 @@ class TeacherThreadsScreen extends StatelessWidget {
                       );
                     }
 
-                    final itemIndex = hasKeyPersonChat ? index - 2 : index - 1;
+                    final itemIndex = hasKeyPersonChat
+                        ? contentIndex - 2
+                        : contentIndex - 1;
                     final item = items[itemIndex];
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(18),
                         onTap: () {
                           Navigator.push(
                             context,
@@ -159,20 +194,25 @@ class TeacherThreadsScreen extends StatelessWidget {
                           );
                         },
                         child: Padding(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(18),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Container(
-                                width: 48,
-                                height: 48,
+                                width: 54,
+                                height: 54,
                                 decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(
-                                    alpha: 0.12,
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      AppColors.student.withValues(alpha: 0.16),
+                                      AppColors.student.withValues(alpha: 0.06),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
                                   ),
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                    color: AppColors.primary.withValues(
+                                    color: AppColors.student.withValues(
                                       alpha: 0.14,
                                     ),
                                   ),
@@ -183,7 +223,7 @@ class TeacherThreadsScreen extends StatelessWidget {
                                       ? item.studentName[0].toUpperCase()
                                       : '?',
                                   style: const TextStyle(
-                                    color: AppColors.primary,
+                                    color: AppColors.student,
                                     fontWeight: FontWeight.w800,
                                     fontSize: 16,
                                   ),
@@ -218,9 +258,13 @@ class TeacherThreadsScreen extends StatelessWidget {
                                               vertical: 4,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: AppColors.primary,
+                                              color: AppColors.student,
                                               borderRadius:
                                                   BorderRadius.circular(999),
+                                              border: Border.all(
+                                                color: Colors.white,
+                                                width: 2,
+                                              ),
                                             ),
                                             child: Text(
                                               item.unreadCount > 99
@@ -268,15 +312,15 @@ class TeacherThreadsScreen extends StatelessWidget {
                                     height: 28,
                                     decoration: BoxDecoration(
                                       color: AppColors.background,
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(999),
                                       border: Border.all(
                                         color: AppColors.border,
                                       ),
                                     ),
                                     child: const Icon(
-                                      Icons.chevron_right,
-                                      size: 18,
-                                      color: AppColors.muted,
+                                      Icons.chevron_right_rounded,
+                                      size: 19,
+                                      color: AppColors.primaryDark,
                                     ),
                                   ),
                                 ],
@@ -586,6 +630,182 @@ class TeacherThreadsScreen extends StatelessWidget {
   }
 }
 
+class _TeacherCourseHeader extends StatelessWidget {
+  final String courseName;
+  final String courseId;
+  final int studentCount;
+  final String? keyPersonName;
+  final bool canManageCourse;
+  final String viewerRole;
+
+  const _TeacherCourseHeader({
+    required this.courseName,
+    required this.courseId,
+    required this.studentCount,
+    required this.keyPersonName,
+    required this.canManageCourse,
+    required this.viewerRole,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final contactName = keyPersonName?.trim();
+    final isContactManager = viewerRole == 'admin' || canManageCourse;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.primary, AppColors.primaryDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.18),
+            blurRadius: 24,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+            ),
+            child: const Icon(
+              Icons.forum_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  courseName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _HeroChip(label: 'Course $courseId'),
+                    _HeroChip(
+                      label:
+                          '$studentCount ${studentCount == 1 ? 'student' : 'students'}',
+                    ),
+                    _HeroChip(
+                      label: isContactManager
+                          ? 'Contact manager view'
+                          : 'Teacher view',
+                    ),
+                    if (contactName != null && contactName.isNotEmpty)
+                      _HeroChip(label: 'Contact: $contactName'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroChip extends StatelessWidget {
+  final String label;
+
+  const _HeroChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _SectionLabel({required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Icon(
+            Icons.chat_bubble_rounded,
+            color: AppColors.primary,
+            size: 18,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: AppColors.ink,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppColors.muted, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _StudentChatItem {
   final String threadId;
   final String studentName;
@@ -630,18 +850,25 @@ class _AnnouncementThreadCard extends StatelessWidget {
         return Card(
           margin: const EdgeInsets.only(bottom: 14),
           child: InkWell(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(18),
             onTap: onTap,
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
               child: Row(
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 54,
+                    height: 54,
                     decoration: BoxDecoration(
-                      color: AppColors.admin.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.admin.withValues(alpha: 0.16),
+                          AppColors.admin.withValues(alpha: 0.06),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: AppColors.admin.withValues(alpha: 0.18),
                       ),
@@ -758,7 +985,20 @@ class _AnnouncementThreadCard extends StatelessWidget {
                           ),
                         ),
                       const SizedBox(height: 8),
-                      const Icon(Icons.chevron_right, color: AppColors.muted),
+                      Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: const Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.primaryDark,
+                          size: 19,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -802,18 +1042,25 @@ class _AdminTeacherThreadCard extends StatelessWidget {
         return Card(
           margin: const EdgeInsets.only(bottom: 14),
           child: InkWell(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(18),
             onTap: onTap,
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
               child: Row(
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 54,
+                    height: 54,
                     decoration: BoxDecoration(
-                      color: AppColors.teacher.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.teacher.withValues(alpha: 0.16),
+                          AppColors.teacher.withValues(alpha: 0.06),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: AppColors.teacher.withValues(alpha: 0.18),
                       ),
@@ -850,6 +1097,10 @@ class _AdminTeacherThreadCard extends StatelessWidget {
                                 decoration: BoxDecoration(
                                   color: AppColors.teacher,
                                   borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
                                 ),
                                 child: Text(
                                   unread > 99 ? '99+' : '$unread',
@@ -889,7 +1140,20 @@ class _AdminTeacherThreadCard extends StatelessWidget {
                           ),
                         ),
                       const SizedBox(height: 8),
-                      const Icon(Icons.chevron_right, color: AppColors.muted),
+                      Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: const Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.primaryDark,
+                          size: 19,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -1028,27 +1292,13 @@ class _FullState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 64, color: AppColors.muted),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.muted),
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: PolishedStateCard(
+        icon: icon,
+        title: title,
+        message: subtitle,
+        color: AppColors.warning,
       ),
     );
   }

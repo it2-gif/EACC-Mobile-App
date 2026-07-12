@@ -7,6 +7,7 @@ import '../services/push_notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/course_card.dart';
+import '../widgets/polished_state_card.dart';
 import '../widgets/screen_header.dart';
 import '../widgets/support_entry_card.dart';
 import 'student_course_chats_screen.dart';
@@ -117,26 +118,11 @@ class _EmptyCoursesState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          children: const [
-            Icon(Icons.event_busy_outlined, size: 44, color: AppColors.muted),
-            SizedBox(height: 12),
-            Text(
-              'No open courses',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-            ),
-            SizedBox(height: 6),
-            Text(
-              'Only courses currently open in the LMS will appear here.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.muted),
-            ),
-          ],
-        ),
-      ),
+    return const PolishedStateCard(
+      icon: Icons.event_busy_outlined,
+      title: 'No open courses',
+      message: 'Only courses currently open in the LMS will appear here.',
+      color: AppColors.student,
     );
   }
 }

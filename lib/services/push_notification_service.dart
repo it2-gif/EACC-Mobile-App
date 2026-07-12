@@ -569,24 +569,29 @@ class _TopNotificationBannerState extends State<_TopNotificationBanner>
         position: _slideAnim,
         child: FadeTransition(
           opacity: _fadeAnim,
-          child: GestureDetector(
-            onVerticalDragEnd: (details) {
-              if (details.primaryVelocity != null &&
-                  details.primaryVelocity! < -100) {
-                _dismiss();
-              }
-            },
-            child: Material(
-              color: Colors.transparent,
-              child: _BannerCard(
-                title: widget.title,
-                body: widget.body,
-                progressController: _progressController,
-                onOpen: () {
-                  _dismiss();
-                  widget.onOpen();
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: GestureDetector(
+                onVerticalDragEnd: (details) {
+                  if (details.primaryVelocity != null &&
+                      details.primaryVelocity! < -100) {
+                    _dismiss();
+                  }
                 },
-                onDismiss: _dismiss,
+                child: Material(
+                  color: Colors.transparent,
+                  child: _BannerCard(
+                    title: widget.title,
+                    body: widget.body,
+                    progressController: _progressController,
+                    onOpen: () {
+                      _dismiss();
+                      widget.onOpen();
+                    },
+                    onDismiss: _dismiss,
+                  ),
+                ),
               ),
             ),
           ),

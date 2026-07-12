@@ -72,6 +72,19 @@ class StudentCourseChatsScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               children: [
+                _CourseChatHeader(
+                  courseName: course.name,
+                  courseId: course.id,
+                  category: course.displayCategory,
+                  teacherName: teacherDisplayName,
+                  keyPersonName: keyPersonName,
+                ),
+                const SizedBox(height: 16),
+                const _SectionLabel(
+                  title: 'Course chats',
+                  subtitle: 'Choose who you want to message for this course.',
+                ),
+                const SizedBox(height: 10),
                 _AnnouncementChatTile(course: course, session: session),
                 const SizedBox(height: 12),
                 StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -239,18 +252,25 @@ class _ChatChoiceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           child: Row(
             children: [
               Container(
-                width: 50,
-                height: 50,
+                width: 54,
+                height: 54,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  gradient: LinearGradient(
+                    colors: [
+                      color.withValues(alpha: 0.15),
+                      color.withValues(alpha: 0.06),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: color.withValues(alpha: 0.18)),
                 ),
                 child: Icon(icon, color: color),
@@ -274,10 +294,34 @@ class _ChatChoiceCard extends StatelessWidget {
                           ),
                         ),
                         if (pinned)
-                          const Icon(
-                            Icons.push_pin_rounded,
-                            size: 16,
-                            color: AppColors.admin,
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.admin.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.push_pin_rounded,
+                                  size: 13,
+                                  color: AppColors.admin,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Pinned',
+                                  style: TextStyle(
+                                    color: AppColors.admin,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                       ],
                     ),
@@ -307,6 +351,7 @@ class _ChatChoiceCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: AppColors.primary,
                         borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: Colors.white, width: 2),
                       ),
                       child: Text(
                         badge!,
@@ -328,12 +373,200 @@ class _ChatChoiceCard extends StatelessWidget {
                       ),
                     ),
                   ],
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: const Icon(
+                      Icons.chevron_right_rounded,
+                      color: AppColors.primaryDark,
+                      size: 19,
+                    ),
+                  ),
                 ],
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _CourseChatHeader extends StatelessWidget {
+  final String courseName;
+  final String courseId;
+  final String? category;
+  final String teacherName;
+  final String? keyPersonName;
+
+  const _CourseChatHeader({
+    required this.courseName,
+    required this.courseId,
+    required this.category,
+    required this.teacherName,
+    required this.keyPersonName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF286FBE), AppColors.primaryDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryDark.withValues(alpha: 0.16),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: const Icon(Icons.forum_rounded, color: Colors.white),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      courseName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        height: 1.08,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      'Course $courseId',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.76),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (category != null && category!.trim().isNotEmpty)
+                _HeroChip(label: category!, icon: Icons.category_rounded),
+              _HeroChip(label: teacherName, icon: Icons.menu_book_rounded),
+              if (keyPersonName != null && keyPersonName!.trim().isNotEmpty)
+                _HeroChip(
+                  label: keyPersonName!,
+                  icon: Icons.verified_user_rounded,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+
+  const _HeroChip({required this.label, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 6),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 180),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _SectionLabel({required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title.toUpperCase(),
+          style: const TextStyle(
+            color: AppColors.muted,
+            fontSize: 12,
+            letterSpacing: 1.1,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            color: AppColors.muted,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }

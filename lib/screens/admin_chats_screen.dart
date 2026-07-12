@@ -5,6 +5,7 @@ import '../models/course.dart';
 import '../services/firestore_chat_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/polished_state_card.dart';
 import '../widgets/screen_header.dart';
 import 'chat_screen.dart';
 
@@ -51,15 +52,15 @@ class _AdminChatsScreenState extends State<AdminChatsScreen> {
     final items = loadedCourse == null ? <_ChatItem>[] : _buildChatItems();
 
     return AppScaffold(
-      title: 'Chat Monitor',
+      title: 'Course Chats',
       showLogout: false,
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
           ScreenHeader(
-            title: 'Chat Monitor',
+            title: 'Course Chats',
             subtitle:
-                'Load one LMS course to monitor its teacher and student conversations.',
+                'Search one LMS course to open announcements, teacher chats, and student chats.',
             icon: Icons.forum_rounded,
           ),
           const SizedBox(height: 18),
@@ -150,25 +151,42 @@ class _CourseLookupBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 520;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Row(
+        child: Flex(
+          direction: compact ? Axis.vertical : Axis.horizontal,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: TextField(
+            if (compact)
+              TextField(
                 controller: controller,
                 keyboardType: TextInputType.number,
                 textInputAction: TextInputAction.search,
                 decoration: const InputDecoration(
                   labelText: 'Course ID',
-                  hintText: 'Enter course ID',
-                  prefixIcon: Icon(Icons.filter_alt_rounded),
+                  hintText: 'Enter LMS Course ID, for example 2203',
+                  prefixIcon: Icon(Icons.search_rounded),
                 ),
                 onSubmitted: (_) => onLoad(),
+              )
+            else
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.search,
+                  decoration: const InputDecoration(
+                    labelText: 'Course ID',
+                    hintText: 'Enter LMS Course ID, for example 2203',
+                    prefixIcon: Icon(Icons.search_rounded),
+                  ),
+                  onSubmitted: (_) => onLoad(),
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
+            SizedBox(width: compact ? 0 : 10, height: compact ? 10 : 0),
             FilledButton.icon(
               onPressed: onLoad,
               icon: const Icon(Icons.search_rounded),
@@ -214,57 +232,9 @@ class _ChatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 10,
-        ),
-        leading: CircleAvatar(
-          backgroundColor: item.color.withValues(alpha: 0.1),
-          child: Icon(item.icon, color: item.color, size: 20),
-        ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                item.personName,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: item.color.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                item.roleLabel,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: item.color,
-                  fontWeight: FontWeight.w600,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-        subtitle: Text(
-          '${item.subtitle} - ${item.courseName}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 12, color: AppColors.muted),
-        ),
-        trailing: const Icon(
-          Icons.chevron_right_rounded,
-          color: AppColors.muted,
-        ),
+      margin: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
@@ -279,6 +249,141 @@ class _ChatTile extends StatelessWidget {
               canManageAllMessages: session.appUser.canViewAllCourses,
             ),
           ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      item.color.withValues(alpha: 0.16),
+                      item.color.withValues(alpha: 0.06),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: item.color.withValues(alpha: 0.16)),
+                ),
+                child: Icon(item.icon, color: item.color, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.personName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.ink,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15.5,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: item.color.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: item.color.withValues(alpha: 0.16),
+                            ),
+                          ),
+                          child: Text(
+                            item.roleLabel,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: item.color,
+                              fontWeight: FontWeight.w900,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      item.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: AppColors.muted,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _CoursePill(label: 'Course ${item.courseId}'),
+                        _CoursePill(label: item.courseName),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.primaryDark,
+                  size: 19,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CoursePill extends StatelessWidget {
+  final String label;
+
+  const _CoursePill({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 220),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppColors.muted,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
@@ -298,27 +403,13 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.only(top: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 52, color: AppColors.muted),
-            const SizedBox(height: 14),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.muted),
-            ),
-          ],
-        ),
-      ),
+    return PolishedStateCard(
+      icon: icon,
+      title: title,
+      message: subtitle,
+      color: icon == Icons.search_off_rounded
+          ? AppColors.warning
+          : AppColors.primary,
     );
   }
 }
