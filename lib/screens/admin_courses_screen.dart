@@ -568,6 +568,7 @@ class _AdminCourseCardState extends State<_AdminCourseCard> {
           courseId: widget.course.id,
           courseName: widget.course.displayName,
           teacherName: widget.course.teacherName,
+          keyPersonName: widget.course.keyPersonName,
           students: widget.course.students,
           session: widget.session,
         ),

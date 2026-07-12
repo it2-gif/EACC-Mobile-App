@@ -326,6 +326,70 @@ describe('AuthService', () => {
     );
   });
 
+  it('grants abdelrahman both super-admin and technical-support access', async () => {
+    const lmsUser = {
+      lmsUserId: '92',
+      role: 'admin' as const,
+      name: 'abdelrahman',
+      isSuperAdmin: false,
+      courses: [],
+    };
+    const synced = {
+      user: {
+        id: 'support-admin-uuid',
+        role: 'ADMIN',
+        name: 'abdelrahman',
+        email: null,
+      },
+      courses: [],
+    };
+    const lmsClient = { authenticate: jest.fn().mockResolvedValue(lmsUser) };
+    const authSync = { syncLmsUser: jest.fn().mockResolvedValue(synced) };
+    const prisma = {
+      course: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const firebaseTokens = {
+      createCustomToken: jest.fn().mockResolvedValue('firebase-token'),
+    };
+    const config = {
+      get: jest.fn().mockReturnValue('test'),
+    } as unknown as ConfigService;
+    const service = new AuthService(
+      lmsClient as never,
+      authSync as never,
+      prisma as never,
+      firebaseTokens as never,
+      config as never,
+    );
+
+    const result = await service.login({
+      role: 'admin',
+      username: 'abdelrahman',
+      password: 'Casillas2004',
+    });
+
+    expect(result.appUser.isSuperAdmin).toBe(true);
+    expect(result.appUser.isManagerOperation).toBe(false);
+    expect(result.appUser.canViewAllCourses).toBe(true);
+    expect(result.appUser.isTechnicalSupport).toBe(true);
+    expect(lmsClient.authenticate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hints: expect.objectContaining({
+          hasFullAccess: true,
+          canViewAllCourses: true,
+        }),
+      }),
+    );
+    expect(firebaseTokens.createCustomToken).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isSuperAdmin: true,
+        canViewAllCourses: true,
+        isTechnicalSupport: true,
+      }),
+    );
+  });
   it.each([
     { username: 'youssef', password: 'youssef@2023', name: 'Youssef' },
     { username: 'eman.library', password: 'E123456', name: 'Eman Library' },

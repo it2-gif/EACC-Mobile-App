@@ -231,6 +231,8 @@ class _ChatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final displayTitle = '${item.roleLabel}: ${item.personName}';
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -239,7 +241,7 @@ class _ChatTile extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (_) => ChatScreen(
-              title: item.personName,
+              title: displayTitle,
               currentUserRole: 'admin',
               courseId: item.courseId,
               threadId: item.threadId,
@@ -280,7 +282,7 @@ class _ChatTile extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            item.personName,
+                            displayTitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(

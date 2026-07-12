@@ -10,6 +10,7 @@ class AdminThreadsScreen extends StatelessWidget {
   final String courseId;
   final String courseName;
   final String? teacherName;
+  final String? keyPersonName;
   final AuthSession session;
   final List<CourseStudent> students;
 
@@ -18,6 +19,7 @@ class AdminThreadsScreen extends StatelessWidget {
     required this.courseId,
     required this.courseName,
     this.teacherName,
+    this.keyPersonName,
     required this.session,
     this.students = const [],
   });
@@ -28,8 +30,13 @@ class AdminThreadsScreen extends StatelessWidget {
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     final displayTeacher = teacherName?.trim();
     final teacherTitle = displayTeacher != null && displayTeacher.isNotEmpty
-        ? '$displayTeacher chat'
-        : 'Teacher chat';
+        ? 'Teacher: $displayTeacher'
+        : 'Teacher';
+    final displayContactPerson = keyPersonName?.trim();
+    final contactPersonTitle =
+        displayContactPerson != null && displayContactPerson.isNotEmpty
+        ? 'Contact person: $displayContactPerson'
+        : 'Contact person';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -86,8 +93,7 @@ class AdminThreadsScreen extends StatelessWidget {
 
                 _AdminThreadTile(
                   title: teacherTitle,
-                  subtitle:
-                      'Private chat between the teacher and contact person.',
+                  subtitle: '$teacherTitle - $contactPersonTitle',
                   icon: Icons.admin_panel_settings_rounded,
                   color: AppColors.teacher,
                   badge: const Icon(
@@ -114,8 +120,8 @@ class AdminThreadsScreen extends StatelessWidget {
                 if (items.isNotEmpty) const _AdminThreadSection('Students'),
                 for (final student in items) ...[
                   _AdminThreadTile(
-                    title: '${student.name} - teacher chat',
-                    subtitle: 'View the student conversation with the teacher.',
+                    title: 'Student: ${student.name}',
+                    subtitle: 'Teacher chat - $teacherTitle',
                     iconLabel: student.name.isNotEmpty
                         ? student.name[0].toUpperCase()
                         : '?',
@@ -142,8 +148,8 @@ class AdminThreadsScreen extends StatelessWidget {
                     ),
                   ),
                   _AdminThreadTile(
-                    title: '${student.name} - contact person chat',
-                    subtitle: 'Private chat between you and this student.',
+                    title: 'Student: ${student.name}',
+                    subtitle: 'Contact person chat - $contactPersonTitle',
                     icon: Icons.verified_user_rounded,
                     color: AppColors.admin,
                     badge: _ThreadBadge(

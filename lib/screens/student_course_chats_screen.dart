@@ -104,7 +104,7 @@ class StudentCourseChatsScreen extends StatelessWidget {
                     );
 
                     return _ChatChoiceCard(
-                      title: '$teacherDisplayName chat',
+                      title: 'Teacher: $teacherDisplayName',
                       subtitle: lastMessage,
                       time: lastTime,
                       icon: Icons.support_agent_rounded,
@@ -114,7 +114,7 @@ class StudentCourseChatsScreen extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (_) => ChatScreen(
-                            title: teacherDisplayName,
+                            title: 'Teacher: $teacherDisplayName',
                             currentUserRole: 'student',
                             courseId: course.id,
                             threadId: studentThreadId,
@@ -145,7 +145,7 @@ class StudentCourseChatsScreen extends StatelessWidget {
                       );
 
                       return _ChatChoiceCard(
-                        title: '$keyPersonDisplayName chat',
+                        title: 'Contact person: $keyPersonDisplayName',
                         subtitle: lastMessage,
                         time: lastTime,
                         icon: Icons.verified_user_rounded,
@@ -155,7 +155,7 @@ class StudentCourseChatsScreen extends StatelessWidget {
                           context,
                           MaterialPageRoute(
                             builder: (_) => ChatScreen(
-                              title: keyPersonDisplayName,
+                              title: 'Contact person: $keyPersonDisplayName',
                               currentUserRole: 'student',
                               courseId: course.id,
                               threadId: keyPersonThreadId,
@@ -485,10 +485,13 @@ class _CourseChatHeader extends StatelessWidget {
             children: [
               if (category != null && category!.trim().isNotEmpty)
                 _HeroChip(label: category!, icon: Icons.category_rounded),
-              _HeroChip(label: teacherName, icon: Icons.menu_book_rounded),
+              _HeroChip(
+                label: 'Teacher: $teacherName',
+                icon: Icons.menu_book_rounded,
+              ),
               if (keyPersonName != null && keyPersonName!.trim().isNotEmpty)
                 _HeroChip(
-                  label: keyPersonName!,
+                  label: 'Contact person: $keyPersonName',
                   icon: Icons.verified_user_rounded,
                 ),
             ],
