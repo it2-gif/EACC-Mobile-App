@@ -464,9 +464,7 @@ class FirestoreChatService {
     final normalizedName = readerName.trim();
     if (user == null || normalizedName.isEmpty) return;
 
-    final threadRef = _threadsRef(
-      courseId: courseId,
-    ).doc(announcementThreadId);
+    final threadRef = _threadsRef(courseId: courseId).doc(announcementThreadId);
 
     await _db.runTransaction((transaction) async {
       final snapshot = await transaction.get(threadRef);
@@ -1321,8 +1319,5 @@ class AdminUnreadCounts {
   final int teacherUnread;
   final int studentUnread;
 
-  AdminUnreadCounts({
-    required this.teacherUnread,
-    required this.studentUnread,
-  });
+  AdminUnreadCounts({required this.teacherUnread, required this.studentUnread});
 }

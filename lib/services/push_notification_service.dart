@@ -170,7 +170,9 @@ class PushNotificationService {
 
   Future<void> _registerDeviceTokenIfPossible({bool force = false}) async {
     if (_session == null || _session!.appUser.isSuperAdmin) {
-      debugPrint('Device token registration skipped: no active session or super admin.');
+      debugPrint(
+        'Device token registration skipped: no active session or super admin.',
+      );
       return;
     }
 
@@ -293,8 +295,7 @@ class PushNotificationService {
 
     final course = _findCourse(session, courseId);
     final studentName = message.data['studentName']?.toString();
-    final senderName =
-        message.data['senderName']?.toString() ?? 'EACC Connect';
+    final senderName = message.data['senderName']?.toString() ?? 'EACC Connect';
 
     _openChatFromRoute(
       session: session,

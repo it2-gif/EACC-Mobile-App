@@ -369,15 +369,17 @@ class _CourseAnnouncementPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final shouldShowMatches = !searchRequired || filter.isNotEmpty;
     final visibleCourses = shouldShowMatches
-        ? courses.where((course) {
-            if (filter.isEmpty) return true;
-            final searchable = [
-              course.id,
-              course.displayName,
-              course.category,
-            ].join(' ').toLowerCase();
-            return searchable.contains(filter);
-          }).toList(growable: false)
+        ? courses
+              .where((course) {
+                if (filter.isEmpty) return true;
+                final searchable = [
+                  course.id,
+                  course.displayName,
+                  course.category,
+                ].join(' ').toLowerCase();
+                return searchable.contains(filter);
+              })
+              .toList(growable: false)
         : <Course>[];
 
     return Card(
@@ -389,7 +391,8 @@ class _CourseAnnouncementPanel extends StatelessWidget {
             const _PanelTitle(
               icon: Icons.campaign_rounded,
               title: 'Course announcements',
-              subtitle: 'Send one update to selected course announcement chats.',
+              subtitle:
+                  'Send one update to selected course announcement chats.',
             ),
             const SizedBox(height: 14),
             _FilterField(
@@ -575,8 +578,7 @@ class _CourseSelectionTile extends StatelessWidget {
             runSpacing: 4,
             children: [
               Text('Course ${course.id}'),
-              if (course.displayCategory != null)
-                Text(course.displayCategory!),
+              if (course.displayCategory != null) Text(course.displayCategory!),
               Text('$readCount read'),
               Text(pinned ? 'Pinned' : 'Unpinned'),
             ],
@@ -623,16 +625,18 @@ class _PrivateBroadcastPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final shouldShowMatches = !searchRequired || filter.isNotEmpty;
     final visibleTargets = shouldShowMatches
-        ? targets.where((target) {
-            if (filter.isEmpty) return true;
-            final searchable = [
-              target.studentName,
-              target.studentId,
-              target.courseName,
-              target.courseId,
-            ].join(' ').toLowerCase();
-            return searchable.contains(filter);
-          }).toList(growable: false)
+        ? targets
+              .where((target) {
+                if (filter.isEmpty) return true;
+                final searchable = [
+                  target.studentName,
+                  target.studentId,
+                  target.courseName,
+                  target.courseId,
+                ].join(' ').toLowerCase();
+                return searchable.contains(filter);
+              })
+              .toList(growable: false)
         : <_StudentTarget>[];
 
     return Card(

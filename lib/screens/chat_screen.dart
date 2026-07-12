@@ -811,11 +811,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
   bool get canForwardMessages =>
       !widget.readOnly &&
-      (widget.currentUserRole == 'teacher' || widget.currentUserRole == 'admin');
+      (widget.currentUserRole == 'teacher' ||
+          widget.currentUserRole == 'admin');
 
   bool get canPinMessages =>
       !widget.readOnly &&
-      (widget.currentUserRole == 'teacher' || widget.currentUserRole == 'admin');
+      (widget.currentUserRole == 'teacher' ||
+          widget.currentUserRole == 'admin');
 
   void toggleMessageSearch() {
     setState(() {
@@ -2552,9 +2554,7 @@ class _TypingIndicatorBar extends StatelessWidget {
 class _AnnouncementReadReceiptsBar extends StatelessWidget {
   final List<_AnnouncementRead> reads;
 
-  const _AnnouncementReadReceiptsBar({
-    required this.reads,
-  });
+  const _AnnouncementReadReceiptsBar({required this.reads});
 
   @override
   Widget build(BuildContext context) {
@@ -2609,10 +2609,7 @@ class _AnnouncementReadReceiptsBar extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.muted,
-              ),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
             ],
           ),
         ),
@@ -3032,7 +3029,11 @@ class _ReadOnlyChatBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.visibility_rounded, color: AppColors.primary, size: 20),
+          const Icon(
+            Icons.visibility_rounded,
+            color: AppColors.primary,
+            size: 20,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

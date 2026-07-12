@@ -106,8 +106,7 @@ class Course {
   }
 
   static String? _readKeyPersonLmsUserId(Map<String, dynamic> json) {
-    final value =
-        json['keyPersonLmsUserId'] ?? json['key_person_lms_user_id'];
+    final value = json['keyPersonLmsUserId'] ?? json['key_person_lms_user_id'];
     if (value is String && value.trim().isNotEmpty) {
       return value.trim();
     }

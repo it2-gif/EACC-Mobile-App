@@ -129,11 +129,10 @@ class TeacherThreadsScreen extends StatelessWidget {
                       return _AdminTeacherThreadCard(
                         courseId: courseId,
                         title: keyPersonDisplayName,
-                        subtitle: 'Talk directly with the course contact person',
-                        onTap: () => _openAdminChat(
-                          context,
-                          keyPersonDisplayName,
-                        ),
+                        subtitle:
+                            'Talk directly with the course contact person',
+                        onTap: () =>
+                            _openAdminChat(context, keyPersonDisplayName),
                       );
                     }
 

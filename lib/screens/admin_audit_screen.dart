@@ -36,8 +36,7 @@ class AdminAuditScreen extends StatelessWidget {
             return const _StateMessage(
               icon: Icons.manage_search_rounded,
               title: 'No deleted messages yet',
-              message:
-                  'Deleted messages and message edits will appear here.',
+              message: 'Deleted messages and message edits will appear here.',
             );
           }
 

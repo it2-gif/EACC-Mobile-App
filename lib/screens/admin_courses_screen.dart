@@ -78,9 +78,10 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
         } catch (refreshError) {
           if (mounted) {
             setState(() {
-              searchError = refreshError
-                  .toString()
-                  .replaceFirst('Exception: ', '');
+              searchError = refreshError.toString().replaceFirst(
+                'Exception: ',
+                '',
+              );
               isSearching = false;
             });
           }
@@ -138,14 +139,14 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
             subtitle: isSuperAdmin
                 ? 'Full access is enabled. Search a course ID to view its chats.'
                 : isManagerOperation
-                    ? 'Manager operation is active. Search a course ID to view its chats.'
+                ? 'Manager operation is active. Search a course ID to view its chats.'
                 : widget.session.courses.isEmpty
-                    ? 'No courses are linked to your contact-person account yet.'
-                    : 'Contact-person access is active. You can monitor only your linked courses.',
+                ? 'No courses are linked to your contact-person account yet.'
+                : 'Contact-person access is active. You can monitor only your linked courses.',
             icon: isSuperAdmin
                 ? Icons.admin_panel_settings_rounded
                 : isManagerOperation
-                    ? Icons.manage_accounts_rounded
+                ? Icons.manage_accounts_rounded
                 : Icons.verified_user_outlined,
           ),
           const SizedBox(height: 18),
@@ -174,28 +175,32 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
             const _EmptyState(
               icon: Icons.search_rounded,
               title: 'Search for a course',
-              subtitle: 'Enter a course ID above to view its details and chats.',
+              subtitle:
+                  'Enter a course ID above to view its details and chats.',
             )
           else if (canViewAllCourses && searchedCourse == null)
             _EmptyState(
               icon: Icons.search_off_rounded,
               title: 'Course not found',
               subtitle:
-                  searchError ?? 'No course with that ID exists in the database.',
+                  searchError ??
+                  'No course with that ID exists in the database.',
             )
           else if (courses.isEmpty)
             _EmptyState(
               icon: Icons.inventory_2_outlined,
-              title: canViewAllCourses ? 'No active courses' : 'No linked courses',
+              title: canViewAllCourses
+                  ? 'No active courses'
+                  : 'No linked courses',
               subtitle: canViewAllCourses
                   ? 'Courses will appear here after they are synced.'
                   : 'Ask a full-access admin to assign you as contact person in the LMS, then log in again.',
             )
           else
-            ...courses.map((course) => _AdminCourseCard(
-                  course: course,
-                  session: widget.session,
-                )),
+            ...courses.map(
+              (course) =>
+                  _AdminCourseCard(course: course, session: widget.session),
+            ),
         ],
       ),
     );
@@ -216,10 +221,7 @@ class _SearchNotice extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              Icons.info_outline_rounded,
-              color: AppColors.warning,
-            ),
+            Icon(Icons.info_outline_rounded, color: AppColors.warning),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -313,8 +315,8 @@ class _AccessSummary extends StatelessWidget {
                 isSuperAdmin
                     ? Icons.workspace_premium_outlined
                     : isManagerOperation
-                        ? Icons.manage_accounts_rounded
-                        : Icons.link_outlined,
+                    ? Icons.manage_accounts_rounded
+                    : Icons.link_outlined,
                 color: isSuperAdmin ? AppColors.admin : AppColors.primary,
               ),
             ),
@@ -327,7 +329,7 @@ class _AccessSummary extends StatelessWidget {
                     isSuperAdmin
                         ? 'Full access admin'
                         : canViewAllCourses
-                            ? 'Manager operation courses and students'
+                        ? 'Manager operation courses and students'
                         : 'Contact manager courses and students',
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,

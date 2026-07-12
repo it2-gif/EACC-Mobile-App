@@ -123,8 +123,7 @@ class StudentCourseChatsScreen extends StatelessWidget {
                     builder: (context, snapshot) {
                       final data = snapshot.data?.data();
                       final unread =
-                          (data?['student_unread_count'] as num?)?.toInt() ??
-                          0;
+                          (data?['student_unread_count'] as num?)?.toInt() ?? 0;
                       final lastMessage =
                           data?['last_message']?.toString() ??
                           'Chat directly with $keyPersonDisplayName';

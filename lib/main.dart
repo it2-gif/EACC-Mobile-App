@@ -57,9 +57,8 @@ Future<void> _initializeNotifications(AuthSession? session) async {
     debugPrint('Notification initialization failed: $error');
     debugPrintStack(stackTrace: stackTrace);
   }
-} 
- 
- 
+}
+
 class EaccChatApp extends StatelessWidget {
   final Future<AuthSession?> initialSessionLoader;
 
