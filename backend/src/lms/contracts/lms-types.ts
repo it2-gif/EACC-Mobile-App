@@ -32,6 +32,7 @@ export interface NormalizedLmsCourse {
   lmsCourseId: string;
   name: string;
   category?: string;
+  teacherName?: string;
   keyPersonLmsUserId?: string;
   keyPersonName?: string;
   students?: NormalizedLmsStudent[];

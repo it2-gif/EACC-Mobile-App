@@ -251,6 +251,7 @@ export class AdminService {
         lmsCourseId: course.lmsCourseId,
         name: course.name,
         category: course.category,
+        teacherName: lmsCourse.teacherName,
         keyPersonLmsUserId: course.keyPersonLmsUserId,
         keyPersonName: course.keyPersonName,
         students: students.map((student) => ({
@@ -272,10 +273,7 @@ export class AdminService {
       });
     }
 
-    if (
-      identity.isSuperAdmin === true ||
-      identity.canViewAllCourses === true
-    ) {
+    if (identity.isSuperAdmin === true || identity.canViewAllCourses === true) {
       return;
     }
 
@@ -305,10 +303,7 @@ export class AdminService {
       });
     }
 
-    if (
-      identity.isSuperAdmin === true ||
-      identity.canViewAllCourses === true
-    ) {
+    if (identity.isSuperAdmin === true || identity.canViewAllCourses === true) {
       return;
     }
 

@@ -120,7 +120,7 @@ class AdminThreadsScreen extends StatelessWidget {
                 if (items.isNotEmpty) const _AdminThreadSection('Students'),
                 for (final student in items) ...[
                   _AdminThreadTile(
-                    title: 'Student: ${student.name}',
+                    title: _studentThreadTitle(student.name, teacherTitle),
                     subtitle: 'Teacher chat - $teacherTitle',
                     iconLabel: student.name.isNotEmpty
                         ? student.name[0].toUpperCase()
@@ -134,7 +134,10 @@ class AdminThreadsScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (_) => ChatScreen(
-                          title: student.name,
+                          title: _studentThreadTitle(
+                            student.name,
+                            teacherTitle,
+                          ),
                           currentUserRole: 'admin',
                           courseId: courseId,
                           threadId: student.id,
@@ -148,7 +151,10 @@ class AdminThreadsScreen extends StatelessWidget {
                     ),
                   ),
                   _AdminThreadTile(
-                    title: 'Student: ${student.name}',
+                    title: _studentThreadTitle(
+                      student.name,
+                      contactPersonTitle,
+                    ),
                     subtitle: 'Contact person chat - $contactPersonTitle',
                     icon: Icons.verified_user_rounded,
                     color: AppColors.admin,
@@ -160,7 +166,10 @@ class AdminThreadsScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (_) => ChatScreen(
-                          title: '${student.name} - contact person',
+                          title: _studentThreadTitle(
+                            student.name,
+                            contactPersonTitle,
+                          ),
                           currentUserRole: 'admin',
                           courseId: courseId,
                           threadId:
@@ -185,6 +194,10 @@ class AdminThreadsScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+String _studentThreadTitle(String studentName, String targetName) {
+  return 'Student: $studentName -> $targetName';
 }
 
 class _AdminThreadSection extends StatelessWidget {

@@ -100,6 +100,13 @@ function readCourses(
       lmsCourseId: readRequiredString(data, ['course_id', 'id']),
       name: readRequiredString(data, ['course_name', 'name']),
       category: readOptionalString(data, ['category', 'course_category']),
+      teacherName: readOptionalString(data, [
+        'teacher_name',
+        'teacherName',
+        'teacher_shortname',
+        'teacherShortname',
+        'te_name',
+      ]),
       keyPersonLmsUserId: readOptionalString(data, [
         'key_person',
         'key_person_id',

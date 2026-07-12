@@ -1,6 +1,9 @@
 import * as cheerio from 'cheerio';
 import type { AnyNode } from 'domhandler';
-import { NormalizedLmsCourse, NormalizedLmsStudent } from './contracts/lms-types';
+import {
+  NormalizedLmsCourse,
+  NormalizedLmsStudent,
+} from './contracts/lms-types';
 
 const courseIdPattern = /[?&]wcid=([A-Za-z0-9_-]+)/i;
 type CheerioRoot = ReturnType<typeof cheerio.load>;
@@ -48,9 +51,7 @@ export function parseAdminCoursesHtml(
     );
     const courseIndex = headers.findIndex(
       (header) =>
-        header === 'course' ||
-        header === 'coursename' ||
-        header === 'level',
+        header === 'course' || header === 'coursename' || header === 'level',
     );
     const department =
       cells[departmentIndex >= 0 ? departmentIndex : 1]?.trim();
@@ -144,7 +145,9 @@ export function parseAdminFromUserList(
         fullAccessIndex >= 0 ? $(cells[fullAccessIndex]) : undefined;
       const isSuperAdmin =
         readFullAccessControl($, $(row)) ??
-        (fullAccessCell ? readExactFullAccess(fullAccessCell.text()) : undefined);
+        (fullAccessCell
+          ? readExactFullAccess(fullAccessCell.text())
+          : undefined);
       const detailsPath = $(row)
         .find('a[href]')
         .toArray()
@@ -250,11 +253,29 @@ export function parseAdminCourseEditHtml(
     $,
     'select[name="category"], select#category, select[name="cat"], select#cat, input[name="category"], input#category',
   );
+  const teacherName = readControlText(
+    $,
+    [
+      'select[name="teacher"]',
+      'select#teacher',
+      'select[name="teacher_id"]',
+      'select#teacher_id',
+      'select[name="teacherid"]',
+      'select#teacherid',
+      'select[name="te_id"]',
+      'select#te_id',
+      'input[name="teacher"]',
+      'input#teacher',
+      'input[name="teacher_name"]',
+      'input#teacher_name',
+    ].join(', '),
+  );
 
   return {
     lmsCourseId,
     name,
     category,
+    teacherName,
     keyPersonLmsUserId: keyPerson.value,
     keyPersonName: keyPerson.text,
   };
@@ -326,9 +347,7 @@ function readSelectedOption(
         ? matching
         : select.find('option').first();
 
-  const resolvedValue = cleanText(
-    String(option.attr('value') ?? value ?? ''),
-  );
+  const resolvedValue = cleanText(String(option.attr('value') ?? value ?? ''));
   const text = cleanText(option.text());
 
   return resolvedValue || text
@@ -413,7 +432,7 @@ export function parseAdminCourseStudentsHtml(
 
     // First cell is ID (e.g. <td>8660</td>)
     const lmsUserId = $(cells[0]).text().trim();
-    
+
     // Second cell contains the name inside an anchor tag
     // e.g. <td><a href='details.php?stid=8660'>test2</a>...
     const nameAnchor = $(cells[1]).find('a').first();

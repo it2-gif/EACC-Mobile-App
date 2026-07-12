@@ -98,8 +98,7 @@ export class AuthService {
           : {}),
       });
       const synced = await this.authSync.syncLmsUser(lmsUser);
-      const isSuperAdmin =
-        lmsUser.role === 'admin' && hasSuperAdminCredentials;
+      const isSuperAdmin = lmsUser.role === 'admin' && hasSuperAdminCredentials;
       const isManagerOperation =
         lmsUser.role === 'admin' && hasManagerOperationCredentials;
       const isTechnicalSupport = hasTechnicalSupportCredentials;
@@ -115,18 +114,22 @@ export class AuthService {
           : null;
       const sessionCourses =
         adminCourses ??
-        synced.courses.map((course) => ({
-          id: course.id,
-          lmsCourseId: course.lmsCourseId,
-          name: course.name,
-          category: course.category,
-          keyPersonLmsUserId: course.keyPersonLmsUserId,
-          keyPersonName: course.keyPersonName,
-          students:
-            lmsUser.courses.find(
-              (lmsCourse) => lmsCourse.lmsCourseId === course.lmsCourseId,
-            )?.students ?? [],
-        }));
+        synced.courses.map((course) => {
+          const lmsCourse = lmsUser.courses.find(
+            (entry) => entry.lmsCourseId === course.lmsCourseId,
+          );
+
+          return {
+            id: course.id,
+            lmsCourseId: course.lmsCourseId,
+            name: course.name,
+            category: course.category,
+            teacherName: lmsCourse?.teacherName,
+            keyPersonLmsUserId: course.keyPersonLmsUserId,
+            keyPersonName: course.keyPersonName,
+            students: lmsCourse?.students ?? [],
+          };
+        });
       const courseIds =
         isManagerOperation && !isSuperAdmin
           ? []
@@ -202,8 +205,7 @@ export class AuthService {
       credentials.password === SUPER_ADMIN_PASSWORD;
 
     return (
-      isPrimarySuperAdmin ||
-      this.matchesHardcodedTechnicalSupport(credentials)
+      isPrimarySuperAdmin || this.matchesHardcodedTechnicalSupport(credentials)
     );
   }
 
@@ -280,18 +282,17 @@ export class AuthService {
       },
     });
 
-    const lmsStudentsByCourseId = new Map(
-      lmsCourses.map((course) => [
-        course.lmsCourseId,
-        (course.students ?? []).map((student) => ({
-          lmsUserId: student.lmsUserId,
-          name: student.name,
-        })),
-      ]),
+    const lmsCourseById = new Map(
+      lmsCourses.map((course) => [course.lmsCourseId, course]),
     );
 
     return courses.map((course) => {
-      const lmsStudents = lmsStudentsByCourseId.get(course.lmsCourseId) ?? [];
+      const lmsCourse = lmsCourseById.get(course.lmsCourseId);
+      const lmsStudents =
+        lmsCourse?.students?.map((student) => ({
+          lmsUserId: student.lmsUserId,
+          name: student.name,
+        })) ?? [];
       const storedStudents = course.memberships.map((membership) => ({
         lmsUserId: membership.user.lmsUserId,
         name: membership.user.name,
@@ -302,6 +303,7 @@ export class AuthService {
         lmsCourseId: course.lmsCourseId,
         name: course.name,
         category: course.category,
+        teacherName: lmsCourse?.teacherName,
         keyPersonLmsUserId: course.keyPersonLmsUserId,
         keyPersonName: course.keyPersonName,
         students: lmsStudents.length > 0 ? lmsStudents : storedStudents,
