@@ -1599,9 +1599,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
                             if (snapshot.connectionState ==
                                 ConnectionState.waiting) {
-                              return const Center(
-                                child: CircularProgressIndicator(),
-                              );
+                              return const _ChatLoadingCard();
                             }
 
                             final threadData = threadSnapshot.data?.data();
@@ -2038,7 +2036,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   SafeArea(
                     child: canSendInThread
                         ? Container(
-                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               border: const Border(
@@ -2111,12 +2109,22 @@ class _ChatScreenState extends State<ChatScreen> {
                                             )
                                           : Container(
                                               decoration: BoxDecoration(
-                                                color: AppColors.background,
+                                                color: Colors.white,
                                                 borderRadius:
-                                                    BorderRadius.circular(16),
+                                                    BorderRadius.circular(20),
                                                 border: Border.all(
                                                   color: AppColors.border,
                                                 ),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: AppColors.primaryDark
+                                                        .withValues(
+                                                          alpha: 0.04,
+                                                        ),
+                                                    blurRadius: 14,
+                                                    offset: const Offset(0, 6),
+                                                  ),
+                                                ],
                                               ),
                                               child: TextField(
                                                 controller: messageController,
@@ -3151,20 +3159,43 @@ class _ReadOnlyChatBar extends StatelessWidget {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primary.withValues(alpha: 0.1),
+            AppColors.sky.withValues(alpha: 0.68),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryDark.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.visibility_rounded,
-            color: AppColors.primary,
-            size: 20,
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: const Icon(
+              Icons.visibility_rounded,
+              color: AppColors.primary,
+              size: 20,
+            ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               message,
@@ -3211,6 +3242,20 @@ class _ChatStatusPill extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ChatLoadingCard extends StatelessWidget {
+  const _ChatLoadingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _ChatStateCard(
+      icon: Icons.forum_rounded,
+      title: 'Loading chat',
+      subtitle: 'Preparing messages, files, and read status.',
+      color: AppColors.primary,
     );
   }
 }

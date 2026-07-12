@@ -6,6 +6,7 @@ import '../services/firestore_chat_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/time_format.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/polished_state_card.dart';
 
 class AdminModerationScreen extends StatefulWidget {
   final AuthSession session;
@@ -94,7 +95,13 @@ class _AdminModerationScreenState extends State<AdminModerationScreen> {
               onSearchChanged: (value) {
                 setState(() => query = value.trim().toLowerCase());
               },
-              child: const Center(child: CircularProgressIndicator()),
+              child: const Padding(
+                padding: EdgeInsets.all(16),
+                child: PolishedLoadingCard(
+                  title: 'Loading messages',
+                  message: 'Fetching the latest course messages for review.',
+                ),
+              ),
             );
           }
 
@@ -345,6 +352,8 @@ class _ModerationShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 620;
+
     return Column(
       children: [
         Padding(
@@ -353,10 +362,12 @@ class _ModerationShell extends StatelessWidget {
             children: [
               if (!canBulkModerate) const _PermissionBanner(),
               if (!canBulkModerate) const SizedBox(height: 10),
-              Row(
+              Flex(
+                direction: compact ? Axis.vertical : Axis.horizontal,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: TextField(
+                  if (compact)
+                    TextField(
                       controller: courseIdController,
                       keyboardType: TextInputType.number,
                       textInputAction: TextInputAction.search,
@@ -366,9 +377,22 @@ class _ModerationShell extends StatelessWidget {
                         prefixIcon: Icon(Icons.filter_alt_rounded),
                       ),
                       onSubmitted: (_) => onLoad(),
+                    )
+                  else
+                    Expanded(
+                      child: TextField(
+                        controller: courseIdController,
+                        keyboardType: TextInputType.number,
+                        textInputAction: TextInputAction.search,
+                        decoration: const InputDecoration(
+                          hintText: 'Course ID, for example 2203',
+                          labelText: 'Course ID',
+                          prefixIcon: Icon(Icons.filter_alt_rounded),
+                        ),
+                        onSubmitted: (_) => onLoad(),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: compact ? 0 : 10, height: compact ? 10 : 0),
                   FilledButton.icon(
                     onPressed: onLoad,
                     icon: const Icon(Icons.manage_search_rounded),
@@ -430,47 +454,47 @@ class _ModerationToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            '$visibleCount recent messages from course $loadedCourseId',
-            style: const TextStyle(
-              color: AppColors.muted,
-              fontWeight: FontWeight.w700,
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _Pill(label: '$visibleCount messages', color: AppColors.primary),
+            _Pill(label: 'Course $loadedCourseId', color: AppColors.admin),
+            IconButton.filledTonal(
+              tooltip: 'Refresh course messages',
+              onPressed: onRefresh,
+              icon: const Icon(Icons.refresh_rounded),
             ),
-          ),
+            if (canBulkModerate) ...[
+              TextButton(
+                onPressed: onSelectVisible,
+                child: const Text('Select visible'),
+              ),
+              TextButton(
+                onPressed: selectedCount == 0 ? null : onClear,
+                child: const Text('Clear'),
+              ),
+              FilledButton.icon(
+                onPressed: isDeleting ? null : onDelete,
+                icon: isDeleting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.delete_outline_rounded),
+                label: Text(
+                  selectedCount == 0 ? 'Delete' : 'Delete $selectedCount',
+                ),
+              ),
+            ],
+          ],
         ),
-        IconButton(
-          tooltip: 'Refresh course messages',
-          onPressed: onRefresh,
-          icon: const Icon(Icons.refresh_rounded),
-        ),
-        if (canBulkModerate) ...[
-          TextButton(
-            onPressed: onSelectVisible,
-            child: const Text('Select visible'),
-          ),
-          TextButton(
-            onPressed: selectedCount == 0 ? null : onClear,
-            child: const Text('Clear'),
-          ),
-          const SizedBox(width: 6),
-          FilledButton.icon(
-            onPressed: isDeleting ? null : onDelete,
-            icon: isDeleting
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.delete_outline_rounded),
-            label: Text(
-              selectedCount == 0 ? 'Delete' : 'Delete $selectedCount',
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 }
@@ -500,12 +524,12 @@ class _ModerationMessageTile extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Checkbox(value: selected, onChanged: canSelect ? onChanged : null),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -587,10 +611,10 @@ class _PermissionBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.admin.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.admin.withValues(alpha: 0.25)),
       ),
       child: const Row(
@@ -667,27 +691,15 @@ class _StateMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 48, color: AppColors.primary),
-            const SizedBox(height: 14),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.muted, height: 1.4),
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: PolishedStateCard(
+        icon: icon,
+        title: title,
+        message: message,
+        color: icon == Icons.error_outline_rounded
+            ? AppColors.danger
+            : AppColors.primary,
       ),
     );
   }

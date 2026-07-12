@@ -242,7 +242,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppColors.background,
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.primary.withValues(alpha: 0.08),
+                              AppColors.sky.withValues(alpha: 0.72),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: AppColors.border),
                         ),
@@ -341,53 +348,119 @@ class _LoginScreenState extends State<LoginScreen> {
                         onSubmitted: (_) => login(),
                       ),
                       const SizedBox(height: 10),
-                      Text(
-                        selectedRole == 'admin'
-                            ? 'Admin sign-in is verified through the EACC LMS.'
-                            : 'This sign-in is verified through the EACC LMS.',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.muted,
-                          height: 1.35,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.lock_outline_rounded,
+                              size: 18,
+                              color: AppColors.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                selectedRole == 'admin'
+                                    ? 'Admin sign-in is verified through the EACC LMS.'
+                                    : 'This sign-in is verified through the EACC LMS.',
+                                textAlign: TextAlign.left,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.muted,
+                                  height: 1.35,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      if (errorMessage != null) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.danger.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: AppColors.danger.withValues(alpha: 0.18),
-                            ),
-                          ),
-                          child: Text(
-                            errorMessage!,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: AppColors.danger,
-                              fontWeight: FontWeight.w600,
-                              height: 1.35,
-                            ),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        child: errorMessage == null
+                            ? const SizedBox(height: 12)
+                            : Padding(
+                                key: ValueKey(errorMessage),
+                                padding: const EdgeInsets.only(top: 12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.danger.withValues(
+                                      alpha: 0.08,
+                                    ),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: AppColors.danger.withValues(
+                                        alpha: 0.18,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(
+                                        Icons.error_outline_rounded,
+                                        color: AppColors.danger,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          errorMessage!,
+                                          textAlign: TextAlign.left,
+                                          style: const TextStyle(
+                                            color: AppColors.danger,
+                                            fontWeight: FontWeight.w700,
+                                            height: 1.35,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                      ),
+                      const SizedBox(height: 22),
+                      AnimatedScale(
+                        scale: isLoading ? 0.99 : 1,
+                        duration: const Duration(milliseconds: 120),
+                        child: FilledButton.icon(
+                          onPressed: isLoading ? null : login,
+                          icon: isLoading
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.login),
+                          label: Text(
+                            isLoading ? 'Signing in...' : 'Login',
+                            style: const TextStyle(fontSize: 16),
                           ),
                         ),
-                      ],
-                      const SizedBox(height: 22),
-                      FilledButton.icon(
-                        onPressed: isLoading ? null : login,
-                        icon: isLoading
-                            ? const SizedBox.square(
-                                dimension: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.login),
-                        label: Text(
-                          isLoading ? 'Signing in...' : 'Login',
-                          style: const TextStyle(fontSize: 16),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'EACC Connect keeps course communication organized and role-based.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 12,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],

@@ -7,6 +7,7 @@ import '../services/firestore_chat_service.dart';
 import '../services/notification_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/polished_state_card.dart';
 import '../widgets/screen_header.dart';
 
 class AdminAnnouncementsScreen extends StatefulWidget {
@@ -569,6 +570,12 @@ class _CourseSelectionTile extends StatelessWidget {
         return CheckboxListTile(
           value: selected,
           dense: true,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          tileColor: selected
+              ? AppColors.admin.withValues(alpha: 0.08)
+              : Colors.white,
           title: Text(
             course.displayName,
             style: const TextStyle(fontWeight: FontWeight.w800),
@@ -768,11 +775,21 @@ class _PanelTitle extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 42,
-          height: 42,
+          width: 50,
+          height: 50,
           decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
+            gradient: LinearGradient(
+              colors: [
+                AppColors.primary.withValues(alpha: 0.14),
+                AppColors.accent.withValues(alpha: 0.06),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.14),
+            ),
           ),
           child: Icon(icon, color: AppColors.primary),
         ),
@@ -915,23 +932,12 @@ class _FilteredEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 34, color: AppColors.muted),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.muted,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: PolishedStateCard(
+        icon: icon,
+        title: 'No results yet',
+        message: message,
+        color: AppColors.admin,
       ),
     );
   }

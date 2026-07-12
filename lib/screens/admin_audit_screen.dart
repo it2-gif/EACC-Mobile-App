@@ -6,6 +6,7 @@ import '../services/firestore_chat_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/time_format.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/polished_state_card.dart';
 
 class AdminAuditScreen extends StatelessWidget {
   final AuthSession session;
@@ -28,7 +29,13 @@ class AdminAuditScreen extends StatelessWidget {
           }
 
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Padding(
+              padding: EdgeInsets.all(16),
+              child: PolishedLoadingCard(
+                title: 'Loading deleted messages',
+                message: 'Collecting the latest moderation activity.',
+              ),
+            );
           }
 
           final docs = snapshot.data?.docs ?? [];
@@ -72,16 +79,26 @@ class _AuditLogTile extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 42,
-              height: 42,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
-                color: _actionColor(action).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+                gradient: LinearGradient(
+                  colors: [
+                    _actionColor(action).withValues(alpha: 0.14),
+                    _actionColor(action).withValues(alpha: 0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _actionColor(action).withValues(alpha: 0.16),
+                ),
               ),
               child: Icon(_actionIcon(action), color: _actionColor(action)),
             ),
@@ -123,7 +140,7 @@ class _AuditLogTile extends StatelessWidget {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: AppColors.background,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: AppColors.border),
                       ),
                       child: Text(
@@ -250,27 +267,15 @@ class _StateMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 48, color: AppColors.primary),
-            const SizedBox(height: 14),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.muted, height: 1.4),
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: PolishedStateCard(
+        icon: icon,
+        title: title,
+        message: message,
+        color: icon == Icons.error_outline_rounded
+            ? AppColors.danger
+            : AppColors.primary,
       ),
     );
   }
