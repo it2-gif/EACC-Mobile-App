@@ -231,6 +231,34 @@ class SupportChatService {
     );
   }
 
+  static Future<void> sendVoiceMessage({
+    required AuthSession session,
+    required String threadId,
+    required Uint8List voiceBytes,
+    required String fileName,
+    required int durationMs,
+    String? requesterName,
+    String? requesterRole,
+    String? requesterLmsUserId,
+    void Function(double progress)? onProgress,
+  }) async {
+    _validateVoiceUpload(fileName: fileName, fileSize: voiceBytes.length);
+
+    await _sendAttachmentMessage(
+      session: session,
+      threadId: threadId,
+      bytes: voiceBytes,
+      fileName: fileName,
+      type: 'voice',
+      lastMessage: 'Voice message',
+      durationMs: durationMs,
+      requesterName: requesterName,
+      requesterRole: requesterRole,
+      requesterLmsUserId: requesterLmsUserId,
+      onProgress: onProgress,
+    );
+  }
+
   static Future<void> _sendAttachmentMessage({
     required AuthSession session,
     required String threadId,
@@ -238,6 +266,7 @@ class SupportChatService {
     required String fileName,
     required String type,
     required String lastMessage,
+    int? durationMs,
     String? requesterName,
     String? requesterRole,
     String? requesterLmsUserId,
@@ -265,19 +294,24 @@ class SupportChatService {
     }
 
     final mediaUrl = await uploadResult.ref.getDownloadURL();
+    final attachmentData = <String, dynamic>{
+      'type': type,
+      'text': '',
+      'media_url': mediaUrl,
+      'file_name': fileName,
+      'file_size_bytes': bytes.length,
+      'file_type': _fileExtension(fileName).toUpperCase(),
+      'storage_path': storagePath,
+    };
+    if (durationMs != null) {
+      attachmentData['duration_ms'] = durationMs;
+    }
+
     await _commitMessage(
       session: session,
       threadId: threadId,
       lastMessage: lastMessage,
-      messageData: {
-        'type': type,
-        'text': '',
-        'media_url': mediaUrl,
-        'file_name': fileName,
-        'file_size_bytes': bytes.length,
-        'file_type': _fileExtension(fileName).toUpperCase(),
-        'storage_path': storagePath,
-      },
+      messageData: attachmentData,
       requesterName: requesterName,
       requesterRole: requesterRole,
       requesterLmsUserId: requesterLmsUserId,
@@ -408,6 +442,27 @@ class SupportChatService {
     }
   }
 
+  static void _validateVoiceUpload({
+    required String fileName,
+    required int fileSize,
+  }) {
+    final extension = _fileExtension(fileName).toLowerCase();
+    const allowed = {'aac', 'm4a', 'mp3', 'ogg', 'opus', 'wav', 'webm'};
+    if (!allowed.contains(extension)) {
+      throw ArgumentError(
+        'Only AAC, M4A, MP3, OGG, OPUS, WAV, and WebM voice files are supported.',
+      );
+    }
+    if (fileSize <= 0) {
+      throw ArgumentError(
+        'This voice recording is empty or could not be read.',
+      );
+    }
+    if (fileSize > 10 * 1024 * 1024) {
+      throw ArgumentError('Voice recording must be 10 MB or smaller.');
+    }
+  }
+
   static String _contentType(String fileName) {
     return switch (_fileExtension(fileName).toLowerCase()) {
       'jpg' || 'jpeg' => 'image/jpeg',
@@ -417,6 +472,11 @@ class SupportChatService {
       'mp4' || 'm4v' => 'video/mp4',
       'mov' => 'video/quicktime',
       'webm' => 'video/webm',
+      'aac' => 'audio/aac',
+      'm4a' => 'audio/mp4',
+      'mp3' => 'audio/mpeg',
+      'ogg' || 'opus' => 'audio/ogg',
+      'wav' => 'audio/wav',
       'pdf' => 'application/pdf',
       'doc' => 'application/msword',
       'docx' =>

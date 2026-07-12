@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:record/record.dart';
 
 import '../models/auth_session.dart';
 import '../services/support_chat_service.dart';
@@ -133,9 +135,17 @@ class SupportChatScreen extends StatefulWidget {
 class _SupportChatScreenState extends State<SupportChatScreen> {
   final messageController = TextEditingController();
   final scrollController = ScrollController();
+  final audioRecorder = AudioRecorder();
+  final voiceChunks = <Uint8List>[];
   bool isSending = false;
-  bool isUploadingImage = false;
+  bool isUploadingMedia = false;
+  bool isRecordingVoice = false;
+  bool isVoiceRecordingPaused = false;
   double uploadProgress = 0;
+  Duration recordingDuration = Duration.zero;
+  Timer? recordingTimer;
+  StreamSubscription<Uint8List>? recordingSubscription;
+  int recordingSampleRate = 16000;
 
   late final String threadId =
       widget.threadId ?? SupportChatService.threadIdFor(widget.session);
@@ -144,6 +154,9 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
 
   @override
   void dispose() {
+    recordingTimer?.cancel();
+    recordingSubscription?.cancel();
+    audioRecorder.dispose();
     messageController.dispose();
     scrollController.dispose();
     super.dispose();
@@ -151,7 +164,9 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
 
   Future<void> sendMessage() async {
     final text = messageController.text.trim();
-    if (text.isEmpty || isSending) return;
+    if (text.isEmpty || isSending || isUploadingMedia || isRecordingVoice) {
+      return;
+    }
 
     setState(() => isSending = true);
     messageController.clear();
@@ -178,7 +193,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   }
 
   void showAttachmentOptions() {
-    if (isSending || isUploadingImage) return;
+    if (isSending || isUploadingMedia || isRecordingVoice) return;
 
     showModalBottomSheet(
       context: context,
@@ -246,7 +261,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   }
 
   Future<void> pickAndSendImage(ImageSource source) async {
-    if (isSending || isUploadingImage) return;
+    if (isSending || isUploadingMedia || isRecordingVoice) return;
 
     final image = await ImagePicker().pickImage(
       source: source,
@@ -256,7 +271,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     if (image == null) return;
 
     setState(() {
-      isUploadingImage = true;
+      isUploadingMedia = true;
       uploadProgress = 0;
     });
 
@@ -284,7 +299,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     } finally {
       if (mounted) {
         setState(() {
-          isUploadingImage = false;
+          isUploadingMedia = false;
           uploadProgress = 0;
         });
       }
@@ -292,7 +307,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   }
 
   Future<void> pickAndSendVideo() async {
-    if (isSending || isUploadingImage) return;
+    if (isSending || isUploadingMedia || isRecordingVoice) return;
 
     final video = await ImagePicker().pickVideo(
       source: ImageSource.gallery,
@@ -301,7 +316,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     if (video == null) return;
 
     setState(() {
-      isUploadingImage = true;
+      isUploadingMedia = true;
       uploadProgress = 0;
     });
 
@@ -329,7 +344,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     } finally {
       if (mounted) {
         setState(() {
-          isUploadingImage = false;
+          isUploadingMedia = false;
           uploadProgress = 0;
         });
       }
@@ -337,7 +352,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   }
 
   Future<void> pickAndSendDocument() async {
-    if (isSending || isUploadingImage) return;
+    if (isSending || isUploadingMedia || isRecordingVoice) return;
 
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -367,7 +382,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     }
 
     setState(() {
-      isUploadingImage = true;
+      isUploadingMedia = true;
       uploadProgress = 0;
     });
 
@@ -394,8 +409,189 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     } finally {
       if (mounted) {
         setState(() {
-          isUploadingImage = false;
+          isUploadingMedia = false;
           uploadProgress = 0;
+        });
+      }
+    }
+  }
+
+  Future<void> toggleVoiceRecording() async {
+    if (isSending || isUploadingMedia) return;
+
+    if (isRecordingVoice) {
+      await stopAndSendVoiceMessage();
+    } else {
+      await startVoiceRecording();
+    }
+  }
+
+  Future<void> startVoiceRecording() async {
+    try {
+      if (!await audioRecorder.hasPermission()) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Microphone permission is required.')),
+        );
+        return;
+      }
+
+      voiceChunks.clear();
+      recordingSampleRate = 16000;
+      await audioRecorder.setOnConfigChanged((config) {
+        recordingSampleRate = config.sampleRate;
+      });
+
+      final stream = await audioRecorder.startStream(
+        const RecordConfig(
+          encoder: AudioEncoder.pcm16bits,
+          sampleRate: 16000,
+          numChannels: 1,
+          echoCancel: true,
+          noiseSuppress: true,
+        ),
+      );
+      recordingSubscription = stream.listen(voiceChunks.add);
+      recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted || isVoiceRecordingPaused) return;
+        setState(() {
+          recordingDuration += const Duration(seconds: 1);
+        });
+        if (recordingDuration >= const Duration(minutes: 5)) {
+          unawaited(stopAndSendVoiceMessage());
+        }
+      });
+
+      if (mounted) {
+        setState(() {
+          recordingDuration = Duration.zero;
+          isRecordingVoice = true;
+          isVoiceRecordingPaused = false;
+        });
+      }
+    } catch (error) {
+      if (!mounted) return;
+      final message = error.toString().toLowerCase();
+      final isPermissionError =
+          message.contains('permission') ||
+          message.contains('notallowed') ||
+          message.contains('not allowed');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isPermissionError
+                ? 'Microphone access is blocked. Allow it, then try again.'
+                : 'Could not start voice recording: $error',
+          ),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
+  }
+
+  Future<void> stopAndSendVoiceMessage() async {
+    final subscription = recordingSubscription;
+    final streamDone = subscription?.asFuture<void>();
+    recordingTimer?.cancel();
+
+    if (mounted) {
+      setState(() {
+        isRecordingVoice = false;
+        isVoiceRecordingPaused = false;
+        isUploadingMedia = true;
+        uploadProgress = 0;
+      });
+    }
+
+    try {
+      await audioRecorder.stop();
+      await streamDone;
+      recordingSubscription = null;
+
+      final bytesBuilder = BytesBuilder(copy: false);
+      for (final chunk in voiceChunks) {
+        bytesBuilder.add(chunk);
+      }
+      final voiceBytes = _createWavFile(
+        bytesBuilder.takeBytes(),
+        sampleRate: recordingSampleRate,
+        channels: 1,
+        bitsPerSample: 16,
+      );
+
+      if (!_containsAudibleAudio(voiceBytes)) {
+        throw ArgumentError(
+          'No voice was detected. Check the selected microphone and try again.',
+        );
+      }
+
+      await SupportChatService.sendVoiceMessage(
+        session: widget.session,
+        threadId: threadId,
+        voiceBytes: voiceBytes,
+        fileName: 'voice_${DateTime.now().millisecondsSinceEpoch}.wav',
+        durationMs: recordingDuration.inMilliseconds,
+        requesterName: widget.requesterName,
+        requesterRole: widget.requesterRole,
+        requesterLmsUserId: widget.requesterLmsUserId,
+        onProgress: (progress) {
+          if (!mounted) return;
+          setState(() => uploadProgress = progress);
+        },
+      );
+      scrollToBottom();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to send voice message: $error')),
+      );
+    } finally {
+      voiceChunks.clear();
+      if (mounted) {
+        setState(() {
+          isUploadingMedia = false;
+          uploadProgress = 0;
+          recordingDuration = Duration.zero;
+          isVoiceRecordingPaused = false;
+        });
+      }
+    }
+  }
+
+  Future<void> toggleVoiceRecordingPause() async {
+    if (!isRecordingVoice) return;
+
+    try {
+      if (isVoiceRecordingPaused) {
+        await audioRecorder.resume();
+      } else {
+        await audioRecorder.pause();
+      }
+
+      if (mounted) {
+        setState(() => isVoiceRecordingPaused = !isVoiceRecordingPaused);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update recording: $error')),
+      );
+    }
+  }
+
+  Future<void> cancelVoiceRecording() async {
+    recordingTimer?.cancel();
+    try {
+      await audioRecorder.cancel();
+      await recordingSubscription?.cancel();
+    } finally {
+      recordingSubscription = null;
+      voiceChunks.clear();
+      if (mounted) {
+        setState(() {
+          isRecordingVoice = false;
+          isVoiceRecordingPaused = false;
+          recordingDuration = Duration.zero;
         });
       }
     }
@@ -535,6 +731,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                           fileSizeBytes: (data['file_size_bytes'] as num?)
                               ?.toInt(),
                           fileType: data['file_type']?.toString(),
+                          durationMs: (data['duration_ms'] as num?)?.toInt(),
                           senderName: senderName,
                           senderRole: senderRole,
                           currentUserRole: isSupportUser
@@ -553,15 +750,74 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
             ),
             _SupportInputBar(
               controller: messageController,
-              isSending: isSending || isUploadingImage,
-              uploadProgress: isUploadingImage ? uploadProgress : null,
+              isSending: isSending || isUploadingMedia,
+              isRecordingVoice: isRecordingVoice,
+              isVoiceRecordingPaused: isVoiceRecordingPaused,
+              recordingDuration: _formatRecordingDuration(),
+              uploadProgress: isUploadingMedia ? uploadProgress : null,
               onAttach: showAttachmentOptions,
               onSend: sendMessage,
+              onToggleVoiceRecording: toggleVoiceRecording,
+              onToggleVoiceRecordingPause: toggleVoiceRecordingPause,
+              onCancelVoiceRecording: cancelVoiceRecording,
             ),
           ],
         ),
       ),
     );
+  }
+
+  String _formatRecordingDuration() {
+    final minutes = recordingDuration.inMinutes;
+    final seconds = recordingDuration.inSeconds.remainder(60);
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  Uint8List _createWavFile(
+    Uint8List pcmBytes, {
+    required int sampleRate,
+    required int channels,
+    required int bitsPerSample,
+  }) {
+    final header = ByteData(44);
+    final byteRate = sampleRate * channels * bitsPerSample ~/ 8;
+    final blockAlign = channels * bitsPerSample ~/ 8;
+
+    void writeText(int offset, String value) {
+      for (var index = 0; index < value.length; index++) {
+        header.setUint8(offset + index, value.codeUnitAt(index));
+      }
+    }
+
+    writeText(0, 'RIFF');
+    header.setUint32(4, 36 + pcmBytes.length, Endian.little);
+    writeText(8, 'WAVE');
+    writeText(12, 'fmt ');
+    header.setUint32(16, 16, Endian.little);
+    header.setUint16(20, 1, Endian.little);
+    header.setUint16(22, channels, Endian.little);
+    header.setUint32(24, sampleRate, Endian.little);
+    header.setUint32(28, byteRate, Endian.little);
+    header.setUint16(32, blockAlign, Endian.little);
+    header.setUint16(34, bitsPerSample, Endian.little);
+    writeText(36, 'data');
+    header.setUint32(40, pcmBytes.length, Endian.little);
+
+    return Uint8List.fromList([...header.buffer.asUint8List(), ...pcmBytes]);
+  }
+
+  bool _containsAudibleAudio(Uint8List wavBytes) {
+    if (wavBytes.length <= 44) return false;
+
+    final samples = ByteData.sublistView(wavBytes, 44);
+    var peak = 0;
+    for (var offset = 0; offset + 1 < samples.lengthInBytes; offset += 2) {
+      final amplitude = samples.getInt16(offset, Endian.little).abs();
+      if (amplitude > peak) peak = amplitude;
+      if (peak >= 160) return true;
+    }
+
+    return false;
   }
 }
 
@@ -828,16 +1084,28 @@ class _SupportAttachmentOption extends StatelessWidget {
 class _SupportInputBar extends StatelessWidget {
   final TextEditingController controller;
   final bool isSending;
+  final bool isRecordingVoice;
+  final bool isVoiceRecordingPaused;
+  final String recordingDuration;
   final double? uploadProgress;
   final VoidCallback onAttach;
   final VoidCallback onSend;
+  final VoidCallback onToggleVoiceRecording;
+  final VoidCallback onToggleVoiceRecordingPause;
+  final VoidCallback onCancelVoiceRecording;
 
   const _SupportInputBar({
     required this.controller,
     required this.isSending,
+    required this.isRecordingVoice,
+    required this.isVoiceRecordingPaused,
+    required this.recordingDuration,
     required this.uploadProgress,
     required this.onAttach,
     required this.onSend,
+    required this.onToggleVoiceRecording,
+    required this.onToggleVoiceRecordingPause,
+    required this.onCancelVoiceRecording,
   });
 
   @override
@@ -868,35 +1136,71 @@ class _SupportInputBar extends StatelessWidget {
               const SizedBox(height: 8),
             ],
             Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 IconButton.filledTonal(
-                  onPressed: isSending ? null : onAttach,
-                  icon: const Icon(Icons.add_rounded),
-                  tooltip: 'Add attachment',
+                  onPressed: isRecordingVoice
+                      ? onCancelVoiceRecording
+                      : isSending
+                      ? null
+                      : onAttach,
+                  style: IconButton.styleFrom(
+                    foregroundColor: isRecordingVoice ? AppColors.danger : null,
+                  ),
+                  icon: Icon(
+                    isRecordingVoice
+                        ? Icons.delete_outline_rounded
+                        : Icons.add_rounded,
+                  ),
+                  tooltip: isRecordingVoice
+                      ? 'Cancel recording'
+                      : 'Add attachment',
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: TextField(
-                    controller: controller,
-                    minLines: 1,
-                    maxLines: 4,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(
-                      hintText: 'Write a message',
-                      filled: true,
-                    ),
-                    onSubmitted: (_) => onSend(),
-                  ),
+                  child: isRecordingVoice
+                      ? _SupportRecordingComposerPill(
+                          duration: recordingDuration,
+                          isPaused: isVoiceRecordingPaused,
+                          onTogglePause: onToggleVoiceRecordingPause,
+                        )
+                      : TextField(
+                          controller: controller,
+                          enabled: !isSending,
+                          minLines: 1,
+                          maxLines: 4,
+                          textCapitalization: TextCapitalization.sentences,
+                          decoration: InputDecoration(
+                            hintText: uploadProgress != null
+                                ? 'Uploading media...'
+                                : 'Write a message',
+                            filled: true,
+                          ),
+                          onSubmitted: (_) => onSend(),
+                        ),
                 ),
-                const SizedBox(width: 10),
-                FilledButton(
-                  onPressed: isSending ? null : onSend,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(50, 50),
-                    padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999),
+                const SizedBox(width: 8),
+                if (!isRecordingVoice) ...[
+                  IconButton.filledTonal(
+                    onPressed: isSending ? null : onToggleVoiceRecording,
+                    style: IconButton.styleFrom(
+                      foregroundColor: AppColors.primary,
                     ),
+                    icon: const Icon(Icons.mic_none_rounded),
+                    tooltip: 'Record voice message',
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                FilledButton(
+                  onPressed: isSending
+                      ? null
+                      : isRecordingVoice
+                      ? onToggleVoiceRecording
+                      : onSend,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.square(50),
+                    padding: EdgeInsets.zero,
+                    shape: const CircleBorder(),
                   ),
                   child: isSending
                       ? const SizedBox.square(
@@ -912,6 +1216,92 @@ class _SupportInputBar extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SupportRecordingComposerPill extends StatelessWidget {
+  final String duration;
+  final bool isPaused;
+  final VoidCallback onTogglePause;
+
+  const _SupportRecordingComposerPill({
+    required this.duration,
+    required this.isPaused,
+    required this.onTogglePause,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 50),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.danger.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: AppColors.danger.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.graphic_eq_rounded,
+              size: 19,
+              color: AppColors.danger,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isPaused ? 'Paused $duration' : 'Recording $duration',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isPaused ? AppColors.muted : AppColors.danger,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isPaused
+                      ? 'Resume to continue, or send what you recorded'
+                      : 'Tap pause or send when you are done',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton.filledTonal(
+            onPressed: onTogglePause,
+            icon: Icon(
+              isPaused ? Icons.mic_rounded : Icons.pause_rounded,
+              size: 19,
+            ),
+            tooltip: isPaused ? 'Resume recording' : 'Pause recording',
+            style: IconButton.styleFrom(
+              foregroundColor: isPaused ? AppColors.primary : AppColors.danger,
+            ),
+          ),
+        ],
       ),
     );
   }

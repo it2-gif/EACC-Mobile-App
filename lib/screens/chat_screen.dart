@@ -1540,673 +1540,639 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         child: SafeArea(
           top: false,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 980),
-              child: Column(
-                children: [
-                  if (isSearchingMessages)
-                    Container(
-                      color: Colors.white,
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                      child: TextField(
-                        controller: searchController,
-                        autofocus: true,
-                        decoration: InputDecoration(
-                          hintText: 'Search messages and files',
-                          prefixIcon: const Icon(Icons.search_rounded),
-                          suffixIcon: messageSearchQuery.isEmpty
-                              ? null
-                              : IconButton(
-                                  tooltip: 'Clear search',
-                                  onPressed: () {
-                                    searchController.clear();
-                                    setState(() => messageSearchQuery = '');
-                                  },
-                                  icon: const Icon(Icons.close_rounded),
-                                ),
-                        ),
-                        onChanged: (value) => setState(() {
-                          messageSearchQuery = value.trim();
-                        }),
-                      ),
+          child: Column(
+            children: [
+              if (isSearchingMessages)
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  child: TextField(
+                    controller: searchController,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: 'Search messages and files',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: messageSearchQuery.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Clear search',
+                              onPressed: () {
+                                searchController.clear();
+                                setState(() => messageSearchQuery = '');
+                              },
+                              icon: const Icon(Icons.close_rounded),
+                            ),
                     ),
-                  Expanded(
-                    child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                      stream: FirestoreChatService.getThread(
+                    onChanged: (value) => setState(() {
+                      messageSearchQuery = value.trim();
+                    }),
+                  ),
+                ),
+              Expanded(
+                child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: FirestoreChatService.getThread(
+                    courseId: widget.courseId,
+                    threadId: widget.threadId,
+                  ),
+                  builder: (context, threadSnapshot) {
+                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: FirestoreChatService.getMessages(
                         courseId: widget.courseId,
                         threadId: widget.threadId,
+                        limit: messageLimit,
                       ),
-                      builder: (context, threadSnapshot) {
-                        return StreamBuilder<
-                          QuerySnapshot<Map<String, dynamic>>
-                        >(
-                          stream: FirestoreChatService.getMessages(
-                            courseId: widget.courseId,
-                            threadId: widget.threadId,
-                            limit: messageLimit,
-                          ),
-                          builder: (context, snapshot) {
-                            if (snapshot.hasError) {
-                              return _ChatStateCard(
-                                icon: Icons.error_outline_rounded,
-                                title: 'Could not load this chat',
-                                subtitle: '${snapshot.error}',
-                                color: AppColors.danger,
-                              );
-                            }
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return _ChatStateCard(
+                            icon: Icons.error_outline_rounded,
+                            title: 'Could not load this chat',
+                            subtitle: '${snapshot.error}',
+                            color: AppColors.danger,
+                          );
+                        }
 
-                            if (snapshot.connectionState ==
-                                ConnectionState.waiting) {
-                              return const _ChatLoadingCard();
-                            }
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const _ChatLoadingCard();
+                        }
 
-                            final threadData = threadSnapshot.data?.data();
-                            scheduleAnnouncementRead(threadData);
-                            final typingLabel = _typingLabel(threadData);
-                            final docs = sortMessages(
-                              snapshot.data?.docs ?? [],
-                            );
-                            final allVisibleDocs = docs.reversed.toList();
-                            final query = messageSearchQuery.toLowerCase();
-                            final visibleDocs = query.isEmpty
-                                ? allVisibleDocs
-                                : allVisibleDocs.where((message) {
-                                    final data = message.data();
-                                    return _messagePreview(
-                                          data,
-                                        ).toLowerCase().contains(query) ||
-                                        (data['file_name']
-                                                    ?.toString()
-                                                    .toLowerCase() ??
-                                                '')
-                                            .contains(query) ||
-                                        (data['sender_name']
-                                                    ?.toString()
-                                                    .toLowerCase() ??
-                                                '')
-                                            .contains(query);
-                                  }).toList();
-                            final canLoadOlder = docs.length >= messageLimit;
-                            final currentLatestMessageId = docs.isEmpty
-                                ? null
-                                : docs.last.id;
-                            final pinnedMessages = allVisibleDocs
-                                .where(
-                                  (message) => message.data()['pinned'] == true,
-                                )
-                                .toList();
-                            final pinnedMessage = pinnedMessages.isEmpty
-                                ? null
-                                : pinnedMessages.last;
+                        final threadData = threadSnapshot.data?.data();
+                        scheduleAnnouncementRead(threadData);
+                        final typingLabel = _typingLabel(threadData);
+                        final docs = sortMessages(snapshot.data?.docs ?? []);
+                        final allVisibleDocs = docs.reversed.toList();
+                        final query = messageSearchQuery.toLowerCase();
+                        final visibleDocs = query.isEmpty
+                            ? allVisibleDocs
+                            : allVisibleDocs.where((message) {
+                                final data = message.data();
+                                return _messagePreview(
+                                      data,
+                                    ).toLowerCase().contains(query) ||
+                                    (data['file_name']
+                                                ?.toString()
+                                                .toLowerCase() ??
+                                            '')
+                                        .contains(query) ||
+                                    (data['sender_name']
+                                                ?.toString()
+                                                .toLowerCase() ??
+                                            '')
+                                        .contains(query);
+                              }).toList();
+                        final canLoadOlder = docs.length >= messageLimit;
+                        final currentLatestMessageId = docs.isEmpty
+                            ? null
+                            : docs.last.id;
+                        final pinnedMessages = allVisibleDocs
+                            .where(
+                              (message) => message.data()['pinned'] == true,
+                            )
+                            .toList();
+                        final pinnedMessage = pinnedMessages.isEmpty
+                            ? null
+                            : pinnedMessages.last;
 
-                            restorePositionAfterLoadingOlderMessages();
+                        restorePositionAfterLoadingOlderMessages();
 
-                            if (currentLatestMessageId != latestMessageId) {
-                              latestMessageId = currentLatestMessageId;
-                              final latestSenderRole = docs.isEmpty
-                                  ? null
-                                  : docs.last.data()['sender_role']?.toString();
-                              if (latestSenderRole != null &&
-                                  latestSenderRole != widget.currentUserRole) {
-                                unawaited(markThreadAsRead());
-                              }
-                              if (hasScrolledToInitialBottom &&
-                                  !isLoadingOlderMessages) {
-                                scrollToBottom();
-                              }
-                            }
+                        if (currentLatestMessageId != latestMessageId) {
+                          latestMessageId = currentLatestMessageId;
+                          final latestSenderRole = docs.isEmpty
+                              ? null
+                              : docs.last.data()['sender_role']?.toString();
+                          if (latestSenderRole != null &&
+                              latestSenderRole != widget.currentUserRole) {
+                            unawaited(markThreadAsRead());
+                          }
+                          if (hasScrolledToInitialBottom &&
+                              !isLoadingOlderMessages) {
+                            scrollToBottom();
+                          }
+                        }
 
-                            if (!hasScrolledToInitialBottom &&
-                                docs.isNotEmpty) {
-                              hasScrolledToInitialBottom = true;
-                              unawaited(scheduleInitialBottomScroll());
-                            }
+                        if (!hasScrolledToInitialBottom && docs.isNotEmpty) {
+                          hasScrolledToInitialBottom = true;
+                          unawaited(scheduleInitialBottomScroll());
+                        }
 
-                            if (shouldScrollAfterSending && docs.isNotEmpty) {
-                              shouldScrollAfterSending = false;
-                              scrollToBottom();
-                            }
+                        if (shouldScrollAfterSending && docs.isNotEmpty) {
+                          shouldScrollAfterSending = false;
+                          scrollToBottom();
+                        }
 
-                            final hasPendingUpload =
-                                isUploadingMedia || failedAttachment != null;
+                        final hasPendingUpload =
+                            isUploadingMedia || failedAttachment != null;
 
-                            if (docs.isEmpty && !hasPendingUpload) {
-                              return _ChatStateCard(
-                                icon: isAnnouncementThread
-                                    ? Icons.campaign_rounded
-                                    : Icons.forum_outlined,
-                                title: isAnnouncementThread
-                                    ? 'No announcements yet'
-                                    : 'Start the conversation',
-                                subtitle: isAnnouncementThread
-                                    ? widget.currentUserRole == 'student'
-                                          ? 'Your teacher will post course updates here.'
-                                          : 'Post the first course announcement here.'
-                                    : 'Send the first message when you are ready.',
-                                color: AppColors.primary,
-                              );
-                            }
+                        if (docs.isEmpty && !hasPendingUpload) {
+                          return _ChatStateCard(
+                            icon: isAnnouncementThread
+                                ? Icons.campaign_rounded
+                                : Icons.forum_outlined,
+                            title: isAnnouncementThread
+                                ? 'No announcements yet'
+                                : 'Start the conversation',
+                            subtitle: isAnnouncementThread
+                                ? widget.currentUserRole == 'student'
+                                      ? 'Your teacher will post course updates here.'
+                                      : 'Post the first course announcement here.'
+                                : 'Send the first message when you are ready.',
+                            color: AppColors.primary,
+                          );
+                        }
 
-                            final showLoadOlder =
-                                canLoadOlder && messageSearchQuery.isEmpty;
-                            final pendingUploadCount = hasPendingUpload ? 1 : 0;
+                        final showLoadOlder =
+                            canLoadOlder && messageSearchQuery.isEmpty;
+                        final pendingUploadCount = hasPendingUpload ? 1 : 0;
 
-                            return Column(
-                              children: [
-                                if (pinnedMessage != null)
-                                  _PinnedMessageBanner(
-                                    preview: _messagePreview(
-                                      pinnedMessage.data(),
-                                    ),
-                                    onTap: () =>
-                                        _jumpToBottomIfPossible(animate: true),
-                                  ),
-                                if (isAnnouncementThread &&
-                                    widget.currentUserRole != 'student')
-                                  _AnnouncementReadReceiptsBar(
-                                    reads: _announcementReads(threadData),
-                                  ),
-                                if (typingLabel != null)
-                                  _TypingIndicatorBar(label: typingLabel),
-                                Expanded(
-                                  child: Stack(
-                                    children: [
-                                      AnimatedSlide(
-                                        offset: isInitialChatReady
-                                            ? Offset.zero
-                                            : const Offset(0, 0.015),
-                                        duration: const Duration(
-                                          milliseconds: 240,
-                                        ),
-                                        curve: Curves.easeOutCubic,
-                                        child: AnimatedOpacity(
-                                          opacity: isInitialChatReady ? 1 : 0,
-                                          duration: const Duration(
-                                            milliseconds: 180,
-                                          ),
-                                          curve: Curves.easeOut,
-                                          child: visibleDocs.isEmpty
-                                              ? const _ChatStateCard(
-                                                  icon:
-                                                      Icons.search_off_rounded,
-                                                  title: 'No matching messages',
-                                                  subtitle:
-                                                      'Try another word, sender name, or file name.',
-                                                  color: AppColors.muted,
-                                                )
-                                              : ListView.builder(
-                                                  controller: scrollController,
-                                                  reverse: true,
-                                                  padding:
-                                                      const EdgeInsets.fromLTRB(
-                                                        12,
-                                                        12,
-                                                        12,
-                                                        8,
-                                                      ),
-                                                  itemCount:
-                                                      visibleDocs.length +
-                                                      pendingUploadCount +
-                                                      (showLoadOlder ? 1 : 0),
-                                                  itemBuilder: (context, index) {
-                                                    if (hasPendingUpload &&
-                                                        index == 0) {
-                                                      return _AttachmentStatusBar(
-                                                        label:
-                                                            mediaUploadLabel ??
-                                                            (failedAttachment !=
-                                                                    null
-                                                                ? _attachmentLabel(
-                                                                    failedAttachment!
-                                                                        .kind,
-                                                                  )
-                                                                : 'Uploading media'),
-                                                        progress:
-                                                            mediaUploadProgress,
-                                                        onRetry:
-                                                            failedAttachment ==
+                        return Column(
+                          children: [
+                            if (pinnedMessage != null)
+                              _PinnedMessageBanner(
+                                preview: _messagePreview(pinnedMessage.data()),
+                                onTap: () =>
+                                    _jumpToBottomIfPossible(animate: true),
+                              ),
+                            if (isAnnouncementThread &&
+                                widget.currentUserRole != 'student')
+                              _AnnouncementReadReceiptsBar(
+                                reads: _announcementReads(threadData),
+                              ),
+                            if (typingLabel != null)
+                              _TypingIndicatorBar(label: typingLabel),
+                            Expanded(
+                              child: Stack(
+                                children: [
+                                  AnimatedSlide(
+                                    offset: isInitialChatReady
+                                        ? Offset.zero
+                                        : const Offset(0, 0.015),
+                                    duration: const Duration(milliseconds: 240),
+                                    curve: Curves.easeOutCubic,
+                                    child: AnimatedOpacity(
+                                      opacity: isInitialChatReady ? 1 : 0,
+                                      duration: const Duration(
+                                        milliseconds: 180,
+                                      ),
+                                      curve: Curves.easeOut,
+                                      child: visibleDocs.isEmpty
+                                          ? const _ChatStateCard(
+                                              icon: Icons.search_off_rounded,
+                                              title: 'No matching messages',
+                                              subtitle:
+                                                  'Try another word, sender name, or file name.',
+                                              color: AppColors.muted,
+                                            )
+                                          : ListView.builder(
+                                              controller: scrollController,
+                                              reverse: true,
+                                              padding:
+                                                  const EdgeInsets.fromLTRB(
+                                                    12,
+                                                    12,
+                                                    12,
+                                                    8,
+                                                  ),
+                                              itemCount:
+                                                  visibleDocs.length +
+                                                  pendingUploadCount +
+                                                  (showLoadOlder ? 1 : 0),
+                                              itemBuilder: (context, index) {
+                                                if (hasPendingUpload &&
+                                                    index == 0) {
+                                                  return _AttachmentStatusBar(
+                                                    label:
+                                                        mediaUploadLabel ??
+                                                        (failedAttachment !=
                                                                 null
-                                                            ? null
-                                                            : retryLastAttachment,
-                                                        canRetry:
-                                                            failedAttachment !=
-                                                            null,
-                                                      );
-                                                    }
+                                                            ? _attachmentLabel(
+                                                                failedAttachment!
+                                                                    .kind,
+                                                              )
+                                                            : 'Uploading media'),
+                                                    progress:
+                                                        mediaUploadProgress,
+                                                    onRetry:
+                                                        failedAttachment == null
+                                                        ? null
+                                                        : retryLastAttachment,
+                                                    canRetry:
+                                                        failedAttachment !=
+                                                        null,
+                                                  );
+                                                }
 
-                                                    final messageIndex =
-                                                        index -
-                                                        pendingUploadCount;
-                                                    if (showLoadOlder &&
-                                                        messageIndex ==
-                                                            visibleDocs
-                                                                .length) {
-                                                      return Center(
-                                                        child: Padding(
-                                                          padding:
-                                                              const EdgeInsets.only(
-                                                                top: 8,
-                                                              ),
-                                                          child: TextButton.icon(
-                                                            onPressed:
-                                                                isLoadingOlderMessages
-                                                                ? null
-                                                                : loadOlderMessages,
-                                                            icon:
-                                                                isLoadingOlderMessages
-                                                                ? const SizedBox(
-                                                                    width: 16,
-                                                                    height: 16,
-                                                                    child: CircularProgressIndicator(
+                                                final messageIndex =
+                                                    index - pendingUploadCount;
+                                                if (showLoadOlder &&
+                                                    messageIndex ==
+                                                        visibleDocs.length) {
+                                                  return Center(
+                                                    child: Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                            top: 8,
+                                                          ),
+                                                      child: TextButton.icon(
+                                                        onPressed:
+                                                            isLoadingOlderMessages
+                                                            ? null
+                                                            : loadOlderMessages,
+                                                        icon:
+                                                            isLoadingOlderMessages
+                                                            ? const SizedBox(
+                                                                width: 16,
+                                                                height: 16,
+                                                                child:
+                                                                    CircularProgressIndicator(
                                                                       strokeWidth:
                                                                           2,
                                                                     ),
-                                                                  )
-                                                                : const Icon(
-                                                                    Icons
-                                                                        .history,
-                                                                  ),
-                                                            label: const Text(
-                                                              'Load older messages',
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      );
-                                                    }
-
-                                                    final message =
-                                                        visibleDocs[messageIndex];
-                                                    final data = message.data();
-                                                    final canManageMessage =
-                                                        _canManageMessage(
-                                                          senderRole:
-                                                              data['sender_role']
-                                                                  ?.toString() ??
-                                                              '',
-                                                          senderName:
-                                                              data['sender_name']
-                                                                  ?.toString() ??
-                                                              '',
-                                                        );
-
-                                                    final showDateSeparator =
-                                                        _shouldShowDateSeparator(
-                                                          messageIndex,
-                                                          visibleDocs,
-                                                        );
-
-                                                    return Column(
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
-                                                      children: [
-                                                        MessageBubble(
-                                                          type:
-                                                              data['type'] ??
-                                                              'text',
-                                                          text:
-                                                              data['text'] ??
-                                                              '',
-                                                          mediaUrl:
-                                                              data['media_url'],
-                                                          fileName:
-                                                              data['file_name']
-                                                                  ?.toString(),
-                                                          fileSizeBytes:
-                                                              (data['file_size_bytes']
-                                                                      as num?)
-                                                                  ?.toInt(),
-                                                          fileType:
-                                                              data['file_type']
-                                                                  ?.toString(),
-                                                          durationMs:
-                                                              data['duration_ms'],
-                                                          senderName:
-                                                              data['sender_name'] ??
-                                                              '',
-                                                          senderRole:
-                                                              data['sender_role'] ??
-                                                              '',
-                                                          currentUserRole: widget
-                                                              .currentUserRole,
-                                                          currentSenderName:
-                                                              widget.senderName,
-                                                          createdAt:
-                                                              data['created_at'],
-                                                          editedAt:
-                                                              data['edited_at'],
-                                                          deletedAt:
-                                                              data['deleted_at'],
-                                                          replySenderName:
-                                                              data['reply_to_sender_name']
-                                                                  ?.toString(),
-                                                          replySenderRole:
-                                                              data['reply_to_sender_role']
-                                                                  ?.toString(),
-                                                          replyPreview:
-                                                              data['reply_to_preview']
-                                                                  ?.toString(),
-                                                          replyType:
-                                                              data['reply_to_type']
-                                                                  ?.toString(),
-                                                          forwarded:
-                                                              data['forwarded'] ==
-                                                              true,
-                                                          pinned:
-                                                              data['pinned'] ==
-                                                              true,
-                                                          reactions:
-                                                              data['reactions']
-                                                                  is Map
-                                                              ? Map<
-                                                                  String,
-                                                                  dynamic
-                                                                >.from(
-                                                                  data['reactions']
-                                                                      as Map,
-                                                                )
-                                                              : null,
-                                                          deliveryStatus:
-                                                              _messageDeliveryStatus(
-                                                                data: data,
-                                                                threadData:
-                                                                    threadData,
-                                                                hasPendingWrites:
-                                                                    message
-                                                                        .metadata
-                                                                        .hasPendingWrites,
+                                                              )
+                                                            : const Icon(
+                                                                Icons.history,
                                                               ),
-                                                          onReply:
-                                                              canSendInThread
-                                                              ? () => replyToMessage(
+                                                        label: const Text(
+                                                          'Load older messages',
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+
+                                                final message =
+                                                    visibleDocs[messageIndex];
+                                                final data = message.data();
+                                                final canManageMessage =
+                                                    _canManageMessage(
+                                                      senderRole:
+                                                          data['sender_role']
+                                                              ?.toString() ??
+                                                          '',
+                                                      senderName:
+                                                          data['sender_name']
+                                                              ?.toString() ??
+                                                          '',
+                                                    );
+
+                                                final showDateSeparator =
+                                                    _shouldShowDateSeparator(
+                                                      messageIndex,
+                                                      visibleDocs,
+                                                    );
+
+                                                return Column(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    MessageBubble(
+                                                      type:
+                                                          data['type'] ??
+                                                          'text',
+                                                      text: data['text'] ?? '',
+                                                      mediaUrl:
+                                                          data['media_url'],
+                                                      fileName:
+                                                          data['file_name']
+                                                              ?.toString(),
+                                                      fileSizeBytes:
+                                                          (data['file_size_bytes']
+                                                                  as num?)
+                                                              ?.toInt(),
+                                                      fileType:
+                                                          data['file_type']
+                                                              ?.toString(),
+                                                      durationMs:
+                                                          data['duration_ms'],
+                                                      senderName:
+                                                          data['sender_name'] ??
+                                                          '',
+                                                      senderRole:
+                                                          data['sender_role'] ??
+                                                          '',
+                                                      currentUserRole: widget
+                                                          .currentUserRole,
+                                                      currentSenderName:
+                                                          widget.senderName,
+                                                      createdAt:
+                                                          data['created_at'],
+                                                      editedAt:
+                                                          data['edited_at'],
+                                                      deletedAt:
+                                                          data['deleted_at'],
+                                                      replySenderName:
+                                                          data['reply_to_sender_name']
+                                                              ?.toString(),
+                                                      replySenderRole:
+                                                          data['reply_to_sender_role']
+                                                              ?.toString(),
+                                                      replyPreview:
+                                                          data['reply_to_preview']
+                                                              ?.toString(),
+                                                      replyType:
+                                                          data['reply_to_type']
+                                                              ?.toString(),
+                                                      forwarded:
+                                                          data['forwarded'] ==
+                                                          true,
+                                                      pinned:
+                                                          data['pinned'] ==
+                                                          true,
+                                                      reactions:
+                                                          data['reactions']
+                                                              is Map
+                                                          ? Map<
+                                                              String,
+                                                              dynamic
+                                                            >.from(
+                                                              data['reactions']
+                                                                  as Map,
+                                                            )
+                                                          : null,
+                                                      deliveryStatus:
+                                                          _messageDeliveryStatus(
+                                                            data: data,
+                                                            threadData:
+                                                                threadData,
+                                                            hasPendingWrites:
+                                                                message
+                                                                    .metadata
+                                                                    .hasPendingWrites,
+                                                          ),
+                                                      onReply: canSendInThread
+                                                          ? () =>
+                                                                replyToMessage(
                                                                   messageId:
                                                                       message
                                                                           .id,
                                                                   data: data,
                                                                 )
-                                                              : null,
-                                                          onReact:
+                                                          : null,
+                                                      onReact:
+                                                          data['deleted_at'] ==
+                                                              null
+                                                          ? () =>
+                                                                reactToMessage(
+                                                                  message.id,
+                                                                )
+                                                          : null,
+                                                      onForward:
+                                                          canForwardMessages &&
                                                               data['deleted_at'] ==
                                                                   null
-                                                              ? () =>
-                                                                    reactToMessage(
-                                                                      message
-                                                                          .id,
-                                                                    )
-                                                              : null,
-                                                          onForward:
-                                                              canForwardMessages &&
-                                                                  data['deleted_at'] ==
-                                                                      null
-                                                              ? () =>
-                                                                    forwardMessage(
-                                                                      data:
-                                                                          data,
-                                                                    )
-                                                              : null,
-                                                          onTogglePin:
-                                                              canPinMessages &&
-                                                                  data['deleted_at'] ==
-                                                                      null
-                                                              ? () => togglePinMessage(
-                                                                  messageId:
-                                                                      message
-                                                                          .id,
-                                                                  currentlyPinned:
-                                                                      data['pinned'] ==
-                                                                      true,
+                                                          ? () =>
+                                                                forwardMessage(
                                                                   data: data,
                                                                 )
-                                                              : null,
-                                                          onEdit:
-                                                              canManageMessage &&
-                                                                  data['type'] ==
-                                                                      'text' &&
-                                                                  data['deleted_at'] ==
-                                                                      null
-                                                              ? () => editMessage(
-                                                                  messageId:
-                                                                      message
-                                                                          .id,
-                                                                  currentText:
-                                                                      data['text']
-                                                                          ?.toString() ??
-                                                                      '',
-                                                                )
-                                                              : null,
-                                                          onDelete:
-                                                              canManageMessage &&
-                                                                  data['deleted_at'] ==
-                                                                      null
-                                                              ? () => deleteMessage(
-                                                                  messageId:
-                                                                      message
-                                                                          .id,
-                                                                  data: data,
-                                                                )
-                                                              : null,
-                                                        ),
-                                                        if (showDateSeparator)
-                                                          _DateSeparator(
-                                                            label: _messageDateLabel(
-                                                              data['created_at'],
-                                                            ),
-                                                          ),
-                                                      ],
-                                                    );
-                                                  },
-                                                ),
-                                        ),
-                                      ),
-                                      if (!isInitialChatReady)
-                                        const Positioned.fill(
-                                          child: IgnorePointer(
-                                            child: Center(
-                                              child: SizedBox(
-                                                width: 24,
-                                                height: 24,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
+                                                          : null,
+                                                      onTogglePin:
+                                                          canPinMessages &&
+                                                              data['deleted_at'] ==
+                                                                  null
+                                                          ? () => togglePinMessage(
+                                                              messageId:
+                                                                  message.id,
+                                                              currentlyPinned:
+                                                                  data['pinned'] ==
+                                                                  true,
+                                                              data: data,
+                                                            )
+                                                          : null,
+                                                      onEdit:
+                                                          canManageMessage &&
+                                                              data['type'] ==
+                                                                  'text' &&
+                                                              data['deleted_at'] ==
+                                                                  null
+                                                          ? () => editMessage(
+                                                              messageId:
+                                                                  message.id,
+                                                              currentText:
+                                                                  data['text']
+                                                                      ?.toString() ??
+                                                                  '',
+                                                            )
+                                                          : null,
+                                                      onDelete:
+                                                          canManageMessage &&
+                                                              data['deleted_at'] ==
+                                                                  null
+                                                          ? () => deleteMessage(
+                                                              messageId:
+                                                                  message.id,
+                                                              data: data,
+                                                            )
+                                                          : null,
                                                     ),
-                                              ),
+                                                    if (showDateSeparator)
+                                                      _DateSeparator(
+                                                        label: _messageDateLabel(
+                                                          data['created_at'],
+                                                        ),
+                                                      ),
+                                                  ],
+                                                );
+                                              },
+                                            ),
+                                    ),
+                                  ),
+                                  if (!isInitialChatReady)
+                                    const Positioned.fill(
+                                      child: IgnorePointer(
+                                        child: Center(
+                                          child: SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
                                             ),
                                           ),
                                         ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
                         );
                       },
-                    ),
+                    );
+                  },
+                ),
+              ),
+              if (widget.currentUserRole != 'admin' && !isAnnouncementThread)
+                _ReadReceiptBar(
+                  currentUserRole: widget.currentUserRole,
+                  threadStream: FirestoreChatService.getThread(
+                    courseId: widget.courseId,
+                    threadId: widget.threadId,
                   ),
-                  if (widget.currentUserRole != 'admin' &&
-                      !isAnnouncementThread)
-                    _ReadReceiptBar(
-                      currentUserRole: widget.currentUserRole,
-                      threadStream: FirestoreChatService.getThread(
-                        courseId: widget.courseId,
-                        threadId: widget.threadId,
-                      ),
-                    ),
-                  SafeArea(
-                    child: canSendInThread
-                        ? Container(
-                            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              border: const Border(
-                                top: BorderSide(color: AppColors.border),
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.06),
-                                  blurRadius: 14,
-                                  offset: const Offset(0, -2),
-                                ),
-                              ],
+                ),
+              SafeArea(
+                child: canSendInThread
+                    ? Container(
+                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: const Border(
+                            top: BorderSide(color: AppColors.border),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.06),
+                              blurRadius: 14,
+                              offset: const Offset(0, -2),
                             ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (selectedReply != null &&
-                                    !isRecordingVoice) ...[
-                                  _ReplyComposerPreview(
-                                    reply: selectedReply!,
-                                    onCancel: cancelReply,
-                                  ),
-                                  const SizedBox(height: 10),
-                                ],
-                                if (isAnnouncementThread &&
-                                    !isRecordingVoice) ...[
-                                  _AnnouncementTemplateRow(
-                                    onUseTemplate: (template) {
-                                      messageController.text = template;
-                                      messageController
-                                          .selection = TextSelection.collapsed(
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (selectedReply != null && !isRecordingVoice) ...[
+                              _ReplyComposerPreview(
+                                reply: selectedReply!,
+                                onCancel: cancelReply,
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+                            if (isAnnouncementThread && !isRecordingVoice) ...[
+                              _AnnouncementTemplateRow(
+                                onUseTemplate: (template) {
+                                  messageController.text = template;
+                                  messageController.selection =
+                                      TextSelection.collapsed(
                                         offset: messageController.text.length,
                                       );
-                                    },
+                                },
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                IconButton.filledTonal(
+                                  onPressed: isRecordingVoice
+                                      ? cancelVoiceRecording
+                                      : isBusy
+                                      ? null
+                                      : showAttachmentOptions,
+                                  style: IconButton.styleFrom(
+                                    foregroundColor: isRecordingVoice
+                                        ? AppColors.danger
+                                        : null,
                                   ),
-                                  const SizedBox(height: 10),
-                                ],
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    IconButton.filledTonal(
-                                      onPressed: isRecordingVoice
-                                          ? cancelVoiceRecording
-                                          : isBusy
-                                          ? null
-                                          : showAttachmentOptions,
-                                      style: IconButton.styleFrom(
-                                        foregroundColor: isRecordingVoice
-                                            ? AppColors.danger
-                                            : null,
-                                      ),
-                                      icon: Icon(
-                                        isRecordingVoice
-                                            ? Icons.delete_outline_rounded
-                                            : Icons.add,
-                                      ),
-                                      tooltip: isRecordingVoice
-                                          ? 'Cancel recording'
-                                          : 'Add attachment',
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: isRecordingVoice
-                                          ? _RecordingComposerPill(
-                                              duration:
-                                                  _formatRecordingDuration(),
-                                              isPaused: isVoiceRecordingPaused,
-                                              onTogglePause:
-                                                  toggleVoiceRecordingPause,
-                                            )
-                                          : Container(
-                                              decoration: BoxDecoration(
-                                                color: Colors.white,
-                                                borderRadius:
-                                                    BorderRadius.circular(20),
-                                                border: Border.all(
-                                                  color: AppColors.border,
-                                                ),
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: AppColors.primaryDark
-                                                        .withValues(
-                                                          alpha: 0.04,
-                                                        ),
-                                                    blurRadius: 14,
-                                                    offset: const Offset(0, 6),
+                                  icon: Icon(
+                                    isRecordingVoice
+                                        ? Icons.delete_outline_rounded
+                                        : Icons.add,
+                                  ),
+                                  tooltip: isRecordingVoice
+                                      ? 'Cancel recording'
+                                      : 'Add attachment',
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: isRecordingVoice
+                                      ? _RecordingComposerPill(
+                                          duration: _formatRecordingDuration(),
+                                          isPaused: isVoiceRecordingPaused,
+                                          onTogglePause:
+                                              toggleVoiceRecordingPause,
+                                        )
+                                      : Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            border: Border.all(
+                                              color: AppColors.border,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: AppColors.primaryDark
+                                                    .withValues(alpha: 0.04),
+                                                blurRadius: 14,
+                                                offset: const Offset(0, 6),
+                                              ),
+                                            ],
+                                          ),
+                                          child: TextField(
+                                            controller: messageController,
+                                            enabled: !isBusy,
+                                            maxLines: 5,
+                                            minLines: 1,
+                                            textCapitalization:
+                                                TextCapitalization.sentences,
+                                            decoration: InputDecoration(
+                                              hintText: isUploadingMedia
+                                                  ? 'Uploading media...'
+                                                  : 'Write a message',
+                                              filled: false,
+                                              contentPadding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 14,
                                                   ),
-                                                ],
-                                              ),
-                                              child: TextField(
-                                                controller: messageController,
-                                                enabled: !isBusy,
-                                                maxLines: 5,
-                                                minLines: 1,
-                                                textCapitalization:
-                                                    TextCapitalization
-                                                        .sentences,
-                                                decoration: InputDecoration(
-                                                  hintText: isUploadingMedia
-                                                      ? 'Uploading media...'
-                                                      : 'Write a message',
-                                                  filled: false,
-                                                  contentPadding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 16,
-                                                        vertical: 14,
-                                                      ),
-                                                  border: InputBorder.none,
-                                                ),
-                                                onSubmitted: (_) =>
-                                                    sendMessage(),
-                                              ),
+                                              border: InputBorder.none,
                                             ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    if (!isRecordingVoice) ...[
-                                      IconButton.filledTonal(
-                                        onPressed: isSendingOrUploading
-                                            ? null
-                                            : toggleVoiceRecording,
-                                        style: IconButton.styleFrom(
-                                          foregroundColor: AppColors.primary,
+                                            onSubmitted: (_) => sendMessage(),
+                                          ),
                                         ),
-                                        icon: const Icon(Icons.mic_none),
-                                        tooltip: 'Record voice message',
-                                      ),
-                                      const SizedBox(width: 8),
-                                    ],
-                                    FilledButton(
-                                      onPressed: isSendingOrUploading
-                                          ? null
-                                          : isRecordingVoice
-                                          ? stopAndSendVoiceMessage
-                                          : sendMessage,
-                                      style: FilledButton.styleFrom(
-                                        backgroundColor: AppColors.primary,
-                                        foregroundColor: Colors.white,
-                                        minimumSize: const Size.square(48),
-                                        padding: EdgeInsets.zero,
-                                        shape: const CircleBorder(),
-                                      ),
-                                      child: isSendingOrUploading
-                                          ? const SizedBox(
-                                              width: 18,
-                                              height: 18,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: Colors.white,
-                                              ),
-                                            )
-                                          : const Icon(
-                                              Icons.send_rounded,
-                                              color: Colors.white,
-                                              size: 20,
-                                            ),
+                                ),
+                                const SizedBox(width: 8),
+                                if (!isRecordingVoice) ...[
+                                  IconButton.filledTonal(
+                                    onPressed: isSendingOrUploading
+                                        ? null
+                                        : toggleVoiceRecording,
+                                    style: IconButton.styleFrom(
+                                      foregroundColor: AppColors.primary,
                                     ),
-                                  ],
+                                    icon: const Icon(Icons.mic_none),
+                                    tooltip: 'Record voice message',
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                                FilledButton(
+                                  onPressed: isSendingOrUploading
+                                      ? null
+                                      : isRecordingVoice
+                                      ? stopAndSendVoiceMessage
+                                      : sendMessage,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: Colors.white,
+                                    minimumSize: const Size.square(48),
+                                    padding: EdgeInsets.zero,
+                                    shape: const CircleBorder(),
+                                  ),
+                                  child: isSendingOrUploading
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.send_rounded,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
                                 ),
                               ],
                             ),
-                          )
-                        : _ReadOnlyChatBar(
-                            message: widget.readOnly
-                                ? 'Manager operation is view-only for this chat.'
-                                : 'Announcements are read-only. Reply in your teacher chat.',
-                          ),
-                  ),
-                ],
+                          ],
+                        ),
+                      )
+                    : _ReadOnlyChatBar(
+                        message: widget.readOnly
+                            ? 'Manager operation is view-only for this chat.'
+                            : 'Announcements are read-only. Reply in your teacher chat.',
+                      ),
               ),
-            ),
+            ],
           ),
         ),
       ),
