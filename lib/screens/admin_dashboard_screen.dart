@@ -4,6 +4,7 @@ import '../models/auth_session.dart';
 import '../services/firestore_chat_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/polished_state_card.dart';
 import '../widgets/support_entry_card.dart';
 import 'admin_analysis_screen.dart';
 import 'admin_announcements_screen.dart';
@@ -21,6 +22,86 @@ class AdminDashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final canSeeAnalysis =
         session.appUser.isSuperAdmin || session.appUser.isTechnicalSupport;
+    final toolTiles = <Widget>[
+      if (canSeeAnalysis)
+        _NavTile(
+          icon: Icons.analytics_rounded,
+          title: 'Analysis',
+          subtitle: 'View courses, chats, messages, uploads, and usage totals',
+          color: const Color(0xFF6A3DE8),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AdminAnalysisScreen(session: session),
+            ),
+          ),
+        ),
+      _NavTile(
+        icon: Icons.menu_book_rounded,
+        title: 'Courses',
+        subtitle: session.appUser.canViewAllCourses
+            ? 'Search courses and open student chats'
+            : 'Open your linked courses and student chats',
+        color: AppColors.primary,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AdminCoursesScreen(session: session),
+          ),
+        ),
+      ),
+      if (session.appUser.isSuperAdmin)
+        _NavTile(
+          icon: Icons.people_rounded,
+          title: 'Users',
+          subtitle: 'Review registered students, teachers, and admins',
+          color: const Color(0xFF0E7C86),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AdminUsersScreen(session: session),
+            ),
+          ),
+        ),
+      _NavTile(
+        icon: Icons.campaign_rounded,
+        title: 'Announcements',
+        subtitle: 'Send course announcements or private student messages',
+        color: AppColors.admin,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AdminAnnouncementsScreen(session: session),
+          ),
+        ),
+      ),
+      if (session.appUser.isSuperAdmin)
+        _NavTile(
+          icon: Icons.admin_panel_settings_rounded,
+          title: 'Moderations',
+          subtitle: 'Search and soft-delete selected messages',
+          color: AppColors.danger,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AdminModerationScreen(session: session),
+            ),
+          ),
+        ),
+      if (session.appUser.isSuperAdmin)
+        _NavTile(
+          icon: Icons.history_edu_rounded,
+          title: 'Deleted Messages',
+          subtitle: 'Review deleted messages and moderation history',
+          color: AppColors.primaryDark,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AdminAuditScreen(session: session),
+            ),
+          ),
+        ),
+    ];
 
     return AppScaffold(
       title: 'EACC Admin',
@@ -37,19 +118,6 @@ class AdminDashboardScreen extends StatelessWidget {
             canViewAllCourses: session.appUser.canViewAllCourses,
           ),
           const SizedBox(height: 14),
-          if (canSeeAnalysis) ...[
-            _AnalysisEntryButton(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AdminAnalysisScreen(session: session),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-
-          // Live stat cards
           _StatsRow(session: session),
           const SizedBox(height: 24),
           if (!session.appUser.isManagerOperation) ...[
@@ -57,89 +125,15 @@ class AdminDashboardScreen extends StatelessWidget {
             const SizedBox(height: 24),
           ],
 
-          // Navigation tiles
-          Text(
-            session.appUser.isSuperAdmin ? 'ADMIN TOOLS' : 'COURSE TOOLS',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppColors.muted,
-              letterSpacing: 1.2,
-            ),
+          _DashboardSection(
+            title: session.appUser.isSuperAdmin
+                ? 'Admin tools'
+                : 'Course tools',
+            subtitle: session.appUser.isSuperAdmin
+                ? 'Manage courses, communication, moderation, and reports.'
+                : 'Open the course tools available to your account.',
+            child: _NavGrid(children: toolTiles),
           ),
-          const SizedBox(height: 10),
-          _NavTile(
-            icon: Icons.menu_book_rounded,
-            title: 'Courses',
-            subtitle: session.appUser.canViewAllCourses
-                ? 'Browse all courses and student chats'
-                : 'Open your linked courses and student chats',
-            color: AppColors.primary,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => AdminCoursesScreen(session: session),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          if (session.appUser.isSuperAdmin) ...[
-            _NavTile(
-              icon: Icons.people_rounded,
-              title: 'Users',
-              subtitle: 'View all registered students and teachers',
-              color: const Color(0xFF0E7C86),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AdminUsersScreen(session: session),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-          _NavTile(
-            icon: Icons.campaign_rounded,
-            title: 'Announcements',
-            subtitle: 'Send course announcements or private student messages',
-            color: AppColors.admin,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => AdminAnnouncementsScreen(session: session),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          if (session.appUser.isSuperAdmin) ...[
-            _NavTile(
-              icon: Icons.admin_panel_settings_rounded,
-              title: 'Moderations',
-              subtitle: 'Search and soft-delete selected messages',
-              color: AppColors.danger,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AdminModerationScreen(session: session),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            _NavTile(
-              icon: Icons.history_edu_rounded,
-              title: 'Deleted Messages',
-              subtitle: 'Review deleted messages and chat edits',
-              color: AppColors.primaryDark,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AdminAuditScreen(session: session),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-          ] else
-            const SizedBox(height: 24),
         ],
       ),
     );
@@ -277,83 +271,6 @@ class _WelcomeHeader extends StatelessWidget {
 
 // ─── Live stat cards ─────────────────────────────────────────────────────────
 
-class _AnalysisEntryButton extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _AnalysisEntryButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.12),
-                  ),
-                ),
-                child: const Icon(
-                  Icons.analytics_rounded,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Application Analysis',
-                      style: TextStyle(
-                        color: AppColors.ink,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    SizedBox(height: 3),
-                    Text(
-                      'View courses, users, chats, messages, and upload totals.',
-                      style: TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.arrow_forward_rounded,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _StatsRow extends StatelessWidget {
   final AuthSession session;
 
@@ -396,6 +313,97 @@ class _StatsRow extends StatelessWidget {
               ),
             ),
           ],
+        );
+      },
+    );
+  }
+}
+
+class _DashboardSection extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  const _DashboardSection({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.dashboard_customize_rounded,
+                color: AppColors.primary,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: AppColors.ink,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        child,
+      ],
+    );
+  }
+}
+
+class _NavGrid extends StatelessWidget {
+  final List<Widget> children;
+
+  const _NavGrid({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 900 ? 2 : 1;
+        final width = columns == 2
+            ? (constraints.maxWidth - 12) / 2
+            : constraints.maxWidth;
+
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: children
+              .map((child) => SizedBox(width: width, child: child))
+              .toList(growable: false),
         );
       },
     );
@@ -629,22 +637,23 @@ class _CourseActivityPanelState extends State<_CourseActivityPanel> {
                     ),
                   )
                 else if (summaryFuture == null)
-                  const Text(
-                    'No course loaded. Enter its ID above when you need a summary.',
-                    style: TextStyle(
-                      color: AppColors.muted,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  const _InlineState(
+                    icon: Icons.manage_search_rounded,
+                    message:
+                        'No course loaded. Enter its ID above when you need a summary.',
+                    color: AppColors.primary,
                   )
                 else if (snapshot.connectionState == ConnectionState.waiting)
-                  const LinearProgressIndicator(minHeight: 3)
+                  const PolishedLoadingCard(
+                    title: 'Loading course activity',
+                    message: 'Counting recent messages, uploads, and media.',
+                  )
                 else if (snapshot.hasError)
-                  Text(
-                    'Could not load course $loadedCourseId: ${snapshot.error}',
-                    style: const TextStyle(
-                      color: AppColors.danger,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  _InlineState(
+                    icon: Icons.error_outline_rounded,
+                    message:
+                        'Could not load course $loadedCourseId: ${snapshot.error}',
+                    color: AppColors.danger,
                   )
                 else ...[
                   Row(
@@ -676,6 +685,47 @@ class _CourseActivityPanelState extends State<_CourseActivityPanel> {
           ),
         );
       },
+    );
+  }
+}
+
+class _InlineState extends StatelessWidget {
+  final IconData icon;
+  final String message;
+  final Color color;
+
+  const _InlineState({
+    required this.icon,
+    required this.message,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w700,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -800,64 +850,79 @@ class _NavTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: color.withValues(alpha: 0.12)),
-                ),
-                child: Icon(icon, color: color, size: 22),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 15,
-                      ),
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.98, end: 1),
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      builder: (context, scale, child) {
+        return Transform.scale(scale: scale, child: child);
+      },
+      child: Card(
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        color.withValues(alpha: 0.14),
+                        color.withValues(alpha: 0.05),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 12,
-                        height: 1.3,
-                        fontWeight: FontWeight.w600,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: color.withValues(alpha: 0.12)),
+                  ),
+                  child: Icon(icon, color: color, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 12,
+                          height: 1.3,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(999),
+                const SizedBox(width: 12),
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    color: color.withValues(alpha: 0.72),
+                    size: 22,
+                  ),
                 ),
-                child: Icon(
-                  Icons.chevron_right_rounded,
-                  color: color.withValues(alpha: 0.72),
-                  size: 22,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

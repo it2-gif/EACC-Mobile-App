@@ -4,6 +4,7 @@ import '../models/auth_session.dart';
 import '../services/firestore_chat_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/polished_state_card.dart';
 import '../widgets/screen_header.dart';
 
 class AdminAnalysisScreen extends StatefulWidget {
@@ -877,45 +878,13 @@ class _AnalysisIdle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            Container(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Icon(
-                Icons.query_stats_rounded,
-                color: AppColors.primary,
-                size: 30,
-              ),
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              'Generate a live report when you need it',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Opening this screen uses no Firestore message reads. A live report scans current app activity once.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.muted, height: 1.4),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: onLoad,
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: const Text('Generate live report'),
-            ),
-          ],
-        ),
-      ),
+    return PolishedStateCard(
+      icon: Icons.query_stats_rounded,
+      title: 'Generate a live report when you need it',
+      message:
+          'Opening this screen uses no Firestore message reads. A live report scans current app activity once.',
+      actionLabel: 'Generate live report',
+      onAction: onLoad,
     );
   }
 }
@@ -925,23 +894,9 @@ class _AnalysisLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Card(
-      child: Padding(
-        padding: EdgeInsets.all(24),
-        child: Column(
-          children: [
-            LinearProgressIndicator(minHeight: 3),
-            SizedBox(height: 16),
-            Text(
-              'Loading application analysis...',
-              style: TextStyle(
-                color: AppColors.muted,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return const PolishedLoadingCard(
+      title: 'Loading application analysis',
+      message: 'Scanning courses, chats, messages, and uploads.',
     );
   }
 }
@@ -954,36 +909,13 @@ class _AnalysisError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            const Icon(
-              Icons.error_outline_rounded,
-              color: AppColors.danger,
-              size: 42,
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Could not load analysis',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              error,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.muted),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Retry'),
-            ),
-          ],
-        ),
-      ),
+    return PolishedStateCard(
+      icon: Icons.error_outline_rounded,
+      title: 'Could not load analysis',
+      message: error,
+      color: AppColors.danger,
+      actionLabel: 'Retry',
+      onAction: onRetry,
     );
   }
 }

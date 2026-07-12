@@ -8,6 +8,7 @@ import '../models/auth_session.dart';
 import '../services/support_chat_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/time_format.dart';
+import '../widgets/polished_state_card.dart';
 
 class SupportInboxScreen extends StatelessWidget {
   final AuthSession session;
@@ -40,7 +41,13 @@ class SupportInboxScreen extends StatelessWidget {
                 }
 
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: PolishedLoadingCard(
+                      title: 'Loading support inbox',
+                      message: 'Checking the latest live-help conversations.',
+                    ),
+                  );
                 }
 
                 final threads = snapshot.data?.docs ?? [];
@@ -54,9 +61,13 @@ class SupportInboxScreen extends StatelessWidget {
 
                 return ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                  itemCount: threads.length,
+                  itemCount: threads.length + 1,
                   itemBuilder: (context, index) {
-                    final doc = threads[index];
+                    if (index == 0) {
+                      return _SupportInboxHeader(total: threads.length);
+                    }
+
+                    final doc = threads[index - 1];
                     final data = doc.data();
                     final requesterName =
                         data['requester_name']?.toString().trim() ?? 'User';
@@ -301,7 +312,13 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
 
                       final docs = snapshot.data?.docs ?? [];
                       if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
+                        return const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: PolishedLoadingCard(
+                            title: 'Loading support chat',
+                            message: 'Preparing your support conversation.',
+                          ),
+                        );
                       }
 
                       if (docs.isEmpty) {
@@ -388,72 +405,203 @@ class _SupportThreadTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 10,
-        ),
-        leading: CircleAvatar(
-          backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-          child: Text(
-            title.trim().isEmpty ? '?' : title.trim()[0].toUpperCase(),
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
-            ),
-            if (unread > 0)
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(999),
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary.withValues(alpha: 0.15),
+                      AppColors.accent.withValues(alpha: 0.06),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.16),
+                  ),
                 ),
-                child: Text(
-                  unread > 99 ? '99+' : '$unread',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                child: Center(
+                  child: Text(
+                    title.trim().isEmpty ? '?' : title.trim()[0].toUpperCase(),
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: AppColors.muted),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              meta,
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                        if (unread > 0) _AnimatedUnreadBadge(unread: unread),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        height: 1.25,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      meta,
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 10),
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.primaryDark,
+                  size: 19,
+                ),
+              ),
+            ],
+          ),
         ),
-        trailing: const Icon(Icons.chevron_right_rounded),
-        onTap: onTap,
+      ),
+    );
+  }
+}
+
+class _SupportInboxHeader extends StatelessWidget {
+  final int total;
+
+  const _SupportInboxHeader({required this.total});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.primary, AppColors.primaryDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryDark.withValues(alpha: 0.18),
+            blurRadius: 24,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+            ),
+            child: const Icon(Icons.support_agent_rounded, color: Colors.white),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Live Help Inbox',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  '$total active support conversation${total == 1 ? '' : 's'}',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.78),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnimatedUnreadBadge extends StatelessWidget {
+  final int unread;
+
+  const _AnimatedUnreadBadge({required this.unread});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.86, end: 1),
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutBack,
+      builder: (context, scale, child) {
+        return Transform.scale(scale: scale, child: child);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppColors.danger,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white, width: 2),
+        ),
+        child: Text(
+          unread > 99 ? '99+' : '$unread',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
       ),
     );
   }
@@ -491,14 +639,21 @@ class _SupportMessageBubble extends StatelessWidget {
       child: Container(
         constraints: const BoxConstraints(maxWidth: 560),
         margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+        padding: const EdgeInsets.fromLTRB(14, 11, 14, 9),
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(16).copyWith(
-            bottomRight: Radius.circular(isMine ? 4 : 16),
-            bottomLeft: Radius.circular(isMine ? 16 : 4),
+          borderRadius: BorderRadius.circular(20).copyWith(
+            bottomRight: Radius.circular(isMine ? 6 : 20),
+            bottomLeft: Radius.circular(isMine ? 20 : 6),
           ),
           border: isMine ? null : Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryDark.withValues(alpha: 0.06),
+              blurRadius: 16,
+              offset: const Offset(0, 7),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -602,19 +757,49 @@ class _SupportImagePreview extends StatelessWidget {
               if (loadingProgress == null) return child;
               return const SizedBox(
                 height: 180,
-                child: Center(child: CircularProgressIndicator()),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2.3),
+                      ),
+                      SizedBox(height: 10),
+                      Text(
+                        'Loading image',
+                        style: TextStyle(
+                          color: AppColors.muted,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               );
             },
             errorBuilder: (context, error, stackTrace) => SizedBox(
               height: 140,
               child: Center(
-                child: Text(
-                  fileName ?? 'Could not load image',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: isMine ? Colors.white : AppColors.muted,
-                    fontWeight: FontWeight.w700,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.broken_image_outlined,
+                      color: isMine ? Colors.white70 : AppColors.muted,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      fileName ?? 'Could not load image',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: isMine ? Colors.white : AppColors.muted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -645,10 +830,17 @@ class _SupportInputBar extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-        decoration: const BoxDecoration(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        decoration: BoxDecoration(
           color: Colors.white,
-          border: Border(top: BorderSide(color: AppColors.border)),
+          border: const Border(top: BorderSide(color: AppColors.border)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 14,
+              offset: const Offset(0, -2),
+            ),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -668,16 +860,27 @@ class _SupportInputBar extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: TextField(
-                    controller: controller,
-                    minLines: 1,
-                    maxLines: 4,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(
-                      hintText: 'Write your support message',
-                      prefixIcon: Icon(Icons.edit_note_rounded),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: AppColors.border),
                     ),
-                    onSubmitted: (_) => onSend(),
+                    child: TextField(
+                      controller: controller,
+                      minLines: 1,
+                      maxLines: 4,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: const InputDecoration(
+                        hintText: 'Write your support message',
+                        prefixIcon: Icon(Icons.edit_note_rounded),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        filled: false,
+                      ),
+                      onSubmitted: (_) => onSend(),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -719,27 +922,15 @@ class _SupportState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 46, color: AppColors.muted),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.muted, height: 1.35),
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: PolishedStateCard(
+        icon: icon,
+        title: title,
+        message: subtitle,
+        color: icon == Icons.error_outline_rounded
+            ? AppColors.danger
+            : AppColors.primary,
       ),
     );
   }

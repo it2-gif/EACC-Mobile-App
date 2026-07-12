@@ -76,24 +76,40 @@ class SupportHelpButton extends StatelessWidget {
               Positioned(
                 right: -4,
                 top: -6,
-                child: Container(
-                  constraints: const BoxConstraints(minWidth: 22),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.danger,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                  child: Text(
-                    unread > 99 ? '99+' : '$unread',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
+                child: TweenAnimationBuilder<double>(
+                  key: ValueKey(unread),
+                  tween: Tween(begin: 0.72, end: 1),
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutBack,
+                  builder: (context, scale, child) {
+                    return Transform.scale(scale: scale, child: child);
+                  },
+                  child: Container(
+                    constraints: const BoxConstraints(minWidth: 22),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.danger,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.danger.withValues(alpha: 0.24),
+                          blurRadius: 12,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      unread > 99 ? '99+' : '$unread',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                 ),

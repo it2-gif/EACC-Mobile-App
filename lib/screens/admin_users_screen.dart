@@ -4,6 +4,7 @@ import '../models/auth_session.dart';
 import '../services/admin_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/polished_state_card.dart';
 import '../widgets/screen_header.dart';
 
 class AdminUsersScreen extends StatefulWidget {
@@ -56,40 +57,25 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: PolishedLoadingCard(
+          title: 'Loading users',
+          message: 'Collecting registered students, teachers, and admins.',
+        ),
+      );
     }
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: 52,
-                color: AppColors.danger,
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'Could not load users',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.muted),
-              ),
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: _load,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
-              ),
-            ],
-          ),
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: PolishedStateCard(
+          icon: Icons.error_outline_rounded,
+          title: 'Could not load users',
+          message: _error!,
+          color: AppColors.danger,
+          actionLabel: 'Retry',
+          onAction: _load,
         ),
       );
     }
@@ -214,25 +200,65 @@ class _UserTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        leading: CircleAvatar(
-          backgroundColor: _roleColor.withValues(alpha: 0.12),
-          child: Icon(_roleIcon, color: _roleColor, size: 20),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOutCubic,
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 10),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      _roleColor.withValues(alpha: 0.14),
+                      _roleColor.withValues(alpha: 0.05),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: _roleColor.withValues(alpha: 0.16)),
+                ),
+                child: Icon(_roleIcon, color: _roleColor, size: 21),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      user.email ?? user.lmsUserId,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.muted,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              _StatusBadge(status: user.status),
+            ],
+          ),
         ),
-        title: Text(
-          user.name,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-        ),
-        subtitle: Text(
-          user.email ?? user.lmsUserId,
-          style: const TextStyle(fontSize: 12, color: AppColors.muted),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: _StatusBadge(status: user.status),
       ),
     );
   }
@@ -271,27 +297,11 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.only(top: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.people_outline, size: 52, color: AppColors.muted),
-            SizedBox(height: 14),
-            Text(
-              'No users yet',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Users will appear here once students and teachers log in.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.muted),
-            ),
-          ],
-        ),
-      ),
+    return const PolishedStateCard(
+      icon: Icons.people_outline_rounded,
+      title: 'No users yet',
+      message: 'Users will appear here once students and teachers log in.',
+      color: AppColors.primary,
     );
   }
 }
