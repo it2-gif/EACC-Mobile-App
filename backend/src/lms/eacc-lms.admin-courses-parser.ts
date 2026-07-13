@@ -17,6 +17,7 @@ export interface AdminUserListEntry {
   id: string;
   shortName: string;
   isSuperAdmin?: boolean;
+  isManagerOperation?: boolean;
   detailsPath?: string;
 }
 
@@ -141,12 +142,22 @@ export function parseAdminFromUserList(
         .toArray()
         .map((header) => normalizeFieldName($(header).text()));
       const fullAccessIndex = headers.findIndex(isFullAccessField);
+      const managerOperationIndex = headers.findIndex(isManagerOperationField);
       const fullAccessCell =
         fullAccessIndex >= 0 ? $(cells[fullAccessIndex]) : undefined;
+      const managerOperationCell =
+        managerOperationIndex >= 0
+          ? $(cells[managerOperationIndex])
+          : undefined;
       const isSuperAdmin =
         readFullAccessControl($, $(row)) ??
         (fullAccessCell
           ? readExactFullAccess(fullAccessCell.text())
+          : undefined);
+      const isManagerOperation =
+        readManagerOperationControl($, $(row)) ??
+        (managerOperationCell
+          ? readExactEnabled(managerOperationCell.text())
           : undefined);
       const detailsPath = $(row)
         .find('a[href]')
@@ -165,6 +176,7 @@ export function parseAdminFromUserList(
         id,
         shortName,
         ...(isSuperAdmin === undefined ? {} : { isSuperAdmin }),
+        ...(isManagerOperation === undefined ? {} : { isManagerOperation }),
         ...(detailsPath ? { detailsPath } : {}),
       };
       return false; // break $.each
@@ -172,6 +184,23 @@ export function parseAdminFromUserList(
   });
 
   return found;
+}
+
+function readManagerOperationControl(
+  $: CheerioRoot,
+  element: ReturnType<CheerioRoot>,
+): boolean | undefined {
+  let result: boolean | undefined;
+
+  element.find('[name]').each((_, control) => {
+    const fieldName = normalizeFieldName($(control).attr('name') ?? '');
+    if (!isManagerOperationField(fieldName)) return;
+
+    result = readExactEnabled(String($(control).val() ?? ''));
+    return false;
+  });
+
+  return result;
 }
 
 function readFullAccessControl(
@@ -192,6 +221,10 @@ function readFullAccessControl(
 }
 
 function readExactFullAccess(value: string): boolean | undefined {
+  return readExactEnabled(value);
+}
+
+function readExactEnabled(value: string): boolean | undefined {
   const normalized = value.trim();
   if (!normalized) return undefined;
   return normalized === '1';
@@ -203,6 +236,10 @@ function normalizeFieldName(value: string): string {
 
 function isFullAccessField(value: string): boolean {
   return value === 'fullaccess' || value === 'fullaccese';
+}
+
+function isManagerOperationField(value: string): boolean {
+  return value === 'moperation' || value === 'manageroperation';
 }
 
 export function parseAdminCourseIdsHtml(html: string): string[] {

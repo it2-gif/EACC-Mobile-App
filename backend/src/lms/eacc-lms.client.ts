@@ -139,7 +139,9 @@ export class EaccLmsClient implements LmsClient {
         credentials.role === 'admin'
           ? {
               ...parsedUser,
-              isSuperAdmin: credentials.hints?.hasFullAccess === true,
+              isSuperAdmin:
+                parsedUser.isSuperAdmin === true ||
+                credentials.hints?.hasFullAccess === true,
             }
           : parsedUser;
 
@@ -330,7 +332,6 @@ export class EaccLmsClient implements LmsClient {
           credentials!.username,
           `${loginResponseHtml}\n${html}`,
         ),
-        isSuperAdmin: credentials!.hints?.hasFullAccess === true,
       };
       const admin = await this.resolveAdminIdentity(
         url.origin,
@@ -406,13 +407,20 @@ export class EaccLmsClient implements LmsClient {
       if (!matchedAdmin) return admin;
 
       console.log(
-        `[AdminAccess] user="${loginUsername}" id="${matchedAdmin.id}" fullAccess=${admin.isSuperAdmin ? 1 : 0}`,
+        `[AdminAccess] user="${loginUsername}" id="${matchedAdmin.id}" fullAccess=${
+          (matchedAdmin.isSuperAdmin ?? admin.isSuperAdmin) ? 1 : 0
+        } managerOperation=${
+          (matchedAdmin.isManagerOperation ?? admin.isManagerOperation) ? 1 : 0
+        }`,
       );
 
       return {
         ...admin,
         lmsUserId: matchedAdmin.id,
         name: matchedAdmin.shortName,
+        isSuperAdmin: matchedAdmin.isSuperAdmin ?? admin.isSuperAdmin,
+        isManagerOperation:
+          matchedAdmin.isManagerOperation ?? admin.isManagerOperation,
       };
     } catch {
       return admin;
@@ -427,7 +435,11 @@ export class EaccLmsClient implements LmsClient {
     admin: NormalizedLmsUser,
     credentials: LmsLoginCredentials,
   ): Promise<NormalizedLmsCourse[]> {
-    if (admin.isSuperAdmin || credentials.hints?.canViewAllCourses === true) {
+    if (
+      admin.isSuperAdmin ||
+      admin.isManagerOperation ||
+      credentials.hints?.canViewAllCourses === true
+    ) {
       return this.loadAdminAllCoursesWithStudents(
         baseUrl,
         sessionCookie,
@@ -1030,6 +1042,7 @@ function parseAdminIdentity(username: string, html: string): NormalizedLmsUser {
     role: 'admin',
     name: displayName,
     isSuperAdmin: hasAdminFullAccess(html),
+    isManagerOperation: hasAdminManagerOperation(html),
     courses: [],
   };
 }
@@ -1084,11 +1097,21 @@ function escapeRegex(value: string): string {
 }
 
 function hasAdminFullAccess(html: string): boolean {
+  return hasAdminBooleanFlag(html, ['fullaccess', 'fullaccese']);
+}
+
+function hasAdminManagerOperation(html: string): boolean {
+  return hasAdminBooleanFlag(html, ['moperation', 'manageroperation']);
+}
+
+function hasAdminBooleanFlag(html: string, compactKeys: string[]): boolean {
   const normalized = html.toLowerCase();
 
-  const fullAccessKeys = ['full[_\\s-]?access', 'fullaccess', 'fullaccese'];
+  const fieldPatterns = compactKeys.map((key) =>
+    key === 'moperation' ? 'm[_\\s-]?operation' : key,
+  );
 
-  const directPatterns = fullAccessKeys.flatMap((key) => [
+  const directPatterns = fieldPatterns.flatMap((key) => [
     new RegExp(`\\b${key}\\b\\s*(?:=|:|=>)\\s*["']?1["']?(?!\\d)`),
     new RegExp(`["']${key}["']\\s*:\\s*["']?1["']?(?!\\d)`),
     new RegExp(`${key}["'\\s:=]+1(?!\\d)`),
@@ -1108,7 +1131,7 @@ function hasAdminFullAccess(html: string): boolean {
     const key = match[1].replace(/[-_\s]/g, '');
     const value = match[2].trim();
 
-    if (['fullaccess', 'fullaccese'].includes(key) && value === '1') {
+    if (compactKeys.includes(key) && value === '1') {
       return true;
     }
   }
@@ -1120,13 +1143,15 @@ function hasAdminFullAccess(html: string): boolean {
     const value = match[1].trim();
     const key = match[2].replace(/[-_\s]/g, '');
 
-    if (['fullaccess', 'fullaccese'].includes(key) && value === '1') {
+    if (compactKeys.includes(key) && value === '1') {
       return true;
     }
   }
 
-  const selectPattern =
-    /<select[^>]+name\s*=\s*["'](?:full[_\s-]?access|fullaccese)["'][^>]*>[\s\S]*?<option[^>]+value\s*=\s*["']?1["']?[^>]*selected[^>]*>/;
+  const selectFieldPattern = fieldPatterns.join('|');
+  const selectPattern = new RegExp(
+    `<select[^>]+name\\s*=\\s*["'](?:${selectFieldPattern})["'][^>]*>[\\s\\S]*?<option[^>]+value\\s*=\\s*["']?1["']?[^>]*selected[^>]*>`,
+  );
 
   return selectPattern.test(normalized);
 }

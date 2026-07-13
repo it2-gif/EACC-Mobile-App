@@ -54,6 +54,10 @@ export function parseLmsResponse(
     expectedRole === 'admin'
       ? hasAdminFullAccess(data) || hasAdminFullAccess(root)
       : false;
+  const isManagerOperation =
+    expectedRole === 'admin'
+      ? hasAdminManagerOperation(data) || hasAdminManagerOperation(root)
+      : false;
 
   if (responseRole && normalizeRole(responseRole) !== expectedRole) {
     throw new InvalidLmsResponseError();
@@ -65,6 +69,7 @@ export function parseLmsResponse(
     name,
     email,
     isSuperAdmin,
+    isManagerOperation,
     courses: readCourses(
       data.courses ?? root.courses,
       root.admin ?? data.admin,
@@ -140,6 +145,17 @@ function hasAdminFullAccess(data: JsonObject): boolean {
   ]);
 
   return accessLevel === 1;
+}
+
+function hasAdminManagerOperation(data: JsonObject): boolean {
+  const managerOperation = readOptionalNumber(data, [
+    'm_operation',
+    'mOperation',
+    'manager_operation',
+    'managerOperation',
+  ]);
+
+  return managerOperation === 1;
 }
 
 function asObject(value: unknown): JsonObject {

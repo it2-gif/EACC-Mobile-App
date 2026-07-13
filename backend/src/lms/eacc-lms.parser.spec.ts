@@ -71,6 +71,40 @@ describe('parseLmsResponse', () => {
     expect(limitedAdmin.isSuperAdmin).toBe(false);
   });
 
+  it('grants manager-operation access only when the LMS m_operation value is 1', () => {
+    const managerAdmin = parseLmsResponse(
+      {
+        admin_name: [
+          {
+            id: 13,
+            shortname: 'Eman',
+            fullaccese: '0',
+            m_operation: '1',
+          },
+        ],
+      },
+      'admin',
+    );
+    const contactPersonAdmin = parseLmsResponse(
+      {
+        admin_name: [
+          {
+            id: 91,
+            shortname: 'testapp',
+            fullaccese: '0',
+            m_operation: '0',
+          },
+        ],
+      },
+      'admin',
+    );
+
+    expect(managerAdmin.isSuperAdmin).toBe(false);
+    expect(managerAdmin.isManagerOperation).toBe(true);
+    expect(contactPersonAdmin.isSuperAdmin).toBe(false);
+    expect(contactPersonAdmin.isManagerOperation).toBe(false);
+  });
+
   it('reads full access from the response root when admin identity is nested', () => {
     const admin = parseLmsResponse(
       {

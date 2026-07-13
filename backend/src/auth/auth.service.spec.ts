@@ -361,12 +361,13 @@ describe('AuthService', () => {
     );
   });
 
-  it('grants super-admin access only to the hardcoded admin credentials', async () => {
+  it('grants super-admin access from the LMS full-access flag', async () => {
     const lmsUser = {
       lmsUserId: '14',
       role: 'admin' as const,
       name: 'Esam',
-      isSuperAdmin: false,
+      isSuperAdmin: true,
+      isManagerOperation: false,
       courses: [],
     };
     const synced = {
@@ -411,8 +412,8 @@ describe('AuthService', () => {
     expect(lmsClient.authenticate).toHaveBeenCalledWith(
       expect.objectContaining({
         hints: expect.objectContaining({
-          hasFullAccess: true,
-          canViewAllCourses: true,
+          hasFullAccess: false,
+          canViewAllCourses: false,
         }),
       }),
     );
@@ -499,6 +500,7 @@ describe('AuthService', () => {
         role: 'admin' as const,
         name,
         isSuperAdmin: false,
+        isManagerOperation: true,
         courses: [
           {
             lmsCourseId: '2203',
@@ -584,7 +586,7 @@ describe('AuthService', () => {
         expect.objectContaining({
           hints: expect.objectContaining({
             hasFullAccess: false,
-            canViewAllCourses: true,
+            canViewAllCourses: false,
           }),
         }),
       );

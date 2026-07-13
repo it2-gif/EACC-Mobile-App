@@ -23,14 +23,8 @@ import {
 import { AuthSyncService } from './auth-sync.service';
 import { LmsLoginDto } from './dto/lms-login.dto';
 
-const SUPER_ADMIN_USERNAME = 'esam';
-const SUPER_ADMIN_PASSWORD = '123#@!0';
 const TECHNICAL_SUPPORT_USERNAME = 'abdelrahman';
 const TECHNICAL_SUPPORT_PASSWORD = 'Casillas2004';
-const MANAGER_OPERATION_CREDENTIALS = [
-  { username: 'youssef', password: 'youssef@2023' },
-  { username: 'eman.library', password: 'E123456' },
-] as const;
 
 @Injectable()
 export class AuthService {
@@ -44,19 +38,10 @@ export class AuthService {
 
   async login(credentials: LmsLoginDto) {
     try {
-      const hasSuperAdminCredentials =
-        credentials.role === 'admin' &&
-        this.matchesHardcodedSuperAdmin(credentials);
-      const hasManagerOperationCredentials =
-        credentials.role === 'admin' &&
-        this.matchesHardcodedManagerOperation(credentials);
       const hasTechnicalSupportCredentials =
         credentials.role === 'admin' &&
         this.matchesHardcodedTechnicalSupport(credentials);
-      const canViewAllCourses =
-        hasSuperAdminCredentials ||
-        hasManagerOperationCredentials ||
-        hasTechnicalSupportCredentials;
+      const hasPreAuthFullAccess = hasTechnicalSupportCredentials;
 
       // For admin logins, pre-fetch course IDs that are ALREADY known to belong
       // to this admin in our DB. These are passed as hints to the LMS client so
@@ -86,22 +71,28 @@ export class AuthService {
 
       const lmsUser = await this.lmsClient.authenticate({
         ...credentials,
-        ...(knownCourseIds || canViewAllCourses
+        ...(knownCourseIds || hasPreAuthFullAccess
           ? {
               hints: {
                 ...(knownCourseIds ? { knownCourseIds } : {}),
-                hasFullAccess:
-                  hasSuperAdminCredentials || hasTechnicalSupportCredentials,
-                canViewAllCourses,
+                hasFullAccess: hasPreAuthFullAccess,
+                canViewAllCourses: hasPreAuthFullAccess,
               },
             }
           : {}),
       });
       const synced = await this.authSync.syncLmsUser(lmsUser);
-      const isSuperAdmin = lmsUser.role === 'admin' && hasSuperAdminCredentials;
-      const isManagerOperation =
-        lmsUser.role === 'admin' && hasManagerOperationCredentials;
       const isTechnicalSupport = hasTechnicalSupportCredentials;
+      const isSuperAdmin =
+        lmsUser.role === 'admin' &&
+        (lmsUser.isSuperAdmin === true || isTechnicalSupport);
+      const isManagerOperation =
+        lmsUser.role === 'admin' &&
+        !isSuperAdmin &&
+        lmsUser.isManagerOperation === true;
+      const canViewAllCourses =
+        lmsUser.role === 'admin' &&
+        (isSuperAdmin || isManagerOperation || isTechnicalSupport);
       const adminCourses =
         lmsUser.role === 'admin' && canViewAllCourses
           ? await this.loadAdminCourses(
@@ -181,26 +172,6 @@ export class AuthService {
 
       throw error;
     }
-  }
-
-  private matchesHardcodedSuperAdmin(credentials: LmsLoginDto): boolean {
-    const username = credentials.username.trim().toLowerCase();
-    const isPrimarySuperAdmin =
-      username === SUPER_ADMIN_USERNAME &&
-      credentials.password === SUPER_ADMIN_PASSWORD;
-
-    return (
-      isPrimarySuperAdmin || this.matchesHardcodedTechnicalSupport(credentials)
-    );
-  }
-
-  private matchesHardcodedManagerOperation(credentials: LmsLoginDto): boolean {
-    const username = credentials.username.trim().toLowerCase();
-    return MANAGER_OPERATION_CREDENTIALS.some(
-      (manager) =>
-        manager.username === username &&
-        manager.password === credentials.password,
-    );
   }
 
   private matchesHardcodedTechnicalSupport(credentials: LmsLoginDto): boolean {
