@@ -77,6 +77,46 @@ export function parseLmsResponse(
   };
 }
 
+export function parseLmsPhpArrayResponse(
+  payload: string,
+  expectedRole: LmsUserRole,
+): NormalizedLmsUser | undefined {
+  if (!/\bArray\s*\(/i.test(payload)) return undefined;
+
+  const fields = userFields[expectedRole];
+  const data: JsonObject = {};
+  const keys = [
+    ...fields.id,
+    ...fields.name,
+    ...fields.email,
+    'fullaccese',
+    'full_access',
+    'fullAccess',
+    'm_operation',
+    'mOperation',
+    'manager_operation',
+    'managerOperation',
+  ];
+
+  for (const key of keys) {
+    const value = readPhpArrayValue(payload, key);
+    if (value !== undefined) {
+      data[key] = value;
+    }
+  }
+
+  try {
+    return parseLmsResponse(
+      expectedRole === 'admin'
+        ? { admin_name: [data] }
+        : { [expectedRole]: data },
+      expectedRole,
+    );
+  } catch {
+    return undefined;
+  }
+}
+
 function readRoleData(root: JsonObject, expectedRole: LmsUserRole): JsonObject {
   const rolePayload =
     expectedRole === 'admin' ? root.admin_name : root[expectedRole];
@@ -231,6 +271,23 @@ function readValue(data: JsonObject, key: string): unknown {
   );
 
   return matchingKey === undefined ? undefined : data[matchingKey];
+}
+
+function readPhpArrayValue(payload: string, key: string): string | undefined {
+  const pattern = new RegExp(
+    `\\[\\s*${escapeRegex(key)}\\s*\\]\\s*=>\\s*([^\\r\\n\\[]+)`,
+    'i',
+  );
+  const value = pattern.exec(payload)?.[1]?.trim();
+
+  return value
+    ?.replace(/^["']|["']$/g, '')
+    .replace(/\)+$/g, '')
+    .trim();
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function normalizeRole(value: string): LmsUserRole | undefined {

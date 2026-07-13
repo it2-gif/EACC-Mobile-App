@@ -1,5 +1,5 @@
 import { InvalidLmsResponseError } from './eacc-lms.errors';
-import { parseLmsResponse } from './eacc-lms.parser';
+import { parseLmsPhpArrayResponse, parseLmsResponse } from './eacc-lms.parser';
 
 describe('parseLmsResponse', () => {
   it('normalizes a student response', () => {
@@ -107,6 +107,68 @@ describe('parseLmsResponse', () => {
     expect(managerAdmin.isManagerOperation).toBe(true);
     expect(contactPersonAdmin.isSuperAdmin).toBe(false);
     expect(contactPersonAdmin.isManagerOperation).toBe(false);
+  });
+
+  it('reads admin role flags from PHP Array responses', () => {
+    const superAdmin = parseLmsPhpArrayResponse(
+      `Array
+(
+    [admin_name] => Array
+        (
+            [0] => Array
+                (
+                    [shortname] => Esam
+                    [id] => 14
+                    [fullaccese] => 1
+                    [m_operation] => 0
+                )
+        )
+)`,
+      'admin',
+    );
+    const managerOperation = parseLmsPhpArrayResponse(
+      `Array
+(
+    [admin_name] => Array
+        (
+            [0] => Array
+                (
+                    [shortname] => Eman
+                    [id] => 13
+                    [fullaccese] => 0
+                    [m_operation] => 1
+                )
+        )
+)`,
+      'admin',
+    );
+    const contactPerson = parseLmsPhpArrayResponse(
+      `Array
+(
+    [admin_name] => Array
+        (
+            [0] => Array
+                (
+                    [shortname] => testapp
+                    [id] => 91
+                    [fullaccese] => 0
+                    [m_operation] => 0
+                )
+        )
+)`,
+      'admin',
+    );
+
+    expect(superAdmin?.lmsUserId).toBe('14');
+    expect(superAdmin?.name).toBe('Esam');
+    expect(superAdmin?.isSuperAdmin).toBe(true);
+    expect(superAdmin?.isManagerOperation).toBe(false);
+    expect(managerOperation?.lmsUserId).toBe('13');
+    expect(managerOperation?.isSuperAdmin).toBe(false);
+    expect(managerOperation?.isManagerOperation).toBe(true);
+    expect(contactPerson?.lmsUserId).toBe('91');
+    expect(contactPerson?.isSuperAdmin).toBe(false);
+    expect(contactPerson?.isManagerOperation).toBe(false);
   });
 
   it('reads full access from the response root when admin identity is nested', () => {

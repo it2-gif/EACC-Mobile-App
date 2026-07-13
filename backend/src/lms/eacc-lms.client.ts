@@ -25,7 +25,7 @@ import { parseTeacherCourseStudentsHtml } from './eacc-lms.course-students-parse
 import { parseStudentCoursesHtml } from './eacc-lms.courses-parser';
 import { parseLmsDashboardHtml } from './eacc-lms.html-parser';
 import { parseTeacherDashboardHtml } from './eacc-lms.teacher-parser';
-import { parseLmsResponse } from './eacc-lms.parser';
+import { parseLmsPhpArrayResponse, parseLmsResponse } from './eacc-lms.parser';
 
 const loginPaths: Record<LmsUserRole, string> = {
   student: '/members/login_1.php',
@@ -138,9 +138,11 @@ export class EaccLmsClient implements LmsClient {
     }
 
     const dashboardUrl = new URL(dashboardPaths[credentials.role], baseUrl);
-    const jsonPayload = tryParseJson(responseText);
-    if (jsonPayload !== undefined) {
-      const parsedUser = parseLmsResponse(jsonPayload.value, credentials.role);
+    const parsedUser = parseStructuredLmsResponse(
+      responseText,
+      credentials.role,
+    );
+    if (parsedUser !== undefined) {
       const user =
         credentials.role === 'admin'
           ? {
@@ -419,22 +421,24 @@ export class EaccLmsClient implements LmsClient {
       );
       const matchedAdmin = parseAdminFromUserList(usersHtml, loginUsername);
       if (!matchedAdmin) return admin;
+      const isSuperAdmin =
+        matchedAdmin.isSuperAdmin === true || admin.isSuperAdmin === true;
+      const isManagerOperation =
+        matchedAdmin.isManagerOperation === true ||
+        admin.isManagerOperation === true;
 
       console.log(
         `[AdminAccess] user="${loginUsername}" id="${matchedAdmin.id}" fullAccess=${
-          (matchedAdmin.isSuperAdmin ?? admin.isSuperAdmin) ? 1 : 0
-        } managerOperation=${
-          (matchedAdmin.isManagerOperation ?? admin.isManagerOperation) ? 1 : 0
-        }`,
+          isSuperAdmin ? 1 : 0
+        } managerOperation=${isManagerOperation ? 1 : 0}`,
       );
 
       return {
         ...admin,
         lmsUserId: matchedAdmin.id,
         name: matchedAdmin.shortName,
-        isSuperAdmin: matchedAdmin.isSuperAdmin ?? admin.isSuperAdmin,
-        isManagerOperation:
-          matchedAdmin.isManagerOperation ?? admin.isManagerOperation,
+        isSuperAdmin,
+        isManagerOperation,
       };
     } catch {
       return admin;
@@ -1180,6 +1184,18 @@ function tryParseJson(value: string): { value: unknown } | undefined {
   }
 }
 
+function parseStructuredLmsResponse(
+  responseText: string,
+  role: LmsUserRole,
+): NormalizedLmsUser | undefined {
+  const jsonPayload = tryParseJson(responseText);
+  if (jsonPayload !== undefined) {
+    return parseLmsResponse(jsonPayload.value, role);
+  }
+
+  return parseLmsPhpArrayResponse(responseText, role);
+}
+
 function parseAdminIdentity(username: string, html: string): NormalizedLmsUser {
   const trimmed = username.trim().toLowerCase();
   const lmsUserId =
@@ -1250,6 +1266,7 @@ function readAdminIdentityValue(
     const escapedKey = escapeRegex(key);
     const patterns = [
       new RegExp(`["']${escapedKey}["']\\s*:\\s*["']?([^"',}\\s]+)`, 'i'),
+      new RegExp(`\\[\\s*${escapedKey}\\s*\\]\\s*=>\\s*([^\\r\\n\\[]+)`, 'i'),
       new RegExp(
         `\\b${escapedKey}\\b\\s*(?:=|:|=>)\\s*["']?([^"',}\\s<>]+)`,
         'i',
@@ -1258,7 +1275,12 @@ function readAdminIdentityValue(
     ];
 
     for (const pattern of patterns) {
-      const value = pattern.exec(html)?.[1]?.trim();
+      const value = pattern
+        .exec(html)?.[1]
+        ?.trim()
+        .replace(/^["']|["']$/g, '')
+        .replace(/\)+$/g, '')
+        .trim();
       if (value) {
         return value;
       }
@@ -1283,9 +1305,12 @@ function hasAdminManagerOperation(html: string): boolean {
 function hasAdminBooleanFlag(html: string, compactKeys: string[]): boolean {
   const normalized = html.toLowerCase();
 
-  const fieldPatterns = compactKeys.map((key) =>
-    key === 'moperation' ? 'm[_\\s-]?operation' : key,
-  );
+  const fieldPatterns = compactKeys.map((key) => {
+    if (key === 'fullaccess') return 'full[_\\s-]?access';
+    if (key === 'moperation') return 'm[_\\s-]?operation';
+    if (key === 'manageroperation') return 'manager[_\\s-]?operation';
+    return key;
+  });
 
   const directPatterns = fieldPatterns.flatMap((key) => [
     new RegExp(`\\b${key}\\b\\s*(?:=|:|=>)\\s*["']?1["']?(?!\\d)`),
