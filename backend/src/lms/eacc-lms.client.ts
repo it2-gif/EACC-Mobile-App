@@ -76,12 +76,18 @@ export class EaccLmsClient implements LmsClient {
     const catalogCourse = catalog.find(
       (entry) => entry.lmsCourseId === course.lmsCourseId,
     );
+    const [courseWithTeacherName] = await this.resolveCourseTeacherNames(
+      baseUrl,
+      sessionCookie,
+      timeout,
+      [mergeCourseCatalogData(course, catalogCourse)],
+    );
 
     return this.loadAdminCourseStudents(
       baseUrl,
       sessionCookie,
       timeout,
-      mergeCourseCatalogData(course, catalogCourse),
+      courseWithTeacherName,
     );
   }
 
@@ -152,7 +158,11 @@ export class EaccLmsClient implements LmsClient {
             baseUrl,
             mergeSessionCookie(sessionCookie, response.headers),
             timeout,
-            user.courses,
+            user.courses.map((course) => ({
+              ...course,
+              teacherName: course.teacherName ?? user.name,
+              teacherLmsUserId: course.teacherLmsUserId ?? user.lmsUserId,
+            })),
           ),
         };
       }
@@ -196,7 +206,11 @@ export class EaccLmsClient implements LmsClient {
           baseUrl,
           mergeSessionCookie(sessionCookie, response.headers),
           timeout,
-          courses,
+          courses.map((course) => ({
+            ...course,
+            teacherName: course.teacherName ?? user.name,
+            teacherLmsUserId: course.teacherLmsUserId ?? user.lmsUserId,
+          })),
         );
 
         return {
@@ -510,10 +524,16 @@ export class EaccLmsClient implements LmsClient {
       loginUsername,
       extraCandidateIds,
     );
+    const coursesWithTeacherNames = await this.resolveCourseTeacherNames(
+      baseUrl,
+      sessionCookie,
+      timeout,
+      courses,
+    );
 
     // Load students for every matched course in parallel.
     return Promise.all(
-      courses.map(async (course) => {
+      coursesWithTeacherNames.map(async (course) => {
         let detailsHtml: string | undefined;
         try {
           detailsHtml = await this.loadAuthenticatedHtml(
@@ -579,9 +599,15 @@ export class EaccLmsClient implements LmsClient {
     const coursesWithCatalogNames = courses.map((course) =>
       mergeCourseCatalogData(course, catalogById.get(course.lmsCourseId)),
     );
+    const coursesWithTeacherNames = await this.resolveCourseTeacherNames(
+      baseUrl,
+      sessionCookie,
+      timeout,
+      coursesWithCatalogNames,
+    );
 
     return Promise.all(
-      coursesWithCatalogNames.map((course) =>
+      coursesWithTeacherNames.map((course) =>
         this.loadAdminCourseStudents(baseUrl, sessionCookie, timeout, course),
       ),
     );
@@ -631,6 +657,64 @@ export class EaccLmsClient implements LmsClient {
       };
     } catch {
       return course;
+    }
+  }
+
+  private async resolveCourseTeacherNames(
+    baseUrl: string,
+    sessionCookie: string,
+    timeout: number,
+    courses: NormalizedLmsCourse[],
+  ): Promise<NormalizedLmsCourse[]> {
+    const teacherNameCache = new Map<string, string | undefined>();
+
+    return Promise.all(
+      courses.map(async (course) => {
+        if (
+          isResolvedTeacherName(course.teacherName, course.teacherLmsUserId)
+        ) {
+          return course;
+        }
+
+        const teacherId = course.teacherLmsUserId?.trim();
+        if (!teacherId) return course;
+
+        if (!teacherNameCache.has(teacherId)) {
+          teacherNameCache.set(
+            teacherId,
+            await this.loadTeacherNameById(
+              baseUrl,
+              sessionCookie,
+              timeout,
+              teacherId,
+            ),
+          );
+        }
+
+        const teacherName = teacherNameCache.get(teacherId);
+        return teacherName ? { ...course, teacherName } : course;
+      }),
+    );
+  }
+
+  private async loadTeacherNameById(
+    baseUrl: string,
+    sessionCookie: string,
+    timeout: number,
+    teacherId: string,
+  ): Promise<string | undefined> {
+    try {
+      const url = new URL('/teacher/get_teacher_name.php', baseUrl);
+      url.searchParams.set('t_id', teacherId);
+      const responseText = await this.loadAuthenticatedHtml(
+        url,
+        sessionCookie,
+        timeout,
+      );
+
+      return parseTeacherNameResponse(responseText);
+    } catch {
+      return undefined;
     }
   }
 
@@ -861,6 +945,8 @@ export class EaccLmsClient implements LmsClient {
                 lmsCourseId: courseId,
                 name: course?.name ?? `Course ${courseId}`,
                 category: course?.category,
+                teacherLmsUserId: course?.teacherLmsUserId,
+                teacherName: course?.teacherName,
                 keyPersonLmsUserId: admin.lmsUserId,
                 keyPersonName: course?.keyPersonName ?? admin.name,
               },
@@ -972,7 +1058,97 @@ function mergeCourseCatalogData(
     ...course,
     name: shouldUseCatalogName ? catalogName : course.name,
     category: catalogCourse.category ?? course.category,
+    teacherLmsUserId: course.teacherLmsUserId ?? catalogCourse.teacherLmsUserId,
+    teacherName: course.teacherName ?? catalogCourse.teacherName,
   };
+}
+
+function isResolvedTeacherName(
+  teacherName: string | undefined,
+  teacherLmsUserId: string | undefined,
+): boolean {
+  const trimmed = teacherName?.trim();
+  if (!trimmed) return false;
+  if (teacherLmsUserId && trimmed === teacherLmsUserId.trim()) return false;
+  return !/^\d+$/.test(trimmed);
+}
+
+function parseTeacherNameResponse(responseText: string): string | undefined {
+  const trimmed = responseText.trim();
+  if (!trimmed) return undefined;
+
+  const json = tryParseJson(trimmed);
+  if (json !== undefined) {
+    return readTeacherNameFromUnknown(json.value);
+  }
+
+  const fieldMatch =
+    /\[(?:teacher_name|teacherName|teacher_shortname|shortname|te_name|name)\]\s*=>\s*([^\r\n]+)/i.exec(
+      trimmed,
+    );
+  if (fieldMatch?.[1]) {
+    return cleanTeacherName(fieldMatch[1]);
+  }
+
+  const assignmentMatch =
+    /(?:teacher_name|teacherName|teacher_shortname|shortname|te_name|name)\s*(?:=|:|=>)\s*["']?([^"',}\r\n<]+)/i.exec(
+      trimmed,
+    );
+  if (assignmentMatch?.[1]) {
+    return cleanTeacherName(assignmentMatch[1]);
+  }
+
+  const text = trimmed
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleanTeacherName(text);
+}
+
+function readTeacherNameFromUnknown(value: unknown): string | undefined {
+  if (typeof value === 'string') return cleanTeacherName(value);
+  if (typeof value !== 'object' || value === null) return undefined;
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const name = readTeacherNameFromUnknown(entry);
+      if (name) return name;
+    }
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  const keys = [
+    'teacher_name',
+    'teacherName',
+    'teacher_shortname',
+    'teacherShortname',
+    'shortname',
+    'te_name',
+    'name',
+  ];
+
+  for (const key of keys) {
+    const match = Object.keys(record).find(
+      (candidate) => candidate.toLowerCase() === key.toLowerCase(),
+    );
+    const value = match ? record[match] : undefined;
+    if (typeof value === 'string' || typeof value === 'number') {
+      const name = cleanTeacherName(String(value));
+      if (name) return name;
+    }
+  }
+
+  return undefined;
+}
+
+function cleanTeacherName(value: string): string | undefined {
+  const name = value.replace(/^["'\s]+|["'\s]+$/g, '').trim();
+  if (!name || /^\d+$/.test(name) || /^array\s*\(/i.test(name)) {
+    return undefined;
+  }
+
+  return name;
 }
 
 function isGenericCourseName(name: string, lmsCourseId: string): boolean {

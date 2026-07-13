@@ -13,6 +13,8 @@ describe('parseLmsResponse', () => {
             course_id: '2191',
             course_name: 'Elementary Level - 3',
             category: 'English Adult',
+            teacher_id: '1',
+            teacher_name: 'Mohamed El-Sayad',
           },
         ],
       },
@@ -22,6 +24,8 @@ describe('parseLmsResponse', () => {
     expect(user.role).toBe('student');
     expect(user.lmsUserId).toBe('55');
     expect(user.courses[0]?.lmsCourseId).toBe('2191');
+    expect(user.courses[0]?.teacherLmsUserId).toBe('1');
+    expect(user.courses[0]?.teacherName).toBe('Mohamed El-Sayad');
   });
 
   it('normalizes a teacher response', () => {

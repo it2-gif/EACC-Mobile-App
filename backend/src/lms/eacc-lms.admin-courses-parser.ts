@@ -290,6 +290,36 @@ export function parseAdminCourseEditHtml(
     $,
     'select[name="category"], select#category, select[name="cat"], select#cat, input[name="category"], input#category',
   );
+  const teacherOption = readSelectedOption(
+    $,
+    [
+      'select[name="teacher"]',
+      'select#teacher',
+      'select[name="teacher_id"]',
+      'select#teacher_id',
+      'select[name="teacherid"]',
+      'select#teacherid',
+      'select[name="te_id"]',
+      'select#te_id',
+      'select[name="t_id"]',
+      'select#t_id',
+    ].join(', '),
+  );
+  const teacherLmsUserId =
+    teacherOption?.value ??
+    readControlValue(
+      $,
+      [
+        'input[name="teacher_id"]',
+        'input#teacher_id',
+        'input[name="teacherid"]',
+        'input#teacherid',
+        'input[name="te_id"]',
+        'input#te_id',
+        'input[name="t_id"]',
+        'input#t_id',
+      ].join(', '),
+    );
   const teacherName = readControlText(
     $,
     [
@@ -301,6 +331,8 @@ export function parseAdminCourseEditHtml(
       'select#teacherid',
       'select[name="te_id"]',
       'select#te_id',
+      'select[name="t_id"]',
+      'select#t_id',
       'input[name="teacher"]',
       'input#teacher',
       'input[name="teacher_name"]',
@@ -312,7 +344,10 @@ export function parseAdminCourseEditHtml(
     lmsCourseId,
     name,
     category,
-    teacherName,
+    teacherLmsUserId,
+    teacherName: isLikelyTeacherName(teacherName, teacherLmsUserId)
+      ? teacherName
+      : undefined,
     keyPersonLmsUserId: keyPerson.value,
     keyPersonName: keyPerson.text,
   };
@@ -357,6 +392,27 @@ function readControlText($: CheerioRoot, selector: string): string | undefined {
 
   const value = cleanText(String(element.val() ?? element.text()));
   return value || undefined;
+}
+
+function readControlValue(
+  $: CheerioRoot,
+  selector: string,
+): string | undefined {
+  const element = $(selector).first();
+  if (element.length === 0) return undefined;
+
+  const value = cleanText(String(element.val() ?? ''));
+  return value || undefined;
+}
+
+function isLikelyTeacherName(
+  value: string | undefined,
+  teacherLmsUserId: string | undefined,
+): value is string {
+  const trimmed = value?.trim();
+  if (!trimmed) return false;
+  if (teacherLmsUserId && trimmed === teacherLmsUserId.trim()) return false;
+  return !/^\d+$/.test(trimmed);
 }
 
 function readSelectedOption(
