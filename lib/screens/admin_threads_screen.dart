@@ -41,10 +41,20 @@ class AdminThreadsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        toolbarHeight: 76,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(courseName, maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(
+              courseName,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 18,
+                height: 1.08,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
             Text(
               'Admin view - Course $courseId',
               style: const TextStyle(
@@ -120,7 +130,7 @@ class AdminThreadsScreen extends StatelessWidget {
                 if (items.isNotEmpty) const _AdminThreadSection('Students'),
                 for (final student in items) ...[
                   _AdminThreadTile(
-                    title: _studentThreadTitle(student.name, teacherTitle),
+                    title: student.name,
                     subtitle: 'Teacher chat - $teacherTitle',
                     iconLabel: student.name.isNotEmpty
                         ? student.name[0].toUpperCase()
@@ -151,10 +161,7 @@ class AdminThreadsScreen extends StatelessWidget {
                     ),
                   ),
                   _AdminThreadTile(
-                    title: _studentThreadTitle(
-                      student.name,
-                      contactPersonTitle,
-                    ),
+                    title: student.name,
                     subtitle: 'Contact person chat - $contactPersonTitle',
                     icon: Icons.verified_user_rounded,
                     color: AppColors.admin,
@@ -286,46 +293,91 @@ class _AdminThreadTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = MediaQuery.sizeOf(context).width < 420;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 10,
-        ),
-        leading: CircleAvatar(
-          backgroundColor: color.withValues(alpha: 0.1),
-          child: icon == null
-              ? Text(
-                  iconLabel ?? '?',
-                  style: TextStyle(color: color, fontWeight: FontWeight.w700),
-                )
-              : Icon(icon, color: color),
-        ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ),
-            ?badge,
-          ],
-        ),
-        subtitle: Text(
-          subtitle,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: AppColors.muted),
-        ),
-        trailing: const Icon(
-          Icons.chevron_right_rounded,
-          color: AppColors.muted,
-        ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
         onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              CircleAvatar(
+                radius: isCompact ? 24 : 26,
+                backgroundColor: color.withValues(alpha: 0.1),
+                child: icon == null
+                    ? Text(
+                        iconLabel ?? '?',
+                        style: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      )
+                    : Icon(icon, color: color),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isCompact) ...[
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15.5,
+                          height: 1.12,
+                        ),
+                      ),
+                      if (badge != null) ...[
+                        const SizedBox(height: 7),
+                        Align(alignment: Alignment.centerLeft, child: badge!),
+                      ],
+                    ] else
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 15.5,
+                              ),
+                            ),
+                          ),
+                          if (badge != null) ...[
+                            const SizedBox(width: 8),
+                            badge!,
+                          ],
+                        ],
+                      ),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      maxLines: isCompact ? 2 : 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        height: 1.28,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+            ],
+          ),
+        ),
       ),
     );
   }
