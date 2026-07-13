@@ -91,7 +91,7 @@ class _StudentCourseCardState extends State<_StudentCourseCard> {
       if (!mounted) return;
 
       PushNotificationService.instance.showInAppNotification(
-        title: widget.course.name,
+        title: widget.course.displayName,
         body: unreadCount == 1
             ? 'Your teacher sent a new message.'
             : '$unreadCount unread messages from your teacher.',

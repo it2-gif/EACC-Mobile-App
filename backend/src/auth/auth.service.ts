@@ -114,22 +114,7 @@ export class AuthService {
           : null;
       const sessionCourses =
         adminCourses ??
-        synced.courses.map((course) => {
-          const lmsCourse = lmsUser.courses.find(
-            (entry) => entry.lmsCourseId === course.lmsCourseId,
-          );
-
-          return {
-            id: course.id,
-            lmsCourseId: course.lmsCourseId,
-            name: course.name,
-            category: course.category,
-            teacherName: lmsCourse?.teacherName,
-            keyPersonLmsUserId: course.keyPersonLmsUserId,
-            keyPersonName: course.keyPersonName,
-            students: lmsCourse?.students ?? [],
-          };
-        });
+        (await this.loadSessionCourses(synced.courses, lmsUser.courses));
       const courseIds =
         isManagerOperation && !isSuperAdmin
           ? []
@@ -302,6 +287,82 @@ export class AuthService {
           lmsUserId: membership.user.lmsUserId,
           name: membership.user.name,
         }));
+
+      return {
+        id: course.id,
+        lmsCourseId: course.lmsCourseId,
+        name: course.name,
+        category: course.category,
+        teacherName: lmsCourse?.teacherName ?? teacherMembership?.user.name,
+        keyPersonLmsUserId: course.keyPersonLmsUserId,
+        keyPersonName: course.keyPersonName,
+        students: lmsStudents.length > 0 ? lmsStudents : storedStudents,
+      };
+    });
+  }
+
+  private async loadSessionCourses(
+    syncedCourses: Array<{
+      id: string;
+      lmsCourseId: string;
+      name: string;
+      category: string | null;
+      keyPersonLmsUserId: string | null;
+      keyPersonName: string | null;
+    }>,
+    lmsCourses: NormalizedLmsCourse[] = [],
+  ) {
+    if (syncedCourses.length === 0) return [];
+
+    const coursesWithMemberships = await this.prisma.course.findMany({
+      where: {
+        id: { in: syncedCourses.map((course) => course.id) },
+        status: CourseStatus.ACTIVE,
+      },
+      include: {
+        memberships: {
+          where: {
+            role: { in: [UserRole.STUDENT, UserRole.TEACHER] },
+            status: MembershipStatus.ACTIVE,
+            user: { status: UserStatus.ACTIVE },
+          },
+          include: {
+            user: {
+              select: {
+                lmsUserId: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const storedCourseById = new Map(
+      coursesWithMemberships.map((course) => [course.id, course]),
+    );
+    const lmsCourseById = new Map(
+      lmsCourses.map((course) => [course.lmsCourseId, course]),
+    );
+
+    return syncedCourses.map((course) => {
+      const storedCourse = storedCourseById.get(course.id);
+      const memberships = storedCourse?.memberships ?? [];
+      const lmsCourse = lmsCourseById.get(course.lmsCourseId);
+      const lmsStudents =
+        lmsCourse?.students?.map((student) => ({
+          lmsUserId: student.lmsUserId,
+          name: student.name,
+        })) ?? [];
+      const storedStudents = memberships
+        .filter((membership) => membership.role === UserRole.STUDENT)
+        .map((membership) => ({
+          lmsUserId: membership.user.lmsUserId,
+          name: membership.user.name,
+        }));
+      const teacherMembership = memberships.find(
+        (membership) => membership.role === UserRole.TEACHER,
+      );
 
       return {
         id: course.id,

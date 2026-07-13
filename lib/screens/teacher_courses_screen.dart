@@ -92,7 +92,7 @@ class _TeacherCourseCardState extends State<_TeacherCourseCard> {
       if (!mounted) return;
 
       PushNotificationService.instance.showInAppNotification(
-        title: widget.course.name,
+        title: widget.course.displayName,
         body: unreadThreads == 1
             ? 'A student sent a new message.'
             : '$unreadThreads students have unread messages.',
@@ -107,7 +107,7 @@ class _TeacherCourseCardState extends State<_TeacherCourseCard> {
       MaterialPageRoute(
         builder: (_) => TeacherThreadsScreen(
           courseId: widget.course.id,
-          courseName: widget.course.name,
+          courseName: widget.course.displayName,
           senderName: widget.session.appUser.name,
           students: widget.course.students,
           viewerLmsUserId: widget.session.lmsUser.lmsUserId,

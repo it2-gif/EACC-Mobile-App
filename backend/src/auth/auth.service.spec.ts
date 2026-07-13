@@ -49,7 +49,11 @@ describe('AuthService', () => {
     };
     const lmsClient = { authenticate: jest.fn().mockResolvedValue(lmsUser) };
     const authSync = { syncLmsUser: jest.fn().mockResolvedValue(synced) };
-    const prisma = {};
+    const prisma = {
+      course: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
     const firebaseTokens = {
       createCustomToken: jest.fn().mockResolvedValue('firebase-token'),
     };
@@ -238,6 +242,11 @@ describe('AuthService', () => {
     };
     const lmsClient = { authenticate: jest.fn().mockResolvedValue(lmsUser) };
     const authSync = { syncLmsUser: jest.fn().mockResolvedValue(synced) };
+    const prisma = {
+      course: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
     const firebaseTokens = {
       createCustomToken: jest.fn().mockResolvedValue('firebase-token'),
     };
@@ -247,7 +256,7 @@ describe('AuthService', () => {
     const service = new AuthService(
       lmsClient as never,
       authSync as never,
-      {} as never,
+      prisma as never,
       firebaseTokens as never,
       config as never,
     );
@@ -262,6 +271,94 @@ describe('AuthService', () => {
     expect(result.courses[0].students).toEqual([
       { lmsUserId: '9001', name: 'Teacher Student' },
     ]);
+  });
+
+  it('falls back to stored active course students when the LMS session has no roster', async () => {
+    const lmsUser = {
+      lmsUserId: 'student-1',
+      role: 'student' as const,
+      name: 'Student One',
+      courses: [
+        {
+          lmsCourseId: '2297',
+          name: 'Course 2297',
+          category: 'Elementary Level - 3 - General English',
+        },
+      ],
+    };
+    const synced = {
+      user: {
+        id: 'student-uuid',
+        role: 'STUDENT',
+        name: 'Student One',
+        email: null,
+      },
+      courses: [
+        {
+          id: 'course-uuid',
+          lmsCourseId: '2297',
+          name: 'Course 2297',
+          category: 'Elementary Level - 3 - General English',
+          keyPersonLmsUserId: '92',
+          keyPersonName: 'Developer',
+        },
+      ],
+    };
+    const lmsClient = { authenticate: jest.fn().mockResolvedValue(lmsUser) };
+    const authSync = { syncLmsUser: jest.fn().mockResolvedValue(synced) };
+    const prisma = {
+      course: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'course-uuid',
+            memberships: [
+              {
+                role: UserRole.STUDENT,
+                user: { lmsUserId: 'student-1', name: 'Student One' },
+              },
+              {
+                role: UserRole.STUDENT,
+                user: { lmsUserId: 'student-2', name: 'Student Two' },
+              },
+              {
+                role: UserRole.TEACHER,
+                user: { lmsUserId: 'teacher-1', name: 'Teacher One' },
+              },
+            ],
+          },
+        ]),
+      },
+    };
+    const firebaseTokens = {
+      createCustomToken: jest.fn().mockResolvedValue('firebase-token'),
+    };
+    const config = {
+      get: jest.fn().mockReturnValue('test'),
+    } as unknown as ConfigService;
+    const service = new AuthService(
+      lmsClient as never,
+      authSync as never,
+      prisma as never,
+      firebaseTokens as never,
+      config as never,
+    );
+
+    const result = await service.login({
+      role: 'student',
+      username: 'student.one',
+      password: 'student-password',
+    });
+
+    expect(result.courses[0]).toEqual(
+      expect.objectContaining({
+        lmsCourseId: '2297',
+        teacherName: 'Teacher One',
+        students: [
+          { lmsUserId: 'student-1', name: 'Student One' },
+          { lmsUserId: 'student-2', name: 'Student Two' },
+        ],
+      }),
+    );
   });
 
   it('grants super-admin access only to the hardcoded admin credentials', async () => {

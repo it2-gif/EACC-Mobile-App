@@ -20,6 +20,7 @@ class StudentCourseChatsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final courseName = course.displayName;
     final studentThreadId = session.lmsUser.lmsUserId;
     final keyPersonThreadId = FirestoreChatService.keyPersonStudentThreadId(
       studentThreadId,
@@ -40,7 +41,7 @@ class StudentCourseChatsScreen extends StatelessWidget {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(course.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(courseName, maxLines: 1, overflow: TextOverflow.ellipsis),
             Text(
               'Course ${course.id}',
               style: const TextStyle(
@@ -73,7 +74,7 @@ class StudentCourseChatsScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               children: [
                 _CourseChatHeader(
-                  courseName: course.name,
+                  courseName: courseName,
                   courseId: course.id,
                   category: course.displayCategory,
                   teacherName: teacherDisplayName,
