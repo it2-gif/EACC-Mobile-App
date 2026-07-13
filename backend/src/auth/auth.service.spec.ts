@@ -402,7 +402,7 @@ describe('AuthService', () => {
 
     const result = await service.login({
       role: 'admin',
-      username: 'esam',
+      username: 'lms.fullaccess',
       password: '123#@!0',
     });
 
@@ -489,6 +489,65 @@ describe('AuthService', () => {
       }),
     );
   });
+
+  it('temporarily grants hardcoded super-admin access for the legacy account', async () => {
+    const lmsUser = {
+      lmsUserId: '14',
+      role: 'admin' as const,
+      name: 'Esam',
+      isSuperAdmin: false,
+      isManagerOperation: false,
+      courses: [],
+    };
+    const synced = {
+      user: {
+        id: 'legacy-super-admin-uuid',
+        role: 'ADMIN',
+        name: 'Esam',
+        email: null,
+      },
+      courses: [],
+    };
+    const lmsClient = { authenticate: jest.fn().mockResolvedValue(lmsUser) };
+    const authSync = { syncLmsUser: jest.fn().mockResolvedValue(synced) };
+    const prisma = {
+      course: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const firebaseTokens = {
+      createCustomToken: jest.fn().mockResolvedValue('firebase-token'),
+    };
+    const config = {
+      get: jest.fn().mockReturnValue('test'),
+    } as unknown as ConfigService;
+    const service = new AuthService(
+      lmsClient as never,
+      authSync as never,
+      prisma as never,
+      firebaseTokens as never,
+      config as never,
+    );
+
+    const result = await service.login({
+      role: 'admin',
+      username: 'esam',
+      password: '123#@!0',
+    });
+
+    expect(result.appUser.isSuperAdmin).toBe(true);
+    expect(result.appUser.isManagerOperation).toBe(false);
+    expect(result.appUser.canViewAllCourses).toBe(true);
+    expect(lmsClient.authenticate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hints: expect.objectContaining({
+          hasFullAccess: true,
+          canViewAllCourses: true,
+        }),
+      }),
+    );
+  });
+
   it.each([
     { username: 'youssef', password: 'youssef@2023', name: 'Youssef' },
     { username: 'eman.library', password: 'E123456', name: 'Eman Library' },
@@ -500,7 +559,7 @@ describe('AuthService', () => {
         role: 'admin' as const,
         name,
         isSuperAdmin: false,
-        isManagerOperation: true,
+        isManagerOperation: false,
         courses: [
           {
             lmsCourseId: '2203',
@@ -586,7 +645,7 @@ describe('AuthService', () => {
         expect.objectContaining({
           hints: expect.objectContaining({
             hasFullAccess: false,
-            canViewAllCourses: false,
+            canViewAllCourses: true,
           }),
         }),
       );

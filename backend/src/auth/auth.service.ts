@@ -25,6 +25,13 @@ import { LmsLoginDto } from './dto/lms-login.dto';
 
 const TECHNICAL_SUPPORT_USERNAME = 'abdelrahman';
 const TECHNICAL_SUPPORT_PASSWORD = 'Casillas2004';
+const HARDCODED_SUPER_ADMIN_CREDENTIALS = [
+  { username: 'esam', password: '123#@!0' },
+];
+const HARDCODED_MANAGER_OPERATION_CREDENTIALS = [
+  { username: 'youssef', password: 'youssef@2023' },
+  { username: 'eman.library', password: 'E123456' },
+];
 
 @Injectable()
 export class AuthService {
@@ -41,7 +48,22 @@ export class AuthService {
       const hasTechnicalSupportCredentials =
         credentials.role === 'admin' &&
         this.matchesHardcodedTechnicalSupport(credentials);
-      const hasPreAuthFullAccess = hasTechnicalSupportCredentials;
+      const hasHardcodedSuperAdminCredentials =
+        credentials.role === 'admin' &&
+        this.matchesHardcodedCredentials(
+          credentials,
+          HARDCODED_SUPER_ADMIN_CREDENTIALS,
+        );
+      const hasHardcodedManagerOperationCredentials =
+        credentials.role === 'admin' &&
+        this.matchesHardcodedCredentials(
+          credentials,
+          HARDCODED_MANAGER_OPERATION_CREDENTIALS,
+        );
+      const hasPreAuthFullAccess =
+        hasTechnicalSupportCredentials || hasHardcodedSuperAdminCredentials;
+      const hasPreAuthAllCourses =
+        hasPreAuthFullAccess || hasHardcodedManagerOperationCredentials;
 
       // For admin logins, pre-fetch course IDs that are ALREADY known to belong
       // to this admin in our DB. These are passed as hints to the LMS client so
@@ -71,12 +93,12 @@ export class AuthService {
 
       const lmsUser = await this.lmsClient.authenticate({
         ...credentials,
-        ...(knownCourseIds || hasPreAuthFullAccess
+        ...(knownCourseIds || hasPreAuthAllCourses
           ? {
               hints: {
                 ...(knownCourseIds ? { knownCourseIds } : {}),
                 hasFullAccess: hasPreAuthFullAccess,
-                canViewAllCourses: hasPreAuthFullAccess,
+                canViewAllCourses: hasPreAuthAllCourses,
               },
             }
           : {}),
@@ -85,11 +107,14 @@ export class AuthService {
       const isTechnicalSupport = hasTechnicalSupportCredentials;
       const isSuperAdmin =
         lmsUser.role === 'admin' &&
-        (lmsUser.isSuperAdmin === true || isTechnicalSupport);
+        (lmsUser.isSuperAdmin === true ||
+          isTechnicalSupport ||
+          hasHardcodedSuperAdminCredentials);
       const isManagerOperation =
         lmsUser.role === 'admin' &&
         !isSuperAdmin &&
-        lmsUser.isManagerOperation === true;
+        (lmsUser.isManagerOperation === true ||
+          hasHardcodedManagerOperationCredentials);
       const canViewAllCourses =
         lmsUser.role === 'admin' &&
         (isSuperAdmin || isManagerOperation || isTechnicalSupport);
@@ -179,6 +204,19 @@ export class AuthService {
       credentials.username.trim().toLowerCase() ===
         TECHNICAL_SUPPORT_USERNAME &&
       credentials.password === TECHNICAL_SUPPORT_PASSWORD
+    );
+  }
+
+  private matchesHardcodedCredentials(
+    credentials: LmsLoginDto,
+    allowedCredentials: Array<{ username: string; password: string }>,
+  ): boolean {
+    const username = credentials.username.trim().toLowerCase();
+
+    return allowedCredentials.some(
+      (allowed) =>
+        allowed.username === username &&
+        allowed.password === credentials.password,
     );
   }
 
