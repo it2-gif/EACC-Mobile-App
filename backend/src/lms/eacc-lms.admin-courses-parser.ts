@@ -21,6 +21,11 @@ export interface AdminUserListEntry {
   detailsPath?: string;
 }
 
+export interface AdminAccessFlags {
+  isSuperAdmin?: boolean;
+  isManagerOperation?: boolean;
+}
+
 export function parseAdminCoursesHtml(
   html: string,
   keyPersonLmsUserId: string,
@@ -134,8 +139,13 @@ export function parseAdminFromUserList(
     const id = $(cells[0]).text().trim();
     const shortName = $(cells[1]).text().replace(/\s+/g, ' ').trim();
     const rowUsername = $(cells[2]).text().trim().toLowerCase();
+    const normalizedShortName = shortName.toLowerCase().trim();
 
-    if (rowUsername === username && id && shortName) {
+    if (
+      (rowUsername === username || normalizedShortName === username) &&
+      id &&
+      shortName
+    ) {
       const headers = $(row)
         .closest('table')
         .find('thead th')
@@ -184,6 +194,20 @@ export function parseAdminFromUserList(
   });
 
   return found;
+}
+
+export function parseAdminAccessFlagsHtml(html: string): AdminAccessFlags {
+  const $ = cheerio.load(html);
+  const isSuperAdmin =
+    readFullAccessControl($, $.root()) ?? readInlineFullAccess(html);
+  const isManagerOperation =
+    readManagerOperationControl($, $.root()) ??
+    readInlineManagerOperation(html);
+
+  return {
+    ...(isSuperAdmin === undefined ? {} : { isSuperAdmin }),
+    ...(isManagerOperation === undefined ? {} : { isManagerOperation }),
+  };
 }
 
 function readManagerOperationControl(
@@ -240,6 +264,33 @@ function isFullAccessField(value: string): boolean {
 
 function isManagerOperationField(value: string): boolean {
   return value === 'moperation' || value === 'manageroperation';
+}
+
+function readInlineFullAccess(html: string): boolean | undefined {
+  return readInlineBooleanFlag(html, ['fullaccess', 'fullaccese']);
+}
+
+function readInlineManagerOperation(html: string): boolean | undefined {
+  return readInlineBooleanFlag(html, ['moperation', 'manageroperation']);
+}
+
+function readInlineBooleanFlag(
+  html: string,
+  compactKeys: string[],
+): boolean | undefined {
+  const normalized = html.toLowerCase();
+
+  for (const key of compactKeys) {
+    const pattern = new RegExp(
+      `(?:\\[\\s*)?["']?${key}["']?\\s*\\]?\\s*(?:=|:|=>)\\s*["']?([01])["']?`,
+      'i',
+    );
+    const value = pattern.exec(normalized)?.[1];
+    if (value === '1') return true;
+    if (value === '0') return false;
+  }
+
+  return undefined;
 }
 
 export function parseAdminCourseIdsHtml(html: string): string[] {

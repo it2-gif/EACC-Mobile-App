@@ -490,7 +490,7 @@ describe('AuthService', () => {
     );
   });
 
-  it('temporarily grants hardcoded super-admin access for the legacy account', async () => {
+  it('does not grant super-admin access from a legacy username without the LMS flag', async () => {
     const lmsUser = {
       lmsUserId: '14',
       role: 'admin' as const,
@@ -535,14 +535,14 @@ describe('AuthService', () => {
       password: '123#@!0',
     });
 
-    expect(result.appUser.isSuperAdmin).toBe(true);
+    expect(result.appUser.isSuperAdmin).toBe(false);
     expect(result.appUser.isManagerOperation).toBe(false);
-    expect(result.appUser.canViewAllCourses).toBe(true);
+    expect(result.appUser.canViewAllCourses).toBe(false);
     expect(lmsClient.authenticate).toHaveBeenCalledWith(
       expect.objectContaining({
         hints: expect.objectContaining({
-          hasFullAccess: true,
-          canViewAllCourses: true,
+          hasFullAccess: false,
+          canViewAllCourses: false,
         }),
       }),
     );
@@ -552,14 +552,14 @@ describe('AuthService', () => {
     { username: 'youssef', password: 'youssef@2023', name: 'Youssef' },
     { username: 'eman.library', password: 'E123456', name: 'Eman Library' },
   ])(
-    'grants manager-operation visibility without super-admin permissions for $username',
+    'grants manager-operation visibility from the LMS m_operation flag for $username',
     async ({ username, password, name }) => {
       const lmsUser = {
         lmsUserId: '77',
         role: 'admin' as const,
         name,
         isSuperAdmin: false,
-        isManagerOperation: false,
+        isManagerOperation: true,
         courses: [
           {
             lmsCourseId: '2203',
@@ -645,7 +645,7 @@ describe('AuthService', () => {
         expect.objectContaining({
           hints: expect.objectContaining({
             hasFullAccess: false,
-            canViewAllCourses: true,
+            canViewAllCourses: false,
           }),
         }),
       );

@@ -14,6 +14,7 @@ import {
 } from './eacc-lms.errors';
 import {
   findAdminKeypersonId,
+  parseAdminAccessFlagsHtml,
   parseAdminCourseEditHtml,
   parseAdminCourseIdsHtml,
   parseAdminCoursesHtml,
@@ -421,10 +422,21 @@ export class EaccLmsClient implements LmsClient {
       );
       const matchedAdmin = parseAdminFromUserList(usersHtml, loginUsername);
       if (!matchedAdmin) return admin;
+      const detailsAccess = matchedAdmin.detailsPath
+        ? await this.loadAdminDetailsAccessFlags(
+            baseUrl,
+            sessionCookie,
+            timeout,
+            matchedAdmin.detailsPath,
+          )
+        : undefined;
       const isSuperAdmin =
-        matchedAdmin.isSuperAdmin === true || admin.isSuperAdmin === true;
+        matchedAdmin.isSuperAdmin === true ||
+        detailsAccess?.isSuperAdmin === true ||
+        admin.isSuperAdmin === true;
       const isManagerOperation =
         matchedAdmin.isManagerOperation === true ||
+        detailsAccess?.isManagerOperation === true ||
         admin.isManagerOperation === true;
 
       console.log(
@@ -442,6 +454,25 @@ export class EaccLmsClient implements LmsClient {
       };
     } catch {
       return admin;
+    }
+  }
+
+  private async loadAdminDetailsAccessFlags(
+    baseUrl: string,
+    sessionCookie: string,
+    timeout: number,
+    detailsPath: string,
+  ) {
+    try {
+      const detailsHtml = await this.loadAuthenticatedHtml(
+        new URL(detailsPath, baseUrl),
+        sessionCookie,
+        timeout,
+      );
+
+      return parseAdminAccessFlagsHtml(detailsHtml);
+    } catch {
+      return undefined;
     }
   }
 
