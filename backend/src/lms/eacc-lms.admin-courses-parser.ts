@@ -175,11 +175,7 @@ export function parseAdminFromUserList(
         .map((link) => $(link).attr('href')?.trim())
         .find(
           (href): href is string =>
-            Boolean(href) &&
-            !/delete|remove/i.test(href!) &&
-            /edit|update|details?|add[_-]?user|(?:user|admin)[^?]*\?[^#]*(?:id|admin_id|ad_id)=/i.test(
-              href!,
-            ),
+            Boolean(href) && isAdminDetailsPath(href!, id),
         );
 
       found = {
@@ -220,8 +216,14 @@ function readManagerOperationControl(
     const fieldName = normalizeFieldName($(control).attr('name') ?? '');
     if (!isManagerOperationField(fieldName)) return;
 
-    result = readExactEnabled(String($(control).val() ?? ''));
-    return false;
+    const value = readBooleanControlValue($, control);
+    if (value === true) {
+      result = true;
+      return false;
+    }
+    if (value === false && result === undefined) {
+      result = false;
+    }
   });
 
   return result;
@@ -237,8 +239,14 @@ function readFullAccessControl(
     const fieldName = normalizeFieldName($(control).attr('name') ?? '');
     if (!isFullAccessField(fieldName)) return;
 
-    result = readExactFullAccess(String($(control).val() ?? ''));
-    return false;
+    const value = readBooleanControlValue($, control);
+    if (value === true) {
+      result = true;
+      return false;
+    }
+    if (value === false && result === undefined) {
+      result = false;
+    }
   });
 
   return result;
@@ -246,6 +254,25 @@ function readFullAccessControl(
 
 function readExactFullAccess(value: string): boolean | undefined {
   return readExactEnabled(value);
+}
+
+function readBooleanControlValue(
+  $: CheerioRoot,
+  control: AnyNode,
+): boolean | undefined {
+  const element = $(control);
+  const tagName = control.type === 'tag' ? control.name.toLowerCase() : '';
+
+  if (tagName === 'input') {
+    const type = String(element.attr('type') ?? 'text').toLowerCase();
+    if (type === 'checkbox' || type === 'radio') {
+      return element.is('[checked]') || element.attr('checked') !== undefined
+        ? readExactEnabled(String(element.val() ?? '1'))
+        : false;
+    }
+  }
+
+  return readExactEnabled(String(element.val() ?? ''));
 }
 
 function readExactEnabled(value: string): boolean | undefined {
@@ -264,6 +291,25 @@ function isFullAccessField(value: string): boolean {
 
 function isManagerOperationField(value: string): boolean {
   return value === 'moperation' || value === 'manageroperation';
+}
+
+function isAdminDetailsPath(href: string, adminId: string): boolean {
+  if (/delete|remove/i.test(href)) return false;
+
+  const hasAdminId = new RegExp(
+    `(?:[?&]|\\b)(?:id|admin_id|ad_id|user_id|uid|auid|admin|user)=${escapeRegex(
+      adminId,
+    )}(?:\\b|&|#|$)`,
+    'i',
+  ).test(href);
+  const looksEditable =
+    /edit|update|details?|add[_-]?user|(?:user|admin)/i.test(href);
+
+  return hasAdminId && looksEditable;
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function readInlineFullAccess(html: string): boolean | undefined {
