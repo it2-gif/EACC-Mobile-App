@@ -550,7 +550,7 @@ describe('AuthService', () => {
 
   it.each([
     { username: 'youssef', password: 'youssef@2023', name: 'Youssef' },
-    { username: 'eman', password: 'E123456', name: 'Eman' },
+    { username: 'eman.library', password: 'E123456', name: 'Eman Library' },
   ])(
     'grants manager-operation visibility without super-admin permissions for $username',
     async ({ username, password, name }) => {

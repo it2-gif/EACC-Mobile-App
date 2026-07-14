@@ -30,7 +30,7 @@ const HARDCODED_SUPER_ADMIN_CREDENTIALS = [
 ];
 const HARDCODED_MANAGER_OPERATION_CREDENTIALS = [
   { username: 'youssef', password: 'youssef@2023' },
-  { username: 'eman', password: 'E123456' },
+  { username: 'eman.library', password: 'E123456' },
 ];
 
 @Injectable()
