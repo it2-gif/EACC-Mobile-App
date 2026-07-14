@@ -552,14 +552,14 @@ describe('AuthService', () => {
     { username: 'youssef', password: 'youssef@2023', name: 'Youssef' },
     { username: 'eman.library', password: 'E123456', name: 'Eman Library' },
   ])(
-    'grants manager-operation visibility from the LMS m_operation flag for $username',
+    'temporarily grants hardcoded manager-operation visibility for $username',
     async ({ username, password, name }) => {
       const lmsUser = {
         lmsUserId: '77',
         role: 'admin' as const,
         name,
         isSuperAdmin: false,
-        isManagerOperation: true,
+        isManagerOperation: false,
         courses: [
           {
             lmsCourseId: '2203',
@@ -645,7 +645,7 @@ describe('AuthService', () => {
         expect.objectContaining({
           hints: expect.objectContaining({
             hasFullAccess: false,
-            canViewAllCourses: false,
+            canViewAllCourses: true,
           }),
         }),
       );

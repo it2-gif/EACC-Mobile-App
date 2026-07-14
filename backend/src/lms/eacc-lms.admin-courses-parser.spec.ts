@@ -116,4 +116,38 @@ describe('parseAdminFromUserList', () => {
       isManagerOperation: true,
     });
   });
+
+  it('reads manager-operation aliases from admin detail forms', () => {
+    const flags = parseAdminAccessFlagsHtml(`
+      <form>
+        <input type="hidden" name="fullaccese" value="0" />
+        <input type="hidden" name="m_op" value="1" />
+      </form>
+    `);
+
+    expect(flags).toEqual({
+      isSuperAdmin: false,
+      isManagerOperation: true,
+    });
+  });
+
+  it('uses selected admin role option values instead of the first select option', () => {
+    const flags = parseAdminAccessFlagsHtml(`
+      <form>
+        <select name="fullaccese">
+          <option value="1">Yes</option>
+          <option value="0" selected>No</option>
+        </select>
+        <select name="m_operation">
+          <option value="1">Yes</option>
+          <option value="0" selected>No</option>
+        </select>
+      </form>
+    `);
+
+    expect(flags).toEqual({
+      isSuperAdmin: false,
+      isManagerOperation: false,
+    });
+  });
 });

@@ -94,8 +94,15 @@ export function parseLmsPhpArrayResponse(
     'fullAccess',
     'm_operation',
     'mOperation',
+    'moperation',
+    'm_op',
+    'mOp',
+    'operation_manager',
+    'operationManager',
     'manager_operation',
     'managerOperation',
+    'manager_op',
+    'managerOp',
   ];
 
   for (const key of keys) {
@@ -198,8 +205,15 @@ function hasAdminManagerOperation(data: JsonObject): boolean {
   const managerOperation = readOptionalNumber(data, [
     'm_operation',
     'mOperation',
+    'moperation',
+    'm_op',
+    'mOp',
+    'operation_manager',
+    'operationManager',
     'manager_operation',
     'managerOperation',
+    'manager_op',
+    'managerOp',
   ]);
 
   return managerOperation === 1;

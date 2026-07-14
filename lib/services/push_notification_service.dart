@@ -54,6 +54,12 @@ class PushNotificationService {
     final session = _session ?? await AuthSessionManager().restore();
     if (session == null) return;
     _session = session;
+    if (!_canReceiveCourseNotification(session, route.courseId)) {
+      debugPrint(
+        'Browser notification route skipped for manager-operation unassigned course: ${route.courseId}',
+      );
+      return;
+    }
 
     await _waitForNavigator();
     if (navigatorKey.currentState == null) return;
@@ -222,6 +228,18 @@ class PushNotificationService {
   void _handleForegroundMessage(RemoteMessage message) {
     debugPrint('Foreground push received: ${message.messageId ?? 'no id'}');
     final data = message.data;
+    final courseId = data['courseId']?.toString();
+    final session = _session;
+    if (session != null &&
+        courseId != null &&
+        courseId.isNotEmpty &&
+        !_canReceiveCourseNotification(session, courseId)) {
+      debugPrint(
+        'Foreground push skipped for manager-operation unassigned course: $courseId',
+      );
+      return;
+    }
+
     final notification = message.notification;
     final title =
         data['title']?.toString() ??
@@ -290,6 +308,12 @@ class PushNotificationService {
         courseId.isEmpty ||
         threadId == null ||
         threadId.isEmpty) {
+      return;
+    }
+    if (!_canReceiveCourseNotification(session, courseId)) {
+      debugPrint(
+        'Notification open skipped for manager-operation unassigned course: $courseId',
+      );
       return;
     }
 
@@ -465,6 +489,25 @@ class PushNotificationService {
       }
     }
     return null;
+  }
+
+  bool _canReceiveCourseNotification(AuthSession session, String courseId) {
+    if (!session.appUser.isManagerOperation) return true;
+
+    final course = _findCourse(session, courseId);
+    if (course == null) return false;
+
+    return _isManagerLinkedCourse(session, course);
+  }
+
+  bool _isManagerLinkedCourse(AuthSession session, Course course) {
+    final adminId = session.lmsUser.lmsUserId.trim().toLowerCase();
+    final adminName = session.appUser.name.trim().toLowerCase();
+    final keyPersonId = course.keyPersonLmsUserId?.trim().toLowerCase();
+    final keyPersonName = course.keyPersonName?.trim().toLowerCase();
+
+    return (adminId.isNotEmpty && keyPersonId == adminId) ||
+        (adminName.isNotEmpty && keyPersonName == adminName);
   }
 
   static const String _webVapidKey = String.fromEnvironment(

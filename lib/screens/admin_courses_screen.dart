@@ -29,6 +29,7 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
   String searchQuery = '';
   String? searchError;
   String? searchNotice;
+  int managerCourseTabIndex = 0;
 
   @override
   void dispose() {
@@ -149,6 +150,21 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
         .toList(growable: false);
   }
 
+  List<Course> _linkedManagerCourses() {
+    final adminId = widget.session.lmsUser.lmsUserId.trim().toLowerCase();
+    final adminName = widget.session.appUser.name.trim().toLowerCase();
+
+    return widget.session.courses
+        .where((course) {
+          final keyPersonId = course.keyPersonLmsUserId?.trim().toLowerCase();
+          final keyPersonName = course.keyPersonName?.trim().toLowerCase();
+
+          return (adminId.isNotEmpty && keyPersonId == adminId) ||
+              (adminName.isNotEmpty && keyPersonName == adminName);
+        })
+        .toList(growable: false);
+  }
+
   bool _isAuthErrorMessage(String message) {
     final normalized = message.toLowerCase();
     return normalized.contains('secure session expired') ||
@@ -162,12 +178,23 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
     final canViewAllCourses = widget.session.appUser.canViewAllCourses;
     final isSuperAdmin = widget.session.appUser.isSuperAdmin;
     final isManagerOperation = widget.session.appUser.isManagerOperation;
-    final courses = canViewAllCourses
+    final managerLinkedCourses = isManagerOperation
+        ? _linkedManagerCourses()
+        : const <Course>[];
+    final showingManagerLinkedCourses =
+        isManagerOperation && managerCourseTabIndex == 0;
+    final hasSearchText = searchQuery.trim().isNotEmpty;
+    final courses = showingManagerLinkedCourses
+        ? managerLinkedCourses
+        : isManagerOperation
+        ? (searchedCourse != null
+              ? [searchedCourse!]
+              : const <Course>[])
+        : canViewAllCourses
         ? (searchedCourse != null
               ? [searchedCourse!]
               : _filterSessionCourses(searchQuery))
         : widget.session.courses;
-    final hasSearchText = searchQuery.trim().isNotEmpty;
 
     return AppScaffold(
       title: canViewAllCourses ? 'Admin Courses' : 'Linked Courses',
@@ -191,7 +218,20 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
                 : Icons.verified_user_outlined,
           ),
           const SizedBox(height: 18),
-          if (canViewAllCourses) ...[
+          if (isManagerOperation) ...[
+            _ManagerCourseScopeTabs(
+              selectedIndex: managerCourseTabIndex,
+              assignedCount: managerLinkedCourses.length,
+              directoryCount: searchedCourse == null ? 0 : 1,
+              onChanged: (index) {
+                setState(() {
+                  managerCourseTabIndex = index;
+                });
+              },
+            ),
+            const SizedBox(height: 18),
+          ],
+          if (canViewAllCourses && !showingManagerLinkedCourses) ...[
             _CourseLookupBar(
               controller: courseIdController,
               onSearch: _searchCourse,
@@ -201,7 +241,15 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
             const SizedBox(height: 18),
           ],
           if (!canViewAllCourses || courses.isNotEmpty) ...[
-            _AccessSummary(session: widget.session, courses: courses),
+            _AccessSummary(
+              session: widget.session,
+              courses: courses,
+              titleOverride: isManagerOperation
+                  ? showingManagerLinkedCourses
+                        ? 'Assigned portfolio overview'
+                        : 'Course directory overview'
+                  : null,
+            ),
             const SizedBox(height: 18),
           ],
           if (searchNotice != null) ...[
@@ -213,13 +261,21 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
               title: 'Searching course',
               message: 'Checking your session and LMS course data.',
             )
-          else if (canViewAllCourses && !hasSearched && !hasSearchText)
-            const _EmptyState(
+          else if (canViewAllCourses &&
+              !showingManagerLinkedCourses &&
+              !hasSearched &&
+              !hasSearchText)
+            _EmptyState(
               icon: Icons.search_rounded,
-              title: 'Search for a course',
-              subtitle: 'Enter a course ID, name, teacher, or key person.',
+              title: isManagerOperation
+                  ? 'Find a course by ID'
+                  : 'Search for a course',
+              subtitle: isManagerOperation
+                  ? 'Enter an LMS course ID to open that course from the directory.'
+                  : 'Enter a course ID, name, teacher, or key person.',
             )
           else if (canViewAllCourses &&
+              !showingManagerLinkedCourses &&
               searchedCourse == null &&
               courses.isEmpty)
             _EmptyState(
@@ -234,10 +290,14 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
           else if (courses.isEmpty)
             _EmptyState(
               icon: Icons.inventory_2_outlined,
-              title: canViewAllCourses
+              title: showingManagerLinkedCourses
+                  ? 'No assigned courses'
+                  : canViewAllCourses
                   ? 'No active courses'
                   : 'No linked courses',
-              subtitle: canViewAllCourses
+              subtitle: showingManagerLinkedCourses
+                  ? 'Courses assigned to your manager-operation profile will appear here.'
+                  : canViewAllCourses
                   ? 'Courses will appear here after they are synced.'
                   : 'Ask a full-access admin to assign you as contact person in the LMS, then log in again.',
             )
@@ -279,6 +339,162 @@ class _SearchNotice extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ManagerCourseScopeTabs extends StatelessWidget {
+  final int selectedIndex;
+  final int assignedCount;
+  final int directoryCount;
+  final ValueChanged<int> onChanged;
+
+  const _ManagerCourseScopeTabs({
+    required this.selectedIndex,
+    required this.assignedCount,
+    required this.directoryCount,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 560;
+            final children = [
+              _ManagerScopeButton(
+                selected: selectedIndex == 0,
+                icon: Icons.assignment_ind_rounded,
+                title: 'Assigned Portfolio',
+                subtitle: '$assignedCount linked courses',
+                onTap: () => onChanged(0),
+              ),
+              _ManagerScopeButton(
+                selected: selectedIndex == 1,
+                icon: Icons.travel_explore_rounded,
+                title: 'Course Directory',
+                subtitle: directoryCount == 0
+                    ? 'Search by course ID'
+                    : '$directoryCount course loaded',
+                onTap: () => onChanged(1),
+              ),
+            ];
+
+            if (compact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [children[0], const SizedBox(height: 8), children[1]],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(child: children[0]),
+                const SizedBox(width: 8),
+                Expanded(child: children[1]),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _ManagerScopeButton extends StatelessWidget {
+  final bool selected;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _ManagerScopeButton({
+    required this.selected,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppColors.primary : AppColors.muted;
+
+    return Material(
+      color: selected
+          ? AppColors.primary.withValues(alpha: 0.1)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected
+                  ? AppColors.primary.withValues(alpha: 0.28)
+                  : AppColors.border,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: selected ? 0.14 : 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: selected ? AppColors.ink : AppColors.muted,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: selected
+                            ? AppColors.primaryDark
+                            : AppColors.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (selected) ...[
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -361,8 +577,13 @@ class _CourseLookupBar extends StatelessWidget {
 class _AccessSummary extends StatelessWidget {
   final AuthSession session;
   final List<Course> courses;
+  final String? titleOverride;
 
-  const _AccessSummary({required this.session, required this.courses});
+  const _AccessSummary({
+    required this.session,
+    required this.courses,
+    this.titleOverride,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -414,11 +635,12 @@ class _AccessSummary extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isSuperAdmin
-                        ? 'Full access admin'
-                        : canViewAllCourses
-                        ? 'Manager operation courses and students'
-                        : 'Contact manager courses and students',
+                    titleOverride ??
+                        (isSuperAdmin
+                            ? 'Full access admin'
+                            : canViewAllCourses
+                            ? 'Manager operation courses and students'
+                            : 'Contact manager courses and students'),
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
                       color: AppColors.ink,
@@ -596,6 +818,7 @@ class _AdminCourseCardState extends State<_AdminCourseCard> {
     final previous = _lastUnreadCount;
     _lastUnreadCount = totalUnread;
     if (previous == null || totalUnread <= previous) return;
+    if (!_canShowUnreadNotification()) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -605,6 +828,19 @@ class _AdminCourseCardState extends State<_AdminCourseCard> {
         onOpen: _openThreads,
       );
     });
+  }
+
+  bool _canShowUnreadNotification() {
+    final appUser = widget.session.appUser;
+    if (!appUser.isManagerOperation) return true;
+
+    final adminId = widget.session.lmsUser.lmsUserId.trim().toLowerCase();
+    final adminName = appUser.name.trim().toLowerCase();
+    final keyPersonId = widget.course.keyPersonLmsUserId?.trim().toLowerCase();
+    final keyPersonName = widget.course.keyPersonName?.trim().toLowerCase();
+
+    return (adminId.isNotEmpty && keyPersonId == adminId) ||
+        (adminName.isNotEmpty && keyPersonName == adminName);
   }
 
   void _openThreads() {

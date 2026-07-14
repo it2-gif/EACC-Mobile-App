@@ -272,6 +272,16 @@ function readBooleanControlValue(
     }
   }
 
+  if (tagName === 'select') {
+    const selectedValue = element
+      .find('option[selected]')
+      .first()
+      .attr('value');
+    return selectedValue === undefined
+      ? undefined
+      : readExactEnabled(selectedValue);
+  }
+
   return readExactEnabled(String(element.val() ?? ''));
 }
 
@@ -290,7 +300,13 @@ function isFullAccessField(value: string): boolean {
 }
 
 function isManagerOperationField(value: string): boolean {
-  return value === 'moperation' || value === 'manageroperation';
+  return (
+    value === 'moperation' ||
+    value === 'mop' ||
+    value === 'operationmanager' ||
+    value === 'manageroperation' ||
+    value === 'managerop'
+  );
 }
 
 function isAdminDetailsPath(href: string, adminId: string): boolean {
@@ -317,7 +333,13 @@ function readInlineFullAccess(html: string): boolean | undefined {
 }
 
 function readInlineManagerOperation(html: string): boolean | undefined {
-  return readInlineBooleanFlag(html, ['moperation', 'manageroperation']);
+  return readInlineBooleanFlag(html, [
+    'moperation',
+    'm_op',
+    'operation_manager',
+    'manageroperation',
+    'manager_op',
+  ]);
 }
 
 function readInlineBooleanFlag(

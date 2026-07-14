@@ -109,6 +109,25 @@ describe('parseLmsResponse', () => {
     expect(contactPersonAdmin.isManagerOperation).toBe(false);
   });
 
+  it('reads manager-operation access from compact LMS field aliases', () => {
+    const managerAdmin = parseLmsResponse(
+      {
+        admin_name: [
+          {
+            id: 13,
+            shortname: 'Eman',
+            fullaccese: '0',
+            m_op: '1',
+          },
+        ],
+      },
+      'admin',
+    );
+
+    expect(managerAdmin.isSuperAdmin).toBe(false);
+    expect(managerAdmin.isManagerOperation).toBe(true);
+  });
+
   it('reads admin role flags from PHP Array responses', () => {
     const superAdmin = parseLmsPhpArrayResponse(
       `Array
@@ -137,6 +156,7 @@ describe('parseLmsResponse', () => {
                     [id] => 13
                     [fullaccese] => 0
                     [m_operation] => 1
+                    [tec] => 0
                 )
         )
 )`,

@@ -154,6 +154,14 @@ export class EaccLmsClient implements LmsClient {
             }
           : parsedUser;
 
+      if (credentials.role === 'admin') {
+        console.log(
+          `[AdminLoginResponse] user="${credentials.username}" fullAccess=${
+            user.isSuperAdmin === true ? 1 : 0
+          } managerOperation=${user.isManagerOperation === true ? 1 : 0}`,
+        );
+      }
+
       if (credentials.role === 'teacher') {
         return {
           ...user,
@@ -1330,7 +1338,13 @@ function hasAdminFullAccess(html: string): boolean {
 }
 
 function hasAdminManagerOperation(html: string): boolean {
-  return hasAdminBooleanFlag(html, ['moperation', 'manageroperation']);
+  return hasAdminBooleanFlag(html, [
+    'moperation',
+    'mop',
+    'operationmanager',
+    'manageroperation',
+    'managerop',
+  ]);
 }
 
 function hasAdminBooleanFlag(html: string, compactKeys: string[]): boolean {
@@ -1339,7 +1353,10 @@ function hasAdminBooleanFlag(html: string, compactKeys: string[]): boolean {
   const fieldPatterns = compactKeys.map((key) => {
     if (key === 'fullaccess') return 'full[_\\s-]?access';
     if (key === 'moperation') return 'm[_\\s-]?operation';
+    if (key === 'mop') return 'm[_\\s-]?op';
+    if (key === 'operationmanager') return 'operation[_\\s-]?manager';
     if (key === 'manageroperation') return 'manager[_\\s-]?operation';
+    if (key === 'managerop') return 'manager[_\\s-]?op';
     return key;
   });
 
