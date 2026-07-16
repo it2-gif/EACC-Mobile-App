@@ -97,8 +97,14 @@ class TeacherThreadsScreen extends StatelessWidget {
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: FirestoreChatService.getThreads(courseId: courseId),
+            child: StreamBuilder<List<DocumentSnapshot<Map<String, dynamic>>>>(
+              stream: FirestoreChatService.getThreadDocuments(
+                courseId: courseId,
+                threadIds: students.map(
+                  (student) =>
+                      ChatThreadResolver.studentTeacherThreadId(student.id),
+                ),
+              ),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return _FullState(
@@ -119,7 +125,8 @@ class TeacherThreadsScreen extends StatelessWidget {
                   );
                 }
 
-                final threads = snapshot.data?.docs ?? [];
+                final threads =
+                    snapshot.data ?? <DocumentSnapshot<Map<String, dynamic>>>[];
                 final items = _buildStudentChatItems(threads);
                 final threadItemCount =
                     items.length + 1 + (hasKeyPersonChat ? 1 : 0);
@@ -560,7 +567,7 @@ class TeacherThreadsScreen extends StatelessWidget {
   }
 
   List<_StudentChatItem> _buildStudentChatItems(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> threads,
+    List<DocumentSnapshot<Map<String, dynamic>>> threads,
   ) {
     final rosterById = {for (final student in students) student.id: student};
     final usedThreadIds = <String>{};
@@ -568,6 +575,8 @@ class TeacherThreadsScreen extends StatelessWidget {
 
     for (final doc in threads) {
       final data = doc.data();
+      if (data == null) continue;
+
       final threadId = doc.id;
       if (threadId == ChatThreadResolver.announcementThreadId) continue;
       if (threadId == ChatThreadResolver.adminTeacherThreadId) continue;

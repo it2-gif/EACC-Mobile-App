@@ -63,6 +63,7 @@ class _TeacherCourseCardState extends State<_TeacherCourseCard> {
     return StreamBuilder<int>(
       stream: FirestoreChatService.getTeacherUnreadMessageCount(
         courseId: widget.course.id,
+        studentThreadIds: widget.course.students.map((student) => student.id),
       ),
       builder: (context, snapshot) {
         final unreadMessages = snapshot.data ?? 0;

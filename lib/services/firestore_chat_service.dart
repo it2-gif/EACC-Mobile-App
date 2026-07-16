@@ -214,14 +214,71 @@ class FirestoreChatService {
     return _threadsRef(courseId: courseId).doc(threadId).snapshots();
   }
 
-  static Stream<int> getTeacherUnreadMessageCount({required String courseId}) {
-    return getThreads(courseId: courseId).map((snapshot) {
-      var total = 0;
-      for (final doc in snapshot.docs) {
-        total += readTeacherUnreadCount(doc.data());
+  static Stream<List<DocumentSnapshot<Map<String, dynamic>>>>
+  getThreadDocuments({
+    required String courseId,
+    required Iterable<String> threadIds,
+  }) {
+    final normalizedCourseId = courseId.trim();
+    final ids = threadIds
+        .map((threadId) => threadId.trim())
+        .where((threadId) => threadId.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    if (normalizedCourseId.isEmpty || ids.isEmpty) {
+      return Stream.value(<DocumentSnapshot<Map<String, dynamic>>>[]);
+    }
+
+    return Stream<List<DocumentSnapshot<Map<String, dynamic>>>>.multi((
+      controller,
+    ) {
+      final docsById = <String, DocumentSnapshot<Map<String, dynamic>>>{};
+      final seenIds = <String>{};
+      final subscriptions = <StreamSubscription<dynamic>>[];
+      var closed = false;
+
+      void emitWhenReady() {
+        if (closed || seenIds.length != ids.length) return;
+
+        controller.add(
+          ids
+              .map((id) => docsById[id])
+              .whereType<DocumentSnapshot<Map<String, dynamic>>>()
+              .toList(growable: false),
+        );
       }
-      return total;
+
+      for (final threadId in ids) {
+        final subscription =
+            getThread(courseId: normalizedCourseId, threadId: threadId).listen((
+              snapshot,
+            ) {
+              seenIds.add(threadId);
+              docsById[threadId] = snapshot;
+              emitWhenReady();
+            }, onError: controller.addError);
+        subscriptions.add(subscription);
+      }
+
+      controller.onCancel = () async {
+        closed = true;
+        for (final subscription in subscriptions) {
+          await subscription.cancel();
+        }
+      };
     });
+  }
+
+  static Stream<int> getTeacherUnreadMessageCount({
+    required String courseId,
+    required Iterable<String> studentThreadIds,
+  }) {
+    return _combineThreadUnreadStreams(
+      courseIds: [courseId],
+      threadIds: studentThreadIds,
+      unreadField: 'teacher_unread_count',
+    );
   }
 
   static Stream<AdminUnreadCounts> getAdminUnreadCounts({
@@ -308,15 +365,70 @@ class FirestoreChatService {
       normalizedThreadId,
     );
 
-    return _combineCourseUnreadStreams(
+    return _combineThreadUnreadStreams(
       courseIds: courseIds,
-      readCount: (data, threadId) {
-        if (threadId != normalizedThreadId && threadId != keyPersonThreadId) {
-          return 0;
-        }
-        return readUnreadCount(data, 'student_unread_count');
-      },
+      threadIds: [normalizedThreadId, keyPersonThreadId],
+      unreadField: 'student_unread_count',
     );
+  }
+
+  static Stream<int> _combineThreadUnreadStreams({
+    required Iterable<String> courseIds,
+    required Iterable<String> threadIds,
+    required String unreadField,
+  }) {
+    final courseIdList = courseIds
+        .map((courseId) => courseId.trim())
+        .where((courseId) => courseId.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    final threadIdList = threadIds
+        .map((threadId) => threadId.trim())
+        .where((threadId) => threadId.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    if (courseIdList.isEmpty || threadIdList.isEmpty) {
+      return Stream.value(0);
+    }
+
+    return Stream<int>.multi((controller) {
+      final totalsByThread = <String, int>{};
+      final subscriptions = <StreamSubscription<dynamic>>[];
+      var closed = false;
+
+      void emitTotal() {
+        if (!closed) {
+          controller.add(totalsByThread.values.fold<int>(0, (a, b) => a + b));
+        }
+      }
+
+      for (final courseId in courseIdList) {
+        for (final threadId in threadIdList) {
+          final key = '$courseId/$threadId';
+          totalsByThread[key] = 0;
+
+          final subscription = getThread(courseId: courseId, threadId: threadId)
+              .listen((snapshot) {
+                totalsByThread[key] = readUnreadCount(
+                  snapshot.data(),
+                  unreadField,
+                );
+                emitTotal();
+              }, onError: controller.addError);
+          subscriptions.add(subscription);
+        }
+      }
+
+      emitTotal();
+
+      controller.onCancel = () async {
+        closed = true;
+        for (final subscription in subscriptions) {
+          await subscription.cancel();
+        }
+      };
+    });
   }
 
   static Stream<int> _combineCourseUnreadStreams({
