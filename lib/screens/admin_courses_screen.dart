@@ -873,7 +873,7 @@ class _AdminCourseCardState extends State<_AdminCourseCard> {
       MaterialPageRoute(
         builder: (_) => AdminThreadsScreen(
           courseId: widget.course.id,
-          courseName: widget.course.displayName,
+          courseName: widget.course.displayTitle,
           teacherName: widget.course.teacherName,
           keyPersonName: widget.course.keyPersonName,
           students: widget.course.students,

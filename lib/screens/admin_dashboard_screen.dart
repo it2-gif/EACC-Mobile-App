@@ -1382,7 +1382,7 @@ class _CourseIssuesScreenState extends State<_CourseIssuesScreen> {
       MaterialPageRoute(
         builder: (_) => AdminThreadsScreen(
           courseId: course.id,
-          courseName: course.displayName,
+          courseName: course.displayTitle,
           teacherName: course.teacherName,
           keyPersonName: course.keyPersonName,
           students: course.students,

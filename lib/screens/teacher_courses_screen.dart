@@ -105,7 +105,7 @@ class _TeacherCourseCardState extends State<_TeacherCourseCard> {
       MaterialPageRoute(
         builder: (_) => TeacherThreadsScreen(
           courseId: widget.course.id,
-          courseName: widget.course.displayName,
+          courseName: widget.course.displayTitle,
           senderName: widget.session.appUser.name,
           students: widget.course.students,
           viewerLmsUserId: widget.session.lmsUser.lmsUserId,

@@ -44,6 +44,23 @@ class Course {
     return normalizedCategory;
   }
 
+  String get displayTitle {
+    final normalizedName = displayName.trim();
+    final normalizedCategory = displayCategory?.trim();
+
+    if (normalizedCategory == null || normalizedCategory.isEmpty) {
+      return normalizedName;
+    }
+
+    if (normalizedName.toLowerCase().contains(
+      normalizedCategory.toLowerCase(),
+    )) {
+      return normalizedName;
+    }
+
+    return '$normalizedCategory - $normalizedName';
+  }
+
   factory Course.fromBackendJson(Map<String, dynamic> json) {
     final students = json['students'] as List<dynamic>? ?? [];
     final id = json['lmsCourseId'] as String;

@@ -22,7 +22,7 @@ class StudentCourseChatsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final courseName = course.displayName;
+    final courseName = course.displayTitle;
     final studentThreadId = ChatThreadResolver.studentTeacherThreadId(
       session.lmsUser.lmsUserId,
     );
