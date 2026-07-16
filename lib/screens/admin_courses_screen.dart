@@ -187,9 +187,7 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
     final courses = showingManagerLinkedCourses
         ? managerLinkedCourses
         : isManagerOperation
-        ? (searchedCourse != null
-              ? [searchedCourse!]
-              : const <Course>[])
+        ? (searchedCourse != null ? [searchedCourse!] : const <Course>[])
         : canViewAllCourses
         ? (searchedCourse != null
               ? [searchedCourse!]
@@ -660,6 +658,24 @@ class _AccessSummary extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
+                      StreamBuilder<int>(
+                        stream:
+                            FirestoreChatService.getAdminUnreadTotalForCourses(
+                              courses.map((course) => course.id),
+                            ),
+                        builder: (context, snapshot) {
+                          final unread = snapshot.data ?? 0;
+                          if (unread <= 0) return const SizedBox.shrink();
+
+                          return _SummaryChip(
+                            icon: Icons.mark_chat_unread_rounded,
+                            label: unread == 1
+                                ? '1 unread message'
+                                : '$unread unread messages',
+                            color: AppColors.danger,
+                          );
+                        },
+                      ),
                       _SummaryChip(
                         icon: Icons.chat_bubble_outline_rounded,
                         label: 'Chats',
@@ -771,7 +787,9 @@ class _AdminCourseCardState extends State<_AdminCourseCard> {
                 ),
               ),
               child: Text(
-                teacherUnread == 1 ? '1 teacher' : '$teacherUnread teachers',
+                teacherUnread == 1
+                    ? '1 teacher message'
+                    : '$teacherUnread teacher messages',
                 style: const TextStyle(
                   color: AppColors.teacher,
                   fontSize: 12,
@@ -794,7 +812,9 @@ class _AdminCourseCardState extends State<_AdminCourseCard> {
                 ),
               ),
               child: Text(
-                studentUnread == 1 ? '1 student' : '$studentUnread students',
+                studentUnread == 1
+                    ? '1 contact message'
+                    : '$studentUnread contact messages',
                 style: const TextStyle(
                   color: AppColors.primaryDark,
                   fontSize: 12,
@@ -807,6 +827,10 @@ class _AdminCourseCardState extends State<_AdminCourseCard> {
 
         return CourseCard(
           course: widget.course,
+          unreadCount: totalUnread,
+          unreadLabel: totalUnread == 1
+              ? '1 unread total'
+              : '$totalUnread unread total',
           customBadges: customBadges.isNotEmpty ? customBadges : null,
           onTap: _openThreads,
         );

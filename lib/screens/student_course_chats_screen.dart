@@ -6,6 +6,7 @@ import '../models/course.dart';
 import '../services/firestore_chat_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/time_format.dart';
+import '../widgets/unread_badge.dart';
 import 'chat_screen.dart';
 
 class StudentCourseChatsScreen extends StatelessWidget {
@@ -110,7 +111,7 @@ class StudentCourseChatsScreen extends StatelessWidget {
                       time: lastTime,
                       icon: Icons.support_agent_rounded,
                       color: AppColors.primary,
-                      badge: unread > 0 ? '$unread' : null,
+                      unreadCount: unread,
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -151,7 +152,7 @@ class StudentCourseChatsScreen extends StatelessWidget {
                         time: lastTime,
                         icon: Icons.verified_user_rounded,
                         color: AppColors.admin,
-                        badge: unread > 0 ? '$unread' : null,
+                        unreadCount: unread,
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -236,7 +237,7 @@ class _ChatChoiceCard extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
   final bool pinned;
-  final String? badge;
+  final int unreadCount;
 
   const _ChatChoiceCard({
     required this.title,
@@ -246,7 +247,7 @@ class _ChatChoiceCard extends StatelessWidget {
     required this.color,
     required this.onTap,
     this.pinned = false,
-    this.badge,
+    this.unreadCount = 0,
   });
 
   @override
@@ -343,26 +344,7 @@ class _ChatChoiceCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  if (badge != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: Text(
-                        badge!,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
+                  UnreadBadge(count: unreadCount, compact: true),
                   if (time.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(

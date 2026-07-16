@@ -61,30 +61,27 @@ class _TeacherCourseCardState extends State<_TeacherCourseCard> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<int>(
-      stream: FirestoreChatService.getTeacherUnreadThreadCount(
+      stream: FirestoreChatService.getTeacherUnreadMessageCount(
         courseId: widget.course.id,
       ),
       builder: (context, snapshot) {
-        final unreadThreads = snapshot.data ?? 0;
-        _showBannerWhenUnreadIncreases(unreadThreads);
+        final unreadMessages = snapshot.data ?? 0;
+        _showBannerWhenUnreadIncreases(unreadMessages);
 
         return CourseCard(
           course: widget.course,
-          unreadCount: unreadThreads,
-          unreadLabel: unreadThreads == 1
-              ? '1 student'
-              : '$unreadThreads students',
+          unreadCount: unreadMessages,
           onTap: _openThreads,
         );
       },
     );
   }
 
-  void _showBannerWhenUnreadIncreases(int unreadThreads) {
+  void _showBannerWhenUnreadIncreases(int unreadMessages) {
     final previous = _lastUnreadThreads;
-    _lastUnreadThreads = unreadThreads;
+    _lastUnreadThreads = unreadMessages;
 
-    if (previous == null || unreadThreads <= previous) {
+    if (previous == null || unreadMessages <= previous) {
       return;
     }
 
@@ -93,9 +90,9 @@ class _TeacherCourseCardState extends State<_TeacherCourseCard> {
 
       PushNotificationService.instance.showInAppNotification(
         title: widget.course.displayName,
-        body: unreadThreads == 1
+        body: unreadMessages == 1
             ? 'A student sent a new message.'
-            : '$unreadThreads students have unread messages.',
+            : '$unreadMessages unread messages from students.',
         onOpen: _openThreads,
       );
     });

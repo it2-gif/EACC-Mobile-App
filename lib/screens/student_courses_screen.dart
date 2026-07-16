@@ -61,9 +61,9 @@ class _StudentCourseCardState extends State<_StudentCourseCard> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<int>(
-      stream: FirestoreChatService.getStudentUnreadCount(
-        courseId: widget.course.id,
-        threadId: widget.session.lmsUser.lmsUserId,
+      stream: FirestoreChatService.getStudentUnreadTotalForCourses(
+        courseIds: [widget.course.id],
+        studentThreadId: widget.session.lmsUser.lmsUserId,
       ),
       builder: (context, snapshot) {
         final unreadCount = snapshot.data ?? 0;
@@ -72,7 +72,6 @@ class _StudentCourseCardState extends State<_StudentCourseCard> {
         return CourseCard(
           course: widget.course,
           unreadCount: unreadCount,
-          unreadLabel: unreadCount == 1 ? '1 unread' : '$unreadCount unread',
           onTap: _openChat,
         );
       },

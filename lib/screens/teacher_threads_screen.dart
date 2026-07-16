@@ -7,6 +7,7 @@ import '../services/notification_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/time_format.dart';
 import '../widgets/polished_state_card.dart';
+import '../widgets/unread_badge.dart';
 import 'chat_screen.dart';
 
 class TeacherThreadsScreen extends StatelessWidget {
@@ -162,8 +163,7 @@ class TeacherThreadsScreen extends StatelessWidget {
                       return _AdminTeacherThreadCard(
                         courseId: courseId,
                         title: 'Contact person: $keyPersonDisplayName',
-                        subtitle:
-                            'Talk directly with $keyPersonDisplayName',
+                        subtitle: 'Talk directly with $keyPersonDisplayName',
                         onTap: () =>
                             _openAdminChat(context, keyPersonDisplayName),
                       );
@@ -248,35 +248,13 @@ class TeacherThreadsScreen extends StatelessWidget {
                                             ),
                                           ),
                                         ),
-                                        if (item.unreadCount > 0)
-                                          Container(
-                                            margin: const EdgeInsets.only(
-                                              left: 8,
-                                            ),
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.student,
-                                              borderRadius:
-                                                  BorderRadius.circular(999),
-                                              border: Border.all(
-                                                color: Colors.white,
-                                                width: 2,
-                                              ),
-                                            ),
-                                            child: Text(
-                                              item.unreadCount > 99
-                                                  ? '99+'
-                                                  : '${item.unreadCount}',
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            ),
+                                        if (item.unreadCount > 0) ...[
+                                          const SizedBox(width: 8),
+                                          UnreadBadge(
+                                            count: item.unreadCount,
+                                            compact: true,
                                           ),
+                                        ],
                                       ],
                                     ),
                                     const SizedBox(height: 5),
@@ -1088,29 +1066,7 @@ class _AdminTeacherThreadCard extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            if (unread > 0)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.teacher,
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: Text(
-                                  unread > 99 ? '99+' : '$unread',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
+                            UnreadBadge(count: unread, compact: true),
                           ],
                         ),
                         const SizedBox(height: 5),

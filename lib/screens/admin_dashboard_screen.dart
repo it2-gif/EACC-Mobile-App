@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/polished_state_card.dart';
 import '../widgets/support_entry_card.dart';
+import '../widgets/unread_badge.dart';
 import 'admin_analysis_screen.dart';
 import 'admin_announcements_screen.dart';
 import 'admin_audit_screen.dart';
@@ -26,6 +27,7 @@ class AdminDashboardScreen extends StatelessWidget {
     final canSeeAnalysis =
         session.appUser.isSuperAdmin || session.appUser.isTechnicalSupport;
     final insights = _DashboardInsights.fromSession(session);
+    final adminUnreadCourseIds = _adminUnreadCourseIds(session);
     final quickActions = <Widget>[
       if (canSeeAnalysis)
         _NavTile(
@@ -48,6 +50,9 @@ class AdminDashboardScreen extends StatelessWidget {
               ? 'Search courses and open student chats'
               : 'Open your linked courses and student chats',
           color: AppColors.primary,
+          unreadStream: FirestoreChatService.getAdminUnreadTotalForCourses(
+            adminUnreadCourseIds,
+          ),
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
@@ -73,6 +78,9 @@ class AdminDashboardScreen extends StatelessWidget {
           title: 'Admin Inbox',
           subtitle: 'Review newest active chats from all visible courses',
           color: AppColors.primaryDark,
+          unreadStream: FirestoreChatService.getAdminUnreadTotalForCourses(
+            adminUnreadCourseIds,
+          ),
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
@@ -125,17 +133,6 @@ class AdminDashboardScreen extends StatelessWidget {
           const SizedBox(height: 14),
           _TodayOverviewSection(insights: insights),
           const SizedBox(height: 24),
-          _AttentionNeededSection(insights: insights),
-          const SizedBox(height: 24),
-          if (isSuperAdmin) ...[
-            _FullAccessControlCenter(session: session),
-            const SizedBox(height: 24),
-          ],
-          if (!session.appUser.isManagerOperation) ...[
-            _CourseActivityPanel(session: session),
-            const SizedBox(height: 24),
-          ],
-
           _QuickActionsSection(
             title: session.appUser.isSuperAdmin
                 ? 'Quick actions'
@@ -145,10 +142,40 @@ class AdminDashboardScreen extends StatelessWidget {
                 : 'Open the course tools available to your account.',
             actions: quickActions,
           ),
+          const SizedBox(height: 24),
+          if (!session.appUser.isManagerOperation) ...[
+            _CourseActivityPanel(session: session),
+            const SizedBox(height: 24),
+          ],
+          _AttentionNeededSection(insights: insights),
+          const SizedBox(height: 24),
+          if (isSuperAdmin) ...[
+            _FullAccessControlCenter(session: session),
+            const SizedBox(height: 24),
+          ],
         ],
       ),
     );
   }
+}
+
+Iterable<String> _adminUnreadCourseIds(AuthSession session) {
+  if (!session.appUser.isManagerOperation || session.appUser.isSuperAdmin) {
+    return session.courses.map((course) => course.id);
+  }
+
+  final adminId = session.lmsUser.lmsUserId.trim().toLowerCase();
+  final adminName = session.appUser.name.trim().toLowerCase();
+
+  return session.courses
+      .where((course) {
+        final keyPersonId = course.keyPersonLmsUserId?.trim().toLowerCase();
+        final keyPersonName = course.keyPersonName?.trim().toLowerCase();
+
+        return (adminId.isNotEmpty && keyPersonId == adminId) ||
+            (adminName.isNotEmpty && keyPersonName == adminName);
+      })
+      .map((course) => course.id);
 }
 
 // ─── Welcome header ─────────────────────────────────────────────────────────
@@ -1464,6 +1491,7 @@ class _NavTile extends StatelessWidget {
   final String subtitle;
   final Color color;
   final VoidCallback onTap;
+  final Stream<int>? unreadStream;
 
   const _NavTile({
     required this.icon,
@@ -1471,11 +1499,12 @@ class _NavTile extends StatelessWidget {
     required this.subtitle,
     required this.color,
     required this.onTap,
+    this.unreadStream,
   });
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
+    final tile = TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.98, end: 1),
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
@@ -1533,18 +1562,37 @@ class _NavTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Icon(
-                    Icons.chevron_right_rounded,
-                    color: color.withValues(alpha: 0.72),
-                    size: 22,
-                  ),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        color: color.withValues(alpha: 0.72),
+                        size: 22,
+                      ),
+                    ),
+                    if (unreadStream != null)
+                      Positioned(
+                        right: -7,
+                        top: -9,
+                        child: StreamBuilder<int>(
+                          stream: unreadStream,
+                          builder: (context, snapshot) {
+                            return UnreadBadge(
+                              count: snapshot.data ?? 0,
+                              compact: true,
+                            );
+                          },
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -1552,5 +1600,7 @@ class _NavTile extends StatelessWidget {
         ),
       ),
     );
+
+    return tile;
   }
 }

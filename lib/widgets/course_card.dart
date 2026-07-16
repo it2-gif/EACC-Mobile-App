@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/course.dart';
 import '../theme/app_theme.dart';
+import 'unread_badge.dart';
 
 class CourseCard extends StatelessWidget {
   final Course course;
@@ -83,18 +84,32 @@ class CourseCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: AppColors.background,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: const Icon(
-                            Icons.chevron_right_rounded,
-                            color: AppColors.primaryDark,
-                            size: 20,
-                          ),
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: AppColors.background,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: const Icon(
+                                Icons.chevron_right_rounded,
+                                color: AppColors.primaryDark,
+                                size: 20,
+                              ),
+                            ),
+                            if (unreadCount > 0)
+                              Positioned(
+                                right: -7,
+                                top: -9,
+                                child: UnreadBadge(
+                                  count: unreadCount,
+                                  compact: true,
+                                ),
+                              ),
+                          ],
                         ),
                       ],
                     ),
@@ -136,32 +151,7 @@ class CourseCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (customBadges != null)
-                          ...customBadges!
-                        else if (unreadCount > 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.success.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: AppColors.success.withValues(
-                                  alpha: 0.25,
-                                ),
-                              ),
-                            ),
-                            child: Text(
-                              unreadLabel ?? '$unreadCount unread',
-                              style: const TextStyle(
-                                color: AppColors.success,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
+                        ...?customBadges,
                         if (hasTeacher)
                           Container(
                             padding: const EdgeInsets.symmetric(

@@ -4,6 +4,7 @@ import '../models/auth_session.dart';
 import '../models/course.dart';
 import '../services/firestore_chat_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/unread_badge.dart';
 import 'chat_screen.dart';
 
 class AdminThreadsScreen extends StatelessWidget {
@@ -101,32 +102,45 @@ class AdminThreadsScreen extends StatelessWidget {
                   ),
                 ),
 
-                _AdminThreadTile(
-                  title: teacherTitle,
-                  subtitle: '$teacherTitle - $contactPersonTitle',
-                  icon: Icons.admin_panel_settings_rounded,
-                  color: AppColors.teacher,
-                  badge: const Icon(
-                    Icons.push_pin_rounded,
-                    size: 16,
-                    color: AppColors.teacher,
-                  ),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ChatScreen(
-                        title: teacherTitle,
-                        currentUserRole: 'admin',
-                        courseId: courseId,
-                        threadId: FirestoreChatService.adminTeacherThreadId,
-                        senderName: session.appUser.name,
-                        isSuperAdmin: session.appUser.isSuperAdmin,
-                        canManageAllMessages: session.appUser.canViewAllCourses,
+                StreamBuilder<Map<String, dynamic>?>(
+                  stream: FirestoreChatService.getThread(
+                    courseId: courseId,
+                    threadId: FirestoreChatService.adminTeacherThreadId,
+                  ).map((snapshot) => snapshot.data()),
+                  builder: (context, snapshot) {
+                    final unread =
+                        (snapshot.data?['admin_unread_count'] as num?)
+                            ?.toInt() ??
+                        0;
+                    return _AdminThreadTile(
+                      title: teacherTitle,
+                      subtitle: '$teacherTitle - $contactPersonTitle',
+                      icon: Icons.admin_panel_settings_rounded,
+                      color: AppColors.teacher,
+                      unreadCount: unread,
+                      badge: const Icon(
+                        Icons.push_pin_rounded,
+                        size: 16,
+                        color: AppColors.teacher,
                       ),
-                    ),
-                  ),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChatScreen(
+                            title: teacherTitle,
+                            currentUserRole: 'admin',
+                            courseId: courseId,
+                            threadId: FirestoreChatService.adminTeacherThreadId,
+                            senderName: session.appUser.name,
+                            isSuperAdmin: session.appUser.isSuperAdmin,
+                            canManageAllMessages:
+                                session.appUser.canViewAllCourses,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-
                 if (items.isNotEmpty) const _AdminThreadSection('Students'),
                 for (final student in items) ...[
                   _AdminThreadTile(
@@ -160,37 +174,52 @@ class AdminThreadsScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  _AdminThreadTile(
-                    title: student.name,
-                    subtitle: 'Contact person chat - $contactPersonTitle',
-                    icon: Icons.verified_user_rounded,
-                    color: AppColors.admin,
-                    badge: _ThreadBadge(
-                      label: 'CONTACT PERSON',
-                      color: AppColors.admin,
-                    ),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ChatScreen(
-                          title: _studentThreadTitle(
-                            student.name,
-                            contactPersonTitle,
-                          ),
-                          currentUserRole: 'admin',
-                          courseId: courseId,
-                          threadId:
-                              FirestoreChatService.keyPersonStudentThreadId(
-                                student.id,
-                              ),
-                          senderName: session.appUser.name,
-                          threadStudentName: student.name,
-                          isSuperAdmin: session.appUser.isSuperAdmin,
-                          canManageAllMessages:
-                              session.appUser.canViewAllCourses,
-                        ),
+                  StreamBuilder<Map<String, dynamic>?>(
+                    stream: FirestoreChatService.getThread(
+                      courseId: courseId,
+                      threadId: FirestoreChatService.keyPersonStudentThreadId(
+                        student.id,
                       ),
-                    ),
+                    ).map((snapshot) => snapshot.data()),
+                    builder: (context, snapshot) {
+                      final unread =
+                          (snapshot.data?['admin_unread_count'] as num?)
+                              ?.toInt() ??
+                          0;
+                      return _AdminThreadTile(
+                        title: student.name,
+                        subtitle: 'Contact person chat - $contactPersonTitle',
+                        icon: Icons.verified_user_rounded,
+                        color: AppColors.admin,
+                        unreadCount: unread,
+                        badge: _ThreadBadge(
+                          label: 'CONTACT PERSON',
+                          color: AppColors.admin,
+                        ),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatScreen(
+                              title: _studentThreadTitle(
+                                student.name,
+                                contactPersonTitle,
+                              ),
+                              currentUserRole: 'admin',
+                              courseId: courseId,
+                              threadId:
+                                  FirestoreChatService.keyPersonStudentThreadId(
+                                    student.id,
+                                  ),
+                              senderName: session.appUser.name,
+                              threadStudentName: student.name,
+                              isSuperAdmin: session.appUser.isSuperAdmin,
+                              canManageAllMessages:
+                                  session.appUser.canViewAllCourses,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
                 if (items.isEmpty) const _AdminEmptyStudentsState(),
@@ -280,6 +309,7 @@ class _AdminThreadTile extends StatelessWidget {
   final IconData? icon;
   final String? iconLabel;
   final Widget? badge;
+  final int unreadCount;
 
   const _AdminThreadTile({
     required this.title,
@@ -289,6 +319,7 @@ class _AdminThreadTile extends StatelessWidget {
     this.icon,
     this.iconLabel,
     this.badge,
+    this.unreadCount = 0,
   });
 
   @override
@@ -339,6 +370,17 @@ class _AdminThreadTile extends StatelessWidget {
                         const SizedBox(height: 7),
                         Align(alignment: Alignment.centerLeft, child: badge!),
                       ],
+                      if (unreadCount > 0) ...[
+                        const SizedBox(height: 7),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: UnreadBadge(
+                            count: unreadCount,
+                            color: AppColors.danger,
+                            compact: true,
+                          ),
+                        ),
+                      ],
                     ] else
                       Row(
                         children: [
@@ -356,6 +398,14 @@ class _AdminThreadTile extends StatelessWidget {
                           if (badge != null) ...[
                             const SizedBox(width: 8),
                             badge!,
+                          ],
+                          if (unreadCount > 0) ...[
+                            const SizedBox(width: 8),
+                            UnreadBadge(
+                              count: unreadCount,
+                              color: AppColors.danger,
+                              compact: true,
+                            ),
                           ],
                         ],
                       ),
