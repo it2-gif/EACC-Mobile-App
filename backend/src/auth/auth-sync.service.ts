@@ -112,9 +112,62 @@ export class AuthSyncService {
       },
     });
 
+    await this.syncCourseTeacher(tx, course.id, lmsCourse);
     await this.syncCourseStudents(tx, course.id, lmsCourse.students ?? []);
 
     return course;
+  }
+
+  private async syncCourseTeacher(
+    tx: PrismaTransaction,
+    courseId: string,
+    lmsCourse: NormalizedLmsCourse,
+  ) {
+    const lmsUserId = lmsCourse.teacherLmsUserId?.trim();
+    const name = lmsCourse.teacherName?.trim();
+    if (!lmsUserId || !name) return;
+
+    const user = await tx.user.upsert({
+      where: {
+        lmsSource_lmsUserId_role: {
+          lmsSource: LMS_SOURCE,
+          lmsUserId,
+          role: UserRole.TEACHER,
+        },
+      },
+      create: {
+        lmsSource: LMS_SOURCE,
+        lmsUserId,
+        role: UserRole.TEACHER,
+        name,
+        status: UserStatus.ACTIVE,
+      },
+      update: {
+        name,
+        status: UserStatus.ACTIVE,
+      },
+    });
+
+    await tx.courseMembership.upsert({
+      where: {
+        courseId_userId_role: {
+          courseId,
+          userId: user.id,
+          role: UserRole.TEACHER,
+        },
+      },
+      create: {
+        courseId,
+        userId: user.id,
+        role: UserRole.TEACHER,
+        status: MembershipStatus.ACTIVE,
+        syncedAt: new Date(),
+      },
+      update: {
+        status: MembershipStatus.ACTIVE,
+        syncedAt: new Date(),
+      },
+    });
   }
 
   private async syncCourseStudents(

@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { DecodedIdToken } from 'firebase-admin/auth';
+import type { Prisma } from '../../generated/prisma/client';
 import {
   CourseStatus,
   MembershipStatus,
@@ -25,6 +26,15 @@ import {
 } from '../lms/eacc-lms.errors';
 
 const LMS_SOURCE = 'eacc_lms';
+const DEFAULT_USER_PAGE_SIZE = 10;
+const MAX_USER_PAGE_SIZE = 50;
+
+interface ListUsersOptions {
+  skip?: string;
+  take?: string;
+  role?: string;
+  query?: string;
+}
 
 @Injectable()
 export class AdminService {
@@ -35,32 +45,116 @@ export class AdminService {
     private readonly config: ConfigService<Environment, true>,
   ) {}
 
-  async listUsers(firebaseIdToken: string) {
+  async listUsers(firebaseIdToken: string, options: ListUsersOptions = {}) {
     const identity = await this.firebaseAuth.verifyIdToken(firebaseIdToken);
     this.assertSuperAdmin(identity);
+    const skip = this.readPositiveInteger(options.skip, 0);
+    const take = Math.min(
+      this.readPositiveInteger(options.take, DEFAULT_USER_PAGE_SIZE),
+      MAX_USER_PAGE_SIZE,
+    );
+    const role = this.readUserRole(options.role);
+    const query = options.query?.trim();
+    const baseWhere = this.buildUserWhere({ query });
+    const pageWhere = this.buildUserWhere({ query, role });
 
-    const users = await this.prisma.user.findMany({
-      orderBy: [{ role: 'asc' }, { name: 'asc' }],
-      select: {
-        id: true,
-        lmsUserId: true,
-        role: true,
-        name: true,
-        email: true,
-        status: true,
-        lastLoginAt: true,
+    const [users, total, admins, teachers, students] = await Promise.all([
+      this.prisma.user.findMany({
+        where: pageWhere,
+        skip,
+        take,
+        orderBy: [{ role: 'asc' }, { name: 'asc' }, { lmsUserId: 'asc' }],
+        select: {
+          id: true,
+          lmsUserId: true,
+          role: true,
+          name: true,
+          email: true,
+          status: true,
+          lastLoginAt: true,
+        },
+      }),
+      this.prisma.user.count({ where: pageWhere }),
+      this.prisma.user.count({
+        where: { AND: [baseWhere, { role: UserRole.ADMIN }] },
+      }),
+      this.prisma.user.count({
+        where: { AND: [baseWhere, { role: UserRole.TEACHER }] },
+      }),
+      this.prisma.user.count({
+        where: { AND: [baseWhere, { role: UserRole.STUDENT }] },
+      }),
+    ]);
+
+    return {
+      items: users.map((user) => ({
+        id: user.id,
+        lmsUserId: user.lmsUserId,
+        role: user.role.toLowerCase(),
+        name: user.name,
+        email: user.email ?? null,
+        status: user.status.toLowerCase(),
+        lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
+      })),
+      total,
+      skip,
+      take,
+      hasMore: skip + users.length < total,
+      counts: {
+        all: admins + teachers + students,
+        admins,
+        teachers,
+        students,
       },
-    });
+    };
+  }
 
-    return users.map((user) => ({
-      id: user.id,
-      lmsUserId: user.lmsUserId,
-      role: user.role.toLowerCase(),
-      name: user.name,
-      email: user.email ?? null,
-      status: user.status.toLowerCase(),
-      lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
-    }));
+  private buildUserWhere({
+    query,
+    role,
+  }: {
+    query?: string;
+    role?: UserRole;
+  }): Prisma.UserWhereInput {
+    const filters: Prisma.UserWhereInput[] = [{ lmsSource: LMS_SOURCE }];
+    if (role) filters.push({ role });
+
+    const normalizedQuery = query?.trim();
+    if (normalizedQuery) {
+      const matchingRole = this.readUserRole(normalizedQuery);
+      filters.push({
+        OR: [
+          { name: { contains: normalizedQuery, mode: 'insensitive' } },
+          { lmsUserId: { contains: normalizedQuery, mode: 'insensitive' } },
+          { email: { contains: normalizedQuery, mode: 'insensitive' } },
+          ...(matchingRole ? [{ role: matchingRole }] : []),
+        ],
+      });
+    }
+
+    return { AND: filters };
+  }
+
+  private readUserRole(role: string | undefined): UserRole | undefined {
+    switch (role?.trim().toLowerCase()) {
+      case 'admin':
+      case 'admins':
+        return UserRole.ADMIN;
+      case 'teacher':
+      case 'teachers':
+        return UserRole.TEACHER;
+      case 'student':
+      case 'students':
+        return UserRole.STUDENT;
+      default:
+        return undefined;
+    }
+  }
+
+  private readPositiveInteger(value: string | undefined, fallback: number) {
+    const parsed = Number.parseInt(value ?? '', 10);
+    if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+    return parsed;
   }
 
   async getCourse(lmsCourseId: string, firebaseIdToken: string) {
@@ -189,6 +283,11 @@ export class AdminService {
         },
       });
 
+      const activeTeacherUserId = await this.syncCourseTeacher(
+        tx,
+        course.id,
+        lmsCourse,
+      );
       const activeStudentUserIds: string[] = [];
 
       for (const student of students) {
@@ -237,6 +336,21 @@ export class AdminService {
         });
       }
 
+      if (activeTeacherUserId) {
+        await tx.courseMembership.updateMany({
+          where: {
+            courseId: course.id,
+            role: UserRole.TEACHER,
+            status: MembershipStatus.ACTIVE,
+            userId: { not: activeTeacherUserId },
+          },
+          data: {
+            status: MembershipStatus.INACTIVE,
+            syncedAt: new Date(),
+          },
+        });
+      }
+
       if (shouldSyncRoster) {
         await tx.courseMembership.updateMany({
           where: {
@@ -268,6 +382,60 @@ export class AdminService {
         })),
       };
     });
+  }
+
+  private async syncCourseTeacher(
+    tx: Prisma.TransactionClient,
+    courseId: string,
+    lmsCourse: NormalizedLmsCourse,
+  ) {
+    const lmsUserId = lmsCourse.teacherLmsUserId?.trim();
+    const name = lmsCourse.teacherName?.trim();
+    if (!lmsUserId || !name) return undefined;
+
+    const user = await tx.user.upsert({
+      where: {
+        lmsSource_lmsUserId_role: {
+          lmsSource: LMS_SOURCE,
+          lmsUserId,
+          role: UserRole.TEACHER,
+        },
+      },
+      create: {
+        lmsSource: LMS_SOURCE,
+        lmsUserId,
+        role: UserRole.TEACHER,
+        name,
+        status: UserStatus.ACTIVE,
+      },
+      update: {
+        name,
+        status: UserStatus.ACTIVE,
+      },
+    });
+
+    await tx.courseMembership.upsert({
+      where: {
+        courseId_userId_role: {
+          courseId,
+          userId: user.id,
+          role: UserRole.TEACHER,
+        },
+      },
+      create: {
+        courseId,
+        userId: user.id,
+        role: UserRole.TEACHER,
+        status: MembershipStatus.ACTIVE,
+        syncedAt: new Date(),
+      },
+      update: {
+        status: MembershipStatus.ACTIVE,
+        syncedAt: new Date(),
+      },
+    });
+
+    return user.id;
   }
 
   private assertAdminCourseAccess(

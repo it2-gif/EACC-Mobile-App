@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/polished_state_card.dart';
 import '../widgets/screen_header.dart';
+import 'admin_inbox_screen.dart';
 
 class AdminAnalysisScreen extends StatefulWidget {
   final AuthSession session;
@@ -83,7 +84,11 @@ class _AdminAnalysisScreenState extends State<AdminAnalysisScreen> {
               else if (snapshot.hasError)
                 _AnalysisError(error: '${snapshot.error}', onRetry: _refresh)
               else
-                _AnalysisContent(data: snapshot.data!, onRefresh: _refresh),
+                _AnalysisContent(
+                  data: snapshot.data!,
+                  session: widget.session,
+                  onRefresh: _refresh,
+                ),
             ],
           );
         },
@@ -98,6 +103,11 @@ class _AnalysisData {
   final int students;
   final int teachers;
   final int admins;
+  final int contactPeople;
+  final int missingTeachers;
+  final int missingContactPeople;
+  final int emptyRosters;
+  final int genericCourseNames;
   final int messages;
   final int uploads;
   final int images;
@@ -112,6 +122,11 @@ class _AnalysisData {
     required this.students,
     required this.teachers,
     required this.admins,
+    required this.contactPeople,
+    required this.missingTeachers,
+    required this.missingContactPeople,
+    required this.emptyRosters,
+    required this.genericCourseNames,
     required this.messages,
     required this.uploads,
     required this.images,
@@ -127,6 +142,11 @@ class _AnalysisData {
   }) {
     final uniqueStudents = <String>{};
     final uniqueTeachers = <String>{};
+    final contactPeople = <String>{};
+    var missingTeachers = 0;
+    var missingContactPeople = 0;
+    var emptyRosters = 0;
+    var genericCourseNames = 0;
 
     for (final course in session.courses) {
       for (final student in course.students) {
@@ -136,6 +156,25 @@ class _AnalysisData {
       final teacher = course.teacherName?.trim();
       if (teacher != null && teacher.isNotEmpty) {
         uniqueTeachers.add(teacher.toLowerCase());
+      } else {
+        missingTeachers++;
+      }
+
+      final contactId = course.keyPersonLmsUserId?.trim();
+      final contactName = course.keyPersonName?.trim();
+      if ((contactId == null || contactId.isEmpty) &&
+          (contactName == null || contactName.isEmpty)) {
+        missingContactPeople++;
+      } else {
+        contactPeople.add(
+          (contactId?.isNotEmpty == true ? contactId : contactName)!
+              .toLowerCase(),
+        );
+      }
+
+      if (course.students.isEmpty) emptyRosters++;
+      if (course.displayName.trim().toLowerCase() == 'course ${course.id}') {
+        genericCourseNames++;
       }
     }
 
@@ -145,6 +184,11 @@ class _AnalysisData {
       students: uniqueStudents.length,
       teachers: uniqueTeachers.length,
       admins: 1,
+      contactPeople: contactPeople.length,
+      missingTeachers: missingTeachers,
+      missingContactPeople: missingContactPeople,
+      emptyRosters: emptyRosters,
+      genericCourseNames: genericCourseNames,
       messages: activity.messages,
       uploads: activity.uploads,
       images: activity.images,
@@ -156,25 +200,131 @@ class _AnalysisData {
   }
 
   int get storageItems => uploads + voiceMessages;
+  int get healthIssues =>
+      missingTeachers +
+      missingContactPeople +
+      emptyRosters +
+      genericCourseNames;
 }
 
-class _AnalysisContent extends StatelessWidget {
+enum _AnalysisTab { overview, communication, storage, people, health }
+
+class _AnalysisContent extends StatefulWidget {
   final _AnalysisData data;
+  final AuthSession session;
   final VoidCallback onRefresh;
 
-  const _AnalysisContent({required this.data, required this.onRefresh});
+  const _AnalysisContent({
+    required this.data,
+    required this.session,
+    required this.onRefresh,
+  });
+
+  @override
+  State<_AnalysisContent> createState() => _AnalysisContentState();
+}
+
+class _AnalysisContentState extends State<_AnalysisContent> {
+  _AnalysisTab selectedTab = _AnalysisTab.overview;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _OverviewHero(data: data, onRefresh: onRefresh),
+        _OverviewHero(data: widget.data, onRefresh: widget.onRefresh),
         const SizedBox(height: 14),
-        _CostUsagePanel(data: data),
-        const SizedBox(height: 18),
+        _AnalysisTabSelector(
+          selected: selectedTab,
+          onChanged: (tab) => setState(() => selectedTab = tab),
+        ),
+        const SizedBox(height: 14),
+        _buildSelectedTab(),
+      ],
+    );
+  }
+
+  Widget _buildSelectedTab() {
+    final data = widget.data;
+
+    switch (selectedTab) {
+      case _AnalysisTab.overview:
+        return _OverviewTab(data: data);
+      case _AnalysisTab.communication:
+        return _CommunicationTab(data: data, session: widget.session);
+      case _AnalysisTab.storage:
+        return _StorageTab(data: data);
+      case _AnalysisTab.people:
+        return _PeopleTab(data: data);
+      case _AnalysisTab.health:
+        return _HealthTab(data: data);
+    }
+  }
+}
+
+class _AnalysisTabSelector extends StatelessWidget {
+  final _AnalysisTab selected;
+  final ValueChanged<_AnalysisTab> onChanged;
+
+  const _AnalysisTabSelector({required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    const tabs = [
+      (_AnalysisTab.overview, Icons.dashboard_rounded, 'Overview'),
+      (_AnalysisTab.communication, Icons.forum_rounded, 'Communication'),
+      (_AnalysisTab.storage, Icons.cloud_upload_rounded, 'Storage'),
+      (_AnalysisTab.people, Icons.groups_rounded, 'People'),
+      (_AnalysisTab.health, Icons.health_and_safety_rounded, 'Health'),
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: tabs
+            .map((tab) {
+              final selectedTab = selected == tab.$1;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  selected: selectedTab,
+                  avatar: Icon(
+                    tab.$2,
+                    size: 16,
+                    color: selectedTab ? AppColors.primary : AppColors.muted,
+                  ),
+                  label: Text(tab.$3),
+                  labelStyle: TextStyle(
+                    color: selectedTab ? AppColors.primary : AppColors.muted,
+                    fontWeight: FontWeight.w900,
+                  ),
+                  selectedColor: AppColors.primary.withValues(alpha: 0.12),
+                  side: BorderSide(
+                    color: selectedTab
+                        ? AppColors.primary.withValues(alpha: 0.35)
+                        : AppColors.border,
+                  ),
+                  onSelected: (_) => onChanged(tab.$1),
+                ),
+              );
+            })
+            .toList(growable: false),
+      ),
+    );
+  }
+}
+
+class _OverviewTab extends StatelessWidget {
+  final _AnalysisData data;
+
+  const _OverviewTab({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
         _SectionTitle(
-          title: 'LMS structure',
-          subtitle: 'People and courses available to this admin session.',
+          title: 'Overview',
+          subtitle: 'System-wide totals from LMS data and Firestore activity.',
         ),
         const SizedBox(height: 10),
         _MetricGrid(
@@ -186,26 +336,44 @@ class _AnalysisContent extends StatelessWidget {
               color: AppColors.primary,
             ),
             _MetricData(
-              label: 'Students',
-              value: data.students,
-              icon: Icons.school_rounded,
-              color: AppColors.student,
+              label: 'Chats',
+              value: data.chats,
+              icon: Icons.forum_rounded,
+              color: const Color(0xFF6A3DE8),
             ),
             _MetricData(
-              label: 'Teachers',
-              value: data.teachers,
-              icon: Icons.auto_stories_rounded,
-              color: AppColors.teacher,
+              label: 'Messages',
+              value: data.messages,
+              icon: Icons.chat_bubble_rounded,
+              color: AppColors.primaryDark,
             ),
             _MetricData(
-              label: 'Admins',
-              value: data.admins,
-              icon: Icons.admin_panel_settings_rounded,
-              color: AppColors.admin,
+              label: 'Health issues',
+              value: data.healthIssues,
+              icon: Icons.health_and_safety_rounded,
+              color: data.healthIssues == 0
+                  ? AppColors.success
+                  : AppColors.admin,
             ),
           ],
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 14),
+        _CostUsagePanel(data: data),
+      ],
+    );
+  }
+}
+
+class _CommunicationTab extends StatelessWidget {
+  final _AnalysisData data;
+  final AuthSession session;
+
+  const _CommunicationTab({required this.data, required this.session});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
         _SectionTitle(
           title: 'Communication',
           subtitle: 'Counts from Firestore, grouped by LMS course.',
@@ -231,12 +399,48 @@ class _AnalysisContent extends StatelessWidget {
               icon: Icons.cloud_upload_rounded,
               color: AppColors.accent,
             ),
+            _MetricData(
+              label: 'Voice',
+              value: data.voiceMessages,
+              icon: Icons.mic_rounded,
+              color: AppColors.primaryDark,
+            ),
           ],
         ),
+        const SizedBox(height: 14),
+        _InsightPanel(
+          icon: Icons.mark_chat_unread_rounded,
+          title: 'Want to see where these messages are?',
+          message:
+              'Open Admin Inbox to see active chats from newest to oldest without loading every message.',
+          color: AppColors.primary,
+          actionLabel: 'Open Admin Inbox',
+          onAction: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AdminInboxScreen(session: session),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StorageTab extends StatelessWidget {
+  final _AnalysisData data;
+
+  const _StorageTab({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _CostUsagePanel(data: data),
         const SizedBox(height: 18),
         _SectionTitle(
           title: 'Upload breakdown',
-          subtitle: 'Media and document usage across the loaded courses.',
+          subtitle: 'Media and document usage across loaded courses.',
         ),
         const SizedBox(height: 10),
         _MetricGrid(
@@ -268,6 +472,194 @@ class _AnalysisContent extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _PeopleTab extends StatelessWidget {
+  final _AnalysisData data;
+
+  const _PeopleTab({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _SectionTitle(
+          title: 'People',
+          subtitle: 'People available to this admin session from LMS data.',
+        ),
+        const SizedBox(height: 10),
+        _MetricGrid(
+          cards: [
+            _MetricData(
+              label: 'Students',
+              value: data.students,
+              icon: Icons.school_rounded,
+              color: AppColors.student,
+            ),
+            _MetricData(
+              label: 'Teachers',
+              value: data.teachers,
+              icon: Icons.auto_stories_rounded,
+              color: AppColors.teacher,
+            ),
+            _MetricData(
+              label: 'Contacts',
+              value: data.contactPeople,
+              icon: Icons.admin_panel_settings_rounded,
+              color: AppColors.admin,
+            ),
+            _MetricData(
+              label: 'Admins',
+              value: data.admins,
+              icon: Icons.security_rounded,
+              color: AppColors.primaryDark,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _InsightPanel(
+          icon: Icons.verified_user_rounded,
+          title: 'Scope-aware report',
+          message:
+              'People counts reflect the courses included in the current admin login session.',
+          color: AppColors.student,
+        ),
+      ],
+    );
+  }
+}
+
+class _HealthTab extends StatelessWidget {
+  final _AnalysisData data;
+
+  const _HealthTab({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final healthCards = [
+      _MetricData(
+        label: 'Missing teacher',
+        value: data.missingTeachers,
+        icon: Icons.person_search_rounded,
+        color: AppColors.teacher,
+      ),
+      _MetricData(
+        label: 'Missing contact',
+        value: data.missingContactPeople,
+        icon: Icons.admin_panel_settings_rounded,
+        color: AppColors.admin,
+      ),
+      _MetricData(
+        label: 'Empty rosters',
+        value: data.emptyRosters,
+        icon: Icons.group_off_rounded,
+        color: AppColors.danger,
+      ),
+      _MetricData(
+        label: 'Generic names',
+        value: data.genericCourseNames,
+        icon: Icons.label_off_rounded,
+        color: const Color(0xFF6A3DE8),
+      ),
+    ];
+
+    return Column(
+      children: [
+        _SectionTitle(
+          title: 'Health checks',
+          subtitle: 'Data-quality checks that help keep admin workflows clear.',
+        ),
+        const SizedBox(height: 10),
+        _MetricGrid(cards: healthCards),
+        const SizedBox(height: 18),
+        _InsightPanel(
+          icon: data.healthIssues == 0
+              ? Icons.verified_rounded
+              : Icons.report_problem_rounded,
+          title: data.healthIssues == 0
+              ? 'Course data looks healthy'
+              : '${data.healthIssues} items need review',
+          message: data.healthIssues == 0
+              ? 'No missing teachers, contact people, empty rosters, or generic course names were found in this session.'
+              : 'Use Course Dashboard to search affected courses, refresh their LMS data, or confirm LMS setup.',
+          color: data.healthIssues == 0 ? AppColors.success : AppColors.admin,
+        ),
+      ],
+    );
+  }
+}
+
+class _InsightPanel extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+  final Color color;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  const _InsightPanel({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.color,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: AppColors.ink,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    message,
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 12,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(width: 12),
+              FilledButton.icon(
+                onPressed: onAction,
+                icon: const Icon(Icons.arrow_forward_rounded),
+                label: Text(actionLabel!),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

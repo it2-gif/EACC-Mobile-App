@@ -79,6 +79,53 @@ class ApplicationActivitySummary {
   int get storageItems => images + videos + documents + voiceMessages;
 }
 
+class AdminInboxPage {
+  final List<AdminInboxThread> items;
+  final DocumentSnapshot<Map<String, dynamic>>? cursor;
+  final bool hasMore;
+
+  const AdminInboxPage({
+    required this.items,
+    required this.cursor,
+    required this.hasMore,
+  });
+}
+
+class AdminInboxThread {
+  final String courseId;
+  final String threadId;
+  final String title;
+  final String studentName;
+  final String lastMessage;
+  final String lastSenderName;
+  final String lastSenderRole;
+  final Timestamp? lastMessageAt;
+  final int adminUnreadCount;
+  final Map<String, dynamic> data;
+
+  const AdminInboxThread({
+    required this.courseId,
+    required this.threadId,
+    required this.title,
+    required this.studentName,
+    required this.lastMessage,
+    required this.lastSenderName,
+    required this.lastSenderRole,
+    required this.lastMessageAt,
+    required this.adminUnreadCount,
+    required this.data,
+  });
+
+  bool get isAnnouncement =>
+      threadId == FirestoreChatService.announcementThreadId;
+  bool get isTeacherChat =>
+      threadId == FirestoreChatService.adminTeacherThreadId;
+  bool get isContactPersonChat =>
+      FirestoreChatService.isKeyPersonStudentThreadId(threadId);
+  bool get isStudentTeacherChat =>
+      !isAnnouncement && !isTeacherChat && !isContactPersonChat;
+}
+
 class FirestoreChatService {
   static const String announcementThreadId = 'announcements';
   static const String adminTeacherThreadId = 'admin_teacher';
@@ -381,6 +428,58 @@ class FirestoreChatService {
       documents: documents,
       voiceMessages: voiceMessages,
       uploadedBytes: uploadedBytes,
+    );
+  }
+
+  static Future<AdminInboxPage> getAdminInboxPage({
+    int pageSize = 5,
+    DocumentSnapshot<Map<String, dynamic>>? startAfter,
+  }) async {
+    Query<Map<String, dynamic>> query = _db
+        .collectionGroup('threads')
+        .orderBy('last_message_at', descending: true)
+        .limit(pageSize + 1);
+
+    if (startAfter != null) {
+      query = query.startAfterDocument(startAfter);
+    }
+
+    final snapshot = await query.get();
+    final visibleDocs = snapshot.docs.take(pageSize).toList(growable: false);
+
+    return AdminInboxPage(
+      items: visibleDocs
+          .map(_adminInboxThreadFromDoc)
+          .where((thread) => thread.lastMessage.trim().isNotEmpty)
+          .toList(growable: false),
+      cursor: visibleDocs.isEmpty ? startAfter : visibleDocs.last,
+      hasMore: snapshot.docs.length > pageSize,
+    );
+  }
+
+  static AdminInboxThread _adminInboxThreadFromDoc(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    final courseRef = doc.reference.parent.parent;
+    final threadId = (data['thread_id']?.toString().trim().isNotEmpty ?? false)
+        ? data['thread_id'].toString().trim()
+        : doc.id;
+    final title = data['title']?.toString().trim();
+    final studentName = data['student_name']?.toString().trim() ?? '';
+    final lastMessageAt = data['last_message_at'];
+
+    return AdminInboxThread(
+      courseId: courseRef?.id ?? '',
+      threadId: threadId,
+      title: title == null || title.isEmpty ? threadId : title,
+      studentName: studentName,
+      lastMessage: data['last_message']?.toString() ?? '',
+      lastSenderName: data['last_sender_name']?.toString() ?? 'Unknown',
+      lastSenderRole: data['last_sender_role']?.toString() ?? 'user',
+      lastMessageAt: lastMessageAt is Timestamp ? lastMessageAt : null,
+      adminUnreadCount: (data['admin_unread_count'] as num?)?.toInt() ?? 0,
+      data: data,
     );
   }
 

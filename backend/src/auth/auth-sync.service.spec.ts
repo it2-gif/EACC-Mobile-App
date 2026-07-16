@@ -176,4 +176,91 @@ describe('AuthSyncService', () => {
       }),
     );
   });
+
+  it('syncs LMS course teachers as active teacher memberships', async () => {
+    const admin = {
+      id: 'admin-1',
+      role: UserRole.ADMIN,
+      name: 'Admin One',
+      email: null,
+    };
+    const teacher = {
+      id: 'teacher-1',
+      role: UserRole.TEACHER,
+      name: 'Teacher One',
+      email: null,
+    };
+    const course = {
+      id: 'course-1',
+      lmsCourseId: '2203',
+      name: 'Preparation IELTS - IELTS',
+      category: 'Preparation',
+    };
+    const tx = {
+      user: {
+        upsert: jest
+          .fn()
+          .mockResolvedValueOnce(admin)
+          .mockResolvedValueOnce(teacher),
+      },
+      course: { upsert: jest.fn().mockResolvedValue(course) },
+      courseMembership: { upsert: jest.fn().mockResolvedValue({}) },
+    };
+    const prisma = {
+      $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+
+    const service = new AuthSyncService(prisma as never);
+    await service.syncLmsUser({
+      lmsUserId: 'admin-lms-id',
+      role: 'admin',
+      name: 'Admin One',
+      courses: [
+        {
+          lmsCourseId: '2203',
+          name: 'Preparation IELTS - IELTS',
+          category: 'Preparation',
+          teacherLmsUserId: '721258',
+          teacherName: 'Teacher One',
+        },
+      ],
+    });
+
+    expect(tx.user.upsert).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: {
+          lmsSource_lmsUserId_role: {
+            lmsSource: 'eacc_lms',
+            lmsUserId: '721258',
+            role: UserRole.TEACHER,
+          },
+        },
+        create: expect.objectContaining({
+          lmsUserId: '721258',
+          role: UserRole.TEACHER,
+          name: 'Teacher One',
+          status: UserStatus.ACTIVE,
+        }),
+      }),
+    );
+    expect(tx.courseMembership.upsert).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: {
+          courseId_userId_role: {
+            courseId: 'course-1',
+            userId: 'teacher-1',
+            role: UserRole.TEACHER,
+          },
+        },
+        create: expect.objectContaining({
+          role: UserRole.TEACHER,
+          status: MembershipStatus.ACTIVE,
+        }),
+      }),
+    );
+  });
 });

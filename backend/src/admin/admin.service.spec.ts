@@ -45,6 +45,75 @@ describe('AdminService', () => {
     expect(prisma.user.findMany).not.toHaveBeenCalled();
   });
 
+  it('returns a paginated LMS-backed people page for super admins', async () => {
+    const prisma = {
+      user: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'teacher-uuid',
+            lmsUserId: '721258',
+            role: UserRole.TEACHER,
+            name: 'Mona Teacher',
+            email: 'mona@example.com',
+            status: UserStatus.ACTIVE,
+            lastLoginAt: null,
+          },
+        ]),
+        count: jest
+          .fn()
+          .mockResolvedValueOnce(15)
+          .mockResolvedValueOnce(3)
+          .mockResolvedValueOnce(5)
+          .mockResolvedValueOnce(7),
+      },
+    };
+    const { service } = createService({ prisma });
+
+    const result = await service.listUsers('firebase-token', {
+      skip: '10',
+      take: '10',
+      role: 'teacher',
+      query: 'mona',
+    });
+
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 10,
+        take: 10,
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            { lmsSource: 'eacc_lms' },
+            { role: UserRole.TEACHER },
+          ]),
+        }),
+      }),
+    );
+    expect(prisma.user.count).toHaveBeenCalledTimes(4);
+    expect(result).toEqual({
+      items: [
+        {
+          id: 'teacher-uuid',
+          lmsUserId: '721258',
+          role: 'teacher',
+          name: 'Mona Teacher',
+          email: 'mona@example.com',
+          status: 'active',
+          lastLoginAt: null,
+        },
+      ],
+      total: 15,
+      skip: 10,
+      take: 10,
+      hasMore: true,
+      counts: {
+        all: 15,
+        admins: 3,
+        teachers: 5,
+        students: 7,
+      },
+    });
+  });
+
   it('returns a course with active student memberships for all-course admins', async () => {
     const prisma = {
       course: {
@@ -148,12 +217,20 @@ describe('AdminService', () => {
       lmsUserId: '7001',
       name: 'Student One',
     };
+    const teacher = {
+      id: 'teacher-uuid',
+      lmsUserId: '721258',
+      name: 'Teacher One',
+    };
     const tx = {
       course: {
         upsert: jest.fn().mockResolvedValue(course),
       },
       user: {
-        upsert: jest.fn().mockResolvedValue(student),
+        upsert: jest
+          .fn()
+          .mockResolvedValueOnce(teacher)
+          .mockResolvedValue(student),
       },
       courseMembership: {
         upsert: jest.fn().mockResolvedValue({}),
@@ -170,6 +247,8 @@ describe('AdminService', () => {
         lmsCourseId: '455',
         name: 'Pre-Intermediate Level - 5',
         category: 'English Adult',
+        teacherLmsUserId: '721258',
+        teacherName: 'Teacher One',
         keyPersonLmsUserId: '12',
         keyPersonName: 'Esraa Al Shaik',
         students: [{ lmsUserId: '7001', name: 'Student One' }],
@@ -214,9 +293,26 @@ describe('AdminService', () => {
     expect(tx.user.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         create: expect.objectContaining({
+          lmsUserId: '721258',
+          role: UserRole.TEACHER,
+          status: UserStatus.ACTIVE,
+        }),
+      }),
+    );
+    expect(tx.user.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
           lmsUserId: '7001',
           role: UserRole.STUDENT,
           status: UserStatus.ACTIVE,
+        }),
+      }),
+    );
+    expect(tx.courseMembership.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          role: UserRole.TEACHER,
+          status: MembershipStatus.ACTIVE,
         }),
       }),
     );
@@ -232,6 +328,7 @@ describe('AdminService', () => {
       lmsCourseId: '455',
       name: 'Pre-Intermediate Level - 5',
       category: 'English Adult',
+      teacherName: 'Teacher One',
       students: [{ lmsUserId: '7001', name: 'Student One' }],
     });
   });

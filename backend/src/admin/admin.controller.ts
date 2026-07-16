@@ -4,6 +4,7 @@ import {
   Headers,
   Param,
   Post,
+  Query,
   UnauthorizedException,
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
@@ -13,8 +14,19 @@ export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
   @Get('users')
-  listUsers(@Headers('authorization') authorization?: string) {
-    return this.adminService.listUsers(this.readBearerToken(authorization));
+  listUsers(
+    @Headers('authorization') authorization?: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('role') role?: string,
+    @Query('q') query?: string,
+  ) {
+    return this.adminService.listUsers(this.readBearerToken(authorization), {
+      skip,
+      take,
+      role,
+      query,
+    });
   }
 
   @Get('courses/:courseId')

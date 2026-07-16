@@ -518,6 +518,11 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /{path=**}/threads/{threadId} {
+      allow read: if canViewAllCourses();
+      allow create, update, delete: if false;
+    }
+
     match /audit_logs/{logId} {
       allow read: if isSuperAdmin();
       allow create: if isSignedIn()
