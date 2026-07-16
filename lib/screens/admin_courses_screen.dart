@@ -140,7 +140,7 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
     return widget.session.courses
         .where((course) {
           return course.id.toLowerCase().contains(normalized) ||
-              course.displayName.toLowerCase().contains(normalized) ||
+              course.displayTitle.toLowerCase().contains(normalized) ||
               course.category.toLowerCase().contains(normalized) ||
               (course.teacherName?.toLowerCase().contains(normalized) ??
                   false) ||
@@ -847,7 +847,7 @@ class _AdminCourseCardState extends State<_AdminCourseCard> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       PushNotificationService.instance.showInAppNotification(
-        title: widget.course.displayName,
+        title: widget.course.displayTitle,
         body: 'You have new unread messages in this course.',
         onOpen: _openThreads,
       );

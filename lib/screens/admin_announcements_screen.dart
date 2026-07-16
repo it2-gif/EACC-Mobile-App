@@ -46,7 +46,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
         targets.add(
           _StudentTarget(
             courseId: course.id,
-            courseName: course.displayName,
+            courseName: course.displayTitle,
             studentId: student.id,
             studentName: student.name,
           ),
@@ -376,7 +376,7 @@ class _CourseAnnouncementPanel extends StatelessWidget {
                 if (filter.isEmpty) return true;
                 final searchable = [
                   course.id,
-                  course.displayName,
+                  course.displayTitle,
                   course.category,
                 ].join(' ').toLowerCase();
                 return searchable.contains(filter);
@@ -578,7 +578,7 @@ class _CourseSelectionTile extends StatelessWidget {
               ? AppColors.admin.withValues(alpha: 0.08)
               : Colors.white,
           title: Text(
-            course.displayName,
+            course.displayTitle,
             style: const TextStyle(fontWeight: FontWeight.w800),
           ),
           subtitle: Wrap(

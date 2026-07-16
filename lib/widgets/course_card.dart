@@ -76,7 +76,7 @@ class CourseCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            course.displayName,
+                            course.displayTitle,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -116,7 +116,7 @@ class CourseCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    if (course.displayCategory != null) ...[
+                    if (_shouldShowCategorySubtitle(course)) ...[
                       const SizedBox(height: 8),
                       Text(
                         course.displayCategory!,
@@ -246,4 +246,11 @@ class CourseCard extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _shouldShowCategorySubtitle(Course course) {
+  final category = course.displayCategory?.trim();
+  if (category == null || category.isEmpty) return false;
+
+  return !course.displayTitle.toLowerCase().contains(category.toLowerCase());
 }

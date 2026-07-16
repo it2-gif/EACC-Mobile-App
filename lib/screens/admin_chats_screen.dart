@@ -103,7 +103,7 @@ class _AdminChatsScreenState extends State<AdminChatsScreen> {
       ..add(
         _ChatItem(
           courseId: course.id,
-          courseName: course.displayName,
+          courseName: course.displayTitle,
           threadId: ChatThreadResolver.adminTeacherThreadId,
           personName: course.teacherName?.trim().isNotEmpty == true
               ? course.teacherName!.trim()
@@ -118,7 +118,7 @@ class _AdminChatsScreenState extends State<AdminChatsScreen> {
         course.students.map(
           (student) => _ChatItem(
             courseId: course.id,
-            courseName: course.displayName,
+            courseName: course.displayTitle,
             threadId: ChatThreadResolver.studentTeacherThreadId(student.id),
             personName: student.name,
             roleLabel: 'Student',

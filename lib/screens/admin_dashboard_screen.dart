@@ -824,7 +824,7 @@ class _InboxPreviewRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _dashboardThreadColor(thread);
-    final courseName = course?.displayName ?? 'Course ${thread.courseId}';
+    final courseName = course?.displayTitle ?? 'Course ${thread.courseId}';
     final compact = MediaQuery.sizeOf(context).width < 390;
 
     return Padding(
@@ -1107,8 +1107,8 @@ List<_CourseIssue> _courseIssuesFor(
   issues.sort((a, b) {
     final typeCompare = a.type.index.compareTo(b.type.index);
     if (typeCompare != 0) return typeCompare;
-    return a.course.displayName.toLowerCase().compareTo(
-      b.course.displayName.toLowerCase(),
+    return a.course.displayTitle.toLowerCase().compareTo(
+      b.course.displayTitle.toLowerCase(),
     );
   });
 
@@ -1267,7 +1267,7 @@ class _CourseIssuePreviewRow extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        issue.course.displayName,
+                        issue.course.displayTitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -1538,7 +1538,7 @@ class _CourseIssueDetailCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        course.displayName,
+                        course.displayTitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(

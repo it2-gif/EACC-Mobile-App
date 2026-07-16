@@ -210,7 +210,11 @@ export class EaccLmsClient implements LmsClient {
         timeout,
       );
 
-      const courses = parseStudentCoursesHtml(coursesHtml);
+      const courses = await this.enrichCoursesWithAdminCatalog(
+        baseUrl,
+        timeout,
+        parseStudentCoursesHtml(coursesHtml),
+      );
 
       if (credentials.role === 'teacher') {
         const coursesWithStudents = await this.loadTeacherCoursesWithStudents(
@@ -311,6 +315,54 @@ export class EaccLmsClient implements LmsClient {
         };
       }),
     );
+  }
+
+  private async enrichCoursesWithAdminCatalog(
+    baseUrl: string,
+    timeout: number,
+    courses: NormalizedLmsCourse[],
+  ): Promise<NormalizedLmsCourse[]> {
+    if (courses.length === 0) return courses;
+
+    const catalog = await this.loadAdminCourseCatalogWithSyncCredentials(
+      baseUrl,
+      timeout,
+    );
+    if (catalog.length === 0) return courses;
+
+    const catalogById = new Map(
+      catalog.map((course) => [course.lmsCourseId, course]),
+    );
+
+    return courses.map((course) =>
+      mergeCourseCatalogData(course, catalogById.get(course.lmsCourseId)),
+    );
+  }
+
+  private async loadAdminCourseCatalogWithSyncCredentials(
+    baseUrl: string,
+    timeout: number,
+  ): Promise<NormalizedLmsCourse[]> {
+    const username = this.config.get('LMS_SYNC_ADMIN_USERNAME', {
+      infer: true,
+    });
+    const password = this.config.get('LMS_SYNC_ADMIN_PASSWORD', {
+      infer: true,
+    });
+
+    if (!username || !password) return [];
+
+    try {
+      const sessionCookie = await this.loginAdminSession(baseUrl, timeout, {
+        username,
+        password,
+      });
+
+      return this.loadAdminCourseCatalog(baseUrl, sessionCookie, timeout);
+    } catch (error) {
+      console.log('[AdminCourses] sync catalog login failed:', error);
+      return [];
+    }
   }
 
   private async createSession(

@@ -222,7 +222,7 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
   bool _matchesSearch(AdminInboxThread thread, Course? course, String query) {
     final values = [
       thread.courseId,
-      course?.displayName,
+      course?.displayTitle,
       course?.category,
       course?.teacherName,
       course?.keyPersonName,
@@ -458,7 +458,7 @@ class _AdminInboxTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _threadColor(thread);
-    final courseName = course?.displayName ?? 'Course ${thread.courseId}';
+    final courseName = course?.displayTitle ?? 'Course ${thread.courseId}';
     final compact = MediaQuery.sizeOf(context).width < 390;
 
     return Card(
