@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../models/auth_session.dart';
 import '../models/course.dart';
+import '../services/chat_thread_resolver.dart';
 import '../services/firestore_chat_service.dart';
 import '../services/notification_api.dart';
 import '../theme/app_theme.dart';
@@ -214,14 +215,14 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
     for (final course in selectedCourses) {
       final messageId = await FirestoreChatService.sendTextMessage(
         courseId: course.id,
-        threadId: FirestoreChatService.announcementThreadId,
+        threadId: ChatThreadResolver.announcementThreadId,
         senderName: widget.session.appUser.name,
         senderRole: 'admin',
         text: text,
       );
       await _notificationApi.notifyChatMessage(
         courseId: course.id,
-        threadId: FirestoreChatService.announcementThreadId,
+        threadId: ChatThreadResolver.announcementThreadId,
         senderRole: 'admin',
         senderName: widget.session.appUser.name,
         messageType: 'text',

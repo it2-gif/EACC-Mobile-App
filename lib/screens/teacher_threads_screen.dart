@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../models/course.dart';
+import '../services/chat_thread_resolver.dart';
 import '../services/firestore_chat_service.dart';
 import '../services/notification_api.dart';
 import '../theme/app_theme.dart';
@@ -173,6 +174,7 @@ class TeacherThreadsScreen extends StatelessWidget {
                         ? contentIndex - 2
                         : contentIndex - 1;
                     final item = items[itemIndex];
+                    final compact = MediaQuery.sizeOf(context).width < 390;
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -198,38 +200,44 @@ class TeacherThreadsScreen extends StatelessWidget {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                width: 54,
-                                height: 54,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      AppColors.student.withValues(alpha: 0.16),
-                                      AppColors.student.withValues(alpha: 0.06),
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
+                              if (!compact) ...[
+                                Container(
+                                  width: 54,
+                                  height: 54,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        AppColors.student.withValues(
+                                          alpha: 0.16,
+                                        ),
+                                        AppColors.student.withValues(
+                                          alpha: 0.06,
+                                        ),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: AppColors.student.withValues(
+                                        alpha: 0.14,
+                                      ),
+                                    ),
                                   ),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: AppColors.student.withValues(
-                                      alpha: 0.14,
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    item.studentName.isNotEmpty
+                                        ? item.studentName[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                      color: AppColors.student,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 16,
                                     ),
                                   ),
                                 ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  item.studentName.isNotEmpty
-                                      ? item.studentName[0].toUpperCase()
-                                      : '?',
-                                  style: const TextStyle(
-                                    color: AppColors.student,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 14),
+                                const SizedBox(width: 14),
+                              ],
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,23 +292,27 @@ class TeacherThreadsScreen extends StatelessWidget {
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                  const SizedBox(height: 8),
-                                  Container(
-                                    width: 28,
-                                    height: 28,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.background,
-                                      borderRadius: BorderRadius.circular(999),
-                                      border: Border.all(
-                                        color: AppColors.border,
+                                  if (!compact) ...[
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      width: 28,
+                                      height: 28,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.background,
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
+                                        border: Border.all(
+                                          color: AppColors.border,
+                                        ),
+                                      ),
+                                      child: const Icon(
+                                        Icons.chevron_right_rounded,
+                                        size: 19,
+                                        color: AppColors.primaryDark,
                                       ),
                                     ),
-                                    child: const Icon(
-                                      Icons.chevron_right_rounded,
-                                      size: 19,
-                                      color: AppColors.primaryDark,
-                                    ),
-                                  ),
+                                  ],
                                 ],
                               ),
                             ],
@@ -326,7 +338,7 @@ class TeacherThreadsScreen extends StatelessWidget {
           title: 'Announcement chat',
           currentUserRole: viewerRole,
           courseId: courseId,
-          threadId: FirestoreChatService.announcementThreadId,
+          threadId: ChatThreadResolver.announcementThreadId,
           senderName: senderName,
         ),
       ),
@@ -341,7 +353,7 @@ class TeacherThreadsScreen extends StatelessWidget {
           title: 'Contact person: $keyPersonDisplayName',
           currentUserRole: viewerRole,
           courseId: courseId,
-          threadId: FirestoreChatService.adminTeacherThreadId,
+          threadId: ChatThreadResolver.adminTeacherThreadId,
           senderName: senderName,
         ),
       ),
@@ -374,7 +386,9 @@ class TeacherThreadsScreen extends StatelessWidget {
                 for (final student in selectedStudents) {
                   final messageId = await FirestoreChatService.sendTextMessage(
                     courseId: courseId,
-                    threadId: student.id,
+                    threadId: ChatThreadResolver.studentTeacherThreadId(
+                      student.id,
+                    ),
                     senderName: senderName,
                     senderRole: viewerRole,
                     text: text,
@@ -382,7 +396,9 @@ class TeacherThreadsScreen extends StatelessWidget {
                   );
                   await _notificationApi.notifyChatMessage(
                     courseId: courseId,
-                    threadId: student.id,
+                    threadId: ChatThreadResolver.studentTeacherThreadId(
+                      student.id,
+                    ),
                     senderRole: viewerRole,
                     senderName: senderName,
                     messageType: 'text',
@@ -553,9 +569,11 @@ class TeacherThreadsScreen extends StatelessWidget {
     for (final doc in threads) {
       final data = doc.data();
       final threadId = doc.id;
-      if (threadId == FirestoreChatService.announcementThreadId) continue;
-      if (threadId == FirestoreChatService.adminTeacherThreadId) continue;
-      if (FirestoreChatService.isKeyPersonStudentThreadId(threadId)) continue;
+      if (threadId == ChatThreadResolver.announcementThreadId) continue;
+      if (threadId == ChatThreadResolver.adminTeacherThreadId) continue;
+      if (ChatThreadResolver.isStudentContactPersonThreadId(threadId)) {
+        continue;
+      }
 
       final rosterStudent = rosterById[threadId];
       final studentName =
@@ -570,7 +588,7 @@ class TeacherThreadsScreen extends StatelessWidget {
           studentName: studentName,
           lastMessage: data['last_message']?.toString() ?? 'No messages yet',
           lastTime: formatThreadTime(lastMessageAt),
-          unreadCount: (data['teacher_unread_count'] as num?)?.toInt() ?? 0,
+          unreadCount: FirestoreChatService.readTeacherUnreadCount(data),
           lastMessageAt: lastMessageAt,
         ),
       );
@@ -582,7 +600,7 @@ class TeacherThreadsScreen extends StatelessWidget {
 
       items.add(
         _StudentChatItem(
-          threadId: student.id,
+          threadId: ChatThreadResolver.studentTeacherThreadId(student.id),
           studentName: student.name,
           lastMessage: 'No messages yet',
           lastTime: '',
@@ -1007,11 +1025,11 @@ class _AdminTeacherThreadCard extends StatelessWidget {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirestoreChatService.getThread(
         courseId: courseId,
-        threadId: FirestoreChatService.adminTeacherThreadId,
+        threadId: ChatThreadResolver.adminTeacherThreadId,
       ),
       builder: (context, snapshot) {
         final data = snapshot.data?.data();
-        final unread = (data?['teacher_unread_count'] as num?)?.toInt() ?? 0;
+        final unread = FirestoreChatService.readTeacherUnreadCount(data);
         final lastMessage = data?['last_message']?.toString() ?? subtitle;
         final lastTime = formatThreadTime(
           data?['last_message_at'] ?? data?['updated_at'],

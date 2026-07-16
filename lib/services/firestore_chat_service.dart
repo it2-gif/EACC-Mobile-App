@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
+import 'chat_thread_resolver.dart';
+
 class ChatUploadException implements Exception {
   final String message;
 
@@ -118,19 +120,15 @@ class AdminInboxThread {
   });
 
   bool get isAnnouncement =>
-      threadId == FirestoreChatService.announcementThreadId;
-  bool get isTeacherChat =>
-      threadId == FirestoreChatService.adminTeacherThreadId;
+      threadId == ChatThreadResolver.announcementThreadId;
+  bool get isTeacherChat => threadId == ChatThreadResolver.adminTeacherThreadId;
   bool get isContactPersonChat =>
-      FirestoreChatService.isKeyPersonStudentThreadId(threadId);
+      ChatThreadResolver.isStudentContactPersonThreadId(threadId);
   bool get isStudentTeacherChat =>
       !isAnnouncement && !isTeacherChat && !isContactPersonChat;
 }
 
 class FirestoreChatService {
-  static const String announcementThreadId = 'announcements';
-  static const String adminTeacherThreadId = 'admin_teacher';
-  static const String _keyPersonStudentThreadPrefix = 'keyperson_student_';
   static const int maxImageSizeBytes = 5 * 1024 * 1024;
   static const int maxVoiceSizeBytes = 10 * 1024 * 1024;
   static const int maxDocumentSizeBytes = 25 * 1024 * 1024;
@@ -171,21 +169,6 @@ class FirestoreChatService {
 
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
   static final FirebaseStorage _storage = FirebaseStorage.instance;
-
-  static String keyPersonStudentThreadId(String studentLmsUserId) {
-    return '$_keyPersonStudentThreadPrefix${studentLmsUserId.trim()}';
-  }
-
-  static bool isKeyPersonStudentThreadId(String threadId) {
-    return threadId.startsWith(_keyPersonStudentThreadPrefix);
-  }
-
-  static String? keyPersonStudentLmsUserId(String threadId) {
-    if (!isKeyPersonStudentThreadId(threadId)) return null;
-
-    final studentId = threadId.substring(_keyPersonStudentThreadPrefix.length);
-    return studentId.trim().isEmpty ? null : studentId;
-  }
 
   static CollectionReference<Map<String, dynamic>> _messagesRef({
     required String courseId,
@@ -231,34 +214,14 @@ class FirestoreChatService {
     return _threadsRef(courseId: courseId).doc(threadId).snapshots();
   }
 
-  static Stream<int> getTeacherUnreadThreadCount({required String courseId}) {
-    return getThreads(courseId: courseId).map(
-      (snapshot) => snapshot.docs.where((doc) {
-        final unread =
-            (doc.data()['teacher_unread_count'] as num?)?.toInt() ?? 0;
-        return unread > 0;
-      }).length,
-    );
-  }
-
   static Stream<int> getTeacherUnreadMessageCount({required String courseId}) {
     return getThreads(courseId: courseId).map((snapshot) {
       var total = 0;
       for (final doc in snapshot.docs) {
-        total += (doc.data()['teacher_unread_count'] as num?)?.toInt() ?? 0;
+        total += readTeacherUnreadCount(doc.data());
       }
       return total;
     });
-  }
-
-  static Stream<int> getTeacherUnreadTotalForCourses(
-    Iterable<String> courseIds,
-  ) {
-    return _combineCourseUnreadStreams(
-      courseIds: courseIds,
-      readCount: (data, _) =>
-          (data['teacher_unread_count'] as num?)?.toInt() ?? 0,
-    );
   }
 
   static Stream<AdminUnreadCounts> getAdminUnreadCounts({
@@ -271,11 +234,13 @@ class FirestoreChatService {
       for (final doc in snapshot.docs) {
         final data = doc.data();
         final threadId = doc.id;
-        final unread = (data['admin_unread_count'] as num?)?.toInt() ?? 0;
+        final unread = readUnreadCount(data, 'admin_unread_count');
         if (unread > 0) {
-          if (threadId == adminTeacherThreadId) {
+          if (threadId == ChatThreadResolver.adminTeacherThreadId) {
             teacherUnread += unread;
-          } else if (isKeyPersonStudentThreadId(threadId)) {
+          } else if (ChatThreadResolver.isStudentContactPersonThreadId(
+            threadId,
+          )) {
             studentUnread += unread;
           }
         }
@@ -292,23 +257,46 @@ class FirestoreChatService {
     return _combineCourseUnreadStreams(
       courseIds: courseIds,
       readCount: (data, threadId) {
-        if (threadId != adminTeacherThreadId &&
-            !isKeyPersonStudentThreadId(threadId)) {
+        if (threadId != ChatThreadResolver.adminTeacherThreadId &&
+            !ChatThreadResolver.isStudentContactPersonThreadId(threadId)) {
           return 0;
         }
-        return (data['admin_unread_count'] as num?)?.toInt() ?? 0;
+        return readUnreadCount(data, 'admin_unread_count');
       },
     );
   }
 
-  static Stream<int> getStudentUnreadCount({
+  static Stream<int> getAdminUnreadCount({
     required String courseId,
     required String threadId,
   }) {
+    return getThreadUnreadCount(
+      courseId: courseId,
+      threadId: threadId,
+      unreadField: 'admin_unread_count',
+    );
+  }
+
+  static Stream<int> getThreadUnreadCount({
+    required String courseId,
+    required String threadId,
+    required String unreadField,
+  }) {
     return getThread(courseId: courseId, threadId: threadId).map((snapshot) {
-      final data = snapshot.data();
-      return (data?['student_unread_count'] as num?)?.toInt() ?? 0;
+      return readUnreadCount(snapshot.data(), unreadField);
     });
+  }
+
+  static int readTeacherUnreadCount(Map<String, dynamic>? data) {
+    return readUnreadCount(data, 'teacher_unread_count');
+  }
+
+  static int readUnreadCount(Map<String, dynamic>? data, String unreadField) {
+    return (data?[unreadField] as num?)?.toInt() ?? 0;
+  }
+
+  static int readStudentUnreadCount(Map<String, dynamic>? data) {
+    return readUnreadCount(data, 'student_unread_count');
   }
 
   static Stream<int> getStudentUnreadTotalForCourses({
@@ -316,7 +304,9 @@ class FirestoreChatService {
     required String studentThreadId,
   }) {
     final normalizedThreadId = studentThreadId.trim();
-    final keyPersonThreadId = keyPersonStudentThreadId(normalizedThreadId);
+    final keyPersonThreadId = ChatThreadResolver.studentContactPersonThreadId(
+      normalizedThreadId,
+    );
 
     return _combineCourseUnreadStreams(
       courseIds: courseIds,
@@ -324,7 +314,7 @@ class FirestoreChatService {
         if (threadId != normalizedThreadId && threadId != keyPersonThreadId) {
           return 0;
         }
-        return (data['student_unread_count'] as num?)?.toInt() ?? 0;
+        return readUnreadCount(data, 'student_unread_count');
       },
     );
   }
@@ -376,7 +366,10 @@ class FirestoreChatService {
   static Stream<DocumentSnapshot<Map<String, dynamic>>> getAnnouncementThread({
     required String courseId,
   }) {
-    return getThread(courseId: courseId, threadId: announcementThreadId);
+    return getThread(
+      courseId: courseId,
+      threadId: ChatThreadResolver.announcementThreadId,
+    );
   }
 
   static Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
@@ -574,7 +567,7 @@ class FirestoreChatService {
       lastSenderName: data['last_sender_name']?.toString() ?? 'Unknown',
       lastSenderRole: data['last_sender_role']?.toString() ?? 'user',
       lastMessageAt: lastMessageAt is Timestamp ? lastMessageAt : null,
-      adminUnreadCount: (data['admin_unread_count'] as num?)?.toInt() ?? 0,
+      adminUnreadCount: readUnreadCount(data, 'admin_unread_count'),
       data: data,
     );
   }
@@ -624,8 +617,10 @@ class FirestoreChatService {
   static Future<void> createOrUpdateAnnouncementThread({
     required String courseId,
   }) async {
-    await _threadsRef(courseId: courseId).doc(announcementThreadId).set({
-      'thread_id': announcementThreadId,
+    await _threadsRef(
+      courseId: courseId,
+    ).doc(ChatThreadResolver.announcementThreadId).set({
+      'thread_id': ChatThreadResolver.announcementThreadId,
       'title': 'Announcement chat',
       'is_announcement': true,
       'pinned': true,
@@ -639,8 +634,10 @@ class FirestoreChatService {
     required String courseId,
     required bool pinned,
   }) async {
-    await _threadsRef(courseId: courseId).doc(announcementThreadId).set({
-      'thread_id': announcementThreadId,
+    await _threadsRef(
+      courseId: courseId,
+    ).doc(ChatThreadResolver.announcementThreadId).set({
+      'thread_id': ChatThreadResolver.announcementThreadId,
       'title': 'Announcement chat',
       'is_announcement': true,
       'pinned': pinned,
@@ -659,7 +656,9 @@ class FirestoreChatService {
     final normalizedName = readerName.trim();
     if (user == null || normalizedName.isEmpty) return;
 
-    final threadRef = _threadsRef(courseId: courseId).doc(announcementThreadId);
+    final threadRef = _threadsRef(
+      courseId: courseId,
+    ).doc(ChatThreadResolver.announcementThreadId);
 
     await _db.runTransaction((transaction) async {
       final snapshot = await transaction.get(threadRef);
@@ -680,7 +679,7 @@ class FirestoreChatService {
       };
 
       transaction.update(threadRef, {
-        'thread_id': announcementThreadId,
+        'thread_id': ChatThreadResolver.announcementThreadId,
         'is_announcement': true,
         'announcement_reads': nextReads,
         'updated_at': FieldValue.serverTimestamp(),
@@ -1281,7 +1280,7 @@ class FirestoreChatService {
     required String lastMessage,
     String? studentName,
   }) {
-    if (threadId == announcementThreadId) {
+    if (threadId == ChatThreadResolver.announcementThreadId) {
       return _announcementThreadUpdateData(
         senderName: senderName,
         senderRole: senderRole,
@@ -1289,7 +1288,7 @@ class FirestoreChatService {
       );
     }
 
-    if (threadId == adminTeacherThreadId) {
+    if (threadId == ChatThreadResolver.adminTeacherThreadId) {
       return _adminTeacherThreadUpdateData(
         senderName: senderName,
         senderRole: senderRole,
@@ -1297,7 +1296,7 @@ class FirestoreChatService {
       );
     }
 
-    if (isKeyPersonStudentThreadId(threadId)) {
+    if (ChatThreadResolver.isStudentContactPersonThreadId(threadId)) {
       return _keyPersonStudentThreadUpdateData(
         threadId: threadId,
         senderName: senderName,
@@ -1322,7 +1321,7 @@ class FirestoreChatService {
     required String lastMessage,
   }) {
     return {
-      'thread_id': announcementThreadId,
+      'thread_id': ChatThreadResolver.announcementThreadId,
       'title': 'Announcement chat',
       'is_announcement': true,
       'pinned': true,
@@ -1341,7 +1340,7 @@ class FirestoreChatService {
     required String lastMessage,
   }) {
     final data = <String, dynamic>{
-      'thread_id': adminTeacherThreadId,
+      'thread_id': ChatThreadResolver.adminTeacherThreadId,
       'title': 'EACC Admin',
       'is_admin_teacher': true,
       'pinned': true,

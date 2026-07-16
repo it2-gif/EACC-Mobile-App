@@ -24,6 +24,7 @@ class CourseCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < 420;
+    final tight = width < 360;
     final iconSize = compact ? 48.0 : 58.0;
     final hasTeacher =
         course.teacherName != null && course.teacherName!.trim().isNotEmpty;
@@ -40,29 +41,31 @@ class CourseCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                width: iconSize,
-                height: iconSize,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.primary.withValues(alpha: 0.14),
-                      AppColors.accent.withValues(alpha: 0.08),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              if (!tight) ...[
+                Container(
+                  width: iconSize,
+                  height: iconSize,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primary.withValues(alpha: 0.14),
+                        AppColors.accent.withValues(alpha: 0.08),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.14),
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.14),
+                  child: const Icon(
+                    Icons.menu_book_outlined,
+                    color: AppColors.primary,
                   ),
                 ),
-                child: const Icon(
-                  Icons.menu_book_outlined,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 14),
+                const SizedBox(width: 14),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,7 +177,7 @@ class CourseCard extends StatelessWidget {
                                 const SizedBox(width: 5),
                                 ConstrainedBox(
                                   constraints: const BoxConstraints(
-                                    maxWidth: 160,
+                                    maxWidth: 130,
                                   ),
                                   child: Text(
                                     course.teacherName!,
@@ -216,7 +219,7 @@ class CourseCard extends StatelessWidget {
                                 const SizedBox(width: 5),
                                 ConstrainedBox(
                                   constraints: const BoxConstraints(
-                                    maxWidth: 160,
+                                    maxWidth: 140,
                                   ),
                                   child: Text(
                                     'Managed by ${course.keyPersonName!}',

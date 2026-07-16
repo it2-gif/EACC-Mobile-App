@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/auth_session.dart';
 import '../models/course.dart';
+import '../services/chat_thread_resolver.dart';
 import '../services/firestore_chat_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/unread_badge.dart';
@@ -86,32 +87,32 @@ class AdminThreadsScreen extends StatelessWidget {
                     size: 16,
                     color: AppColors.admin,
                   ),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ChatScreen(
-                        title: 'Announcement chat',
-                        currentUserRole: 'admin',
-                        courseId: courseId,
-                        threadId: FirestoreChatService.announcementThreadId,
-                        senderName: session.appUser.name,
-                        isSuperAdmin: session.appUser.isSuperAdmin,
-                        canManageAllMessages: session.appUser.canViewAllCourses,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatScreen(
+                          title: 'Announcement chat',
+                          currentUserRole: 'admin',
+                          courseId: courseId,
+                          threadId: ChatThreadResolver.announcementThreadId,
+                          senderName: session.appUser.name,
+                          isSuperAdmin: session.appUser.isSuperAdmin,
+                          canManageAllMessages:
+                              session.appUser.canViewAllCourses,
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
 
-                StreamBuilder<Map<String, dynamic>?>(
-                  stream: FirestoreChatService.getThread(
+                StreamBuilder<int>(
+                  stream: FirestoreChatService.getAdminUnreadCount(
                     courseId: courseId,
-                    threadId: FirestoreChatService.adminTeacherThreadId,
-                  ).map((snapshot) => snapshot.data()),
+                    threadId: ChatThreadResolver.adminTeacherThreadId,
+                  ),
                   builder: (context, snapshot) {
-                    final unread =
-                        (snapshot.data?['admin_unread_count'] as num?)
-                            ?.toInt() ??
-                        0;
+                    final unread = snapshot.data ?? 0;
                     return _AdminThreadTile(
                       title: teacherTitle,
                       subtitle: '$teacherTitle - $contactPersonTitle',
@@ -123,21 +124,23 @@ class AdminThreadsScreen extends StatelessWidget {
                         size: 16,
                         color: AppColors.teacher,
                       ),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ChatScreen(
-                            title: teacherTitle,
-                            currentUserRole: 'admin',
-                            courseId: courseId,
-                            threadId: FirestoreChatService.adminTeacherThreadId,
-                            senderName: session.appUser.name,
-                            isSuperAdmin: session.appUser.isSuperAdmin,
-                            canManageAllMessages:
-                                session.appUser.canViewAllCourses,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatScreen(
+                              title: teacherTitle,
+                              currentUserRole: 'admin',
+                              courseId: courseId,
+                              threadId: ChatThreadResolver.adminTeacherThreadId,
+                              senderName: session.appUser.name,
+                              isSuperAdmin: session.appUser.isSuperAdmin,
+                              canManageAllMessages:
+                                  session.appUser.canViewAllCourses,
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     );
                   },
                 ),
@@ -154,38 +157,41 @@ class AdminThreadsScreen extends StatelessWidget {
                       label: 'TEACHER',
                       color: AppColors.primary,
                     ),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ChatScreen(
-                          title: _studentThreadTitle(
-                            student.name,
-                            teacherTitle,
+                    onTap: () {
+                      final threadId =
+                          ChatThreadResolver.studentTeacherThreadId(student.id);
+                      final title = _studentThreadTitle(
+                        student.name,
+                        teacherTitle,
+                      );
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChatScreen(
+                            title: title,
+                            currentUserRole: 'admin',
+                            courseId: courseId,
+                            threadId: threadId,
+                            senderName: session.appUser.name,
+                            threadStudentName: student.name,
+                            isSuperAdmin: session.appUser.isSuperAdmin,
+                            canManageAllMessages:
+                                session.appUser.canViewAllCourses,
                           ),
-                          currentUserRole: 'admin',
-                          courseId: courseId,
-                          threadId: student.id,
-                          senderName: session.appUser.name,
-                          threadStudentName: student.name,
-                          isSuperAdmin: session.appUser.isSuperAdmin,
-                          canManageAllMessages:
-                              session.appUser.canViewAllCourses,
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
-                  StreamBuilder<Map<String, dynamic>?>(
-                    stream: FirestoreChatService.getThread(
+                  StreamBuilder<int>(
+                    stream: FirestoreChatService.getAdminUnreadCount(
                       courseId: courseId,
-                      threadId: FirestoreChatService.keyPersonStudentThreadId(
+                      threadId: ChatThreadResolver.studentContactPersonThreadId(
                         student.id,
                       ),
-                    ).map((snapshot) => snapshot.data()),
+                    ),
                     builder: (context, snapshot) {
-                      final unread =
-                          (snapshot.data?['admin_unread_count'] as num?)
-                              ?.toInt() ??
-                          0;
+                      final unread = snapshot.data ?? 0;
                       return _AdminThreadTile(
                         title: student.name,
                         subtitle: 'Contact person chat - $contactPersonTitle',
@@ -196,28 +202,33 @@ class AdminThreadsScreen extends StatelessWidget {
                           label: 'CONTACT PERSON',
                           color: AppColors.admin,
                         ),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ChatScreen(
-                              title: _studentThreadTitle(
-                                student.name,
-                                contactPersonTitle,
+                        onTap: () {
+                          final threadId =
+                              ChatThreadResolver.studentContactPersonThreadId(
+                                student.id,
+                              );
+                          final title = _studentThreadTitle(
+                            student.name,
+                            contactPersonTitle,
+                          );
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(
+                                title: title,
+                                currentUserRole: 'admin',
+                                courseId: courseId,
+                                threadId: threadId,
+                                senderName: session.appUser.name,
+                                threadStudentName: student.name,
+                                isSuperAdmin: session.appUser.isSuperAdmin,
+                                canManageAllMessages:
+                                    session.appUser.canViewAllCourses,
                               ),
-                              currentUserRole: 'admin',
-                              courseId: courseId,
-                              threadId:
-                                  FirestoreChatService.keyPersonStudentThreadId(
-                                    student.id,
-                                  ),
-                              senderName: session.appUser.name,
-                              threadStudentName: student.name,
-                              isSuperAdmin: session.appUser.isSuperAdmin,
-                              canManageAllMessages:
-                                  session.appUser.canViewAllCourses,
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       );
                     },
                   ),

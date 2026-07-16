@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 
+import '../services/chat_thread_resolver.dart';
 import '../services/firestore_chat_service.dart';
 import '../services/notification_api.dart';
 import '../theme/app_theme.dart';
@@ -81,13 +82,13 @@ class _ChatScreenState extends State<ChatScreen> {
   int? lastScheduledAnnouncementReadAt;
 
   bool get isAnnouncementThread =>
-      widget.threadId == FirestoreChatService.announcementThreadId;
+      widget.threadId == ChatThreadResolver.announcementThreadId;
 
   bool get isAdminTeacherThread =>
-      widget.threadId == FirestoreChatService.adminTeacherThreadId;
+      widget.threadId == ChatThreadResolver.adminTeacherThreadId;
 
   bool get isKeyPersonStudentThread =>
-      FirestoreChatService.isKeyPersonStudentThreadId(widget.threadId);
+      ChatThreadResolver.isStudentContactPersonThreadId(widget.threadId);
 
   bool get canSendInThread =>
       !widget.readOnly &&

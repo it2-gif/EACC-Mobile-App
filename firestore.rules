@@ -46,14 +46,22 @@ service cloud.firestore {
         && hasCourseClaim(courseId);
     }
 
-    function isCourseAdmin(courseId) {
+    function isFullCourseAdmin() {
       return isAdmin()
-        && (isSuperAdmin() || canViewAllCourses() || hasCourseClaim(courseId));
+        && (isSuperAdmin() || canViewAllCourses());
+    }
+
+    function isLinkedCourseAdmin(courseId) {
+      return isAdmin()
+        && hasCourseClaim(courseId);
+    }
+
+    function isCourseAdmin(courseId) {
+      return isFullCourseAdmin() || isLinkedCourseAdmin(courseId);
     }
 
     function canReadCourseAsAdmin(courseId) {
-      return isAdmin()
-        && (isSuperAdmin() || canViewAllCourses() || hasCourseClaim(courseId));
+      return isCourseAdmin(courseId);
     }
 
     function isStudentThread(threadId) {
@@ -78,13 +86,29 @@ service cloud.firestore {
       return request.auth.token.role == 'teacher';
     }
 
+    function isStudent() {
+      return request.auth.token.role == 'student';
+    }
+
+    function isTeacherCourseThread(threadId) {
+      return isTeacher()
+        && !isKeyPersonStudentThreadId(threadId);
+    }
+
+    function isStudentOwnCourseThread(threadId) {
+      return isStudent()
+        && (
+          isStudentThread(threadId)
+          || isKeyPersonStudentThread(threadId)
+          || isAnnouncementThread(threadId)
+        );
+    }
+
     function canAccessThread(courseId, threadId) {
       return hasCourse(courseId)
         && (
-          isTeacher()
-          || isStudentThread(threadId)
-          || isKeyPersonStudentThread(threadId)
-          || isAnnouncementThread(threadId)
+          isTeacherCourseThread(threadId)
+          || isStudentOwnCourseThread(threadId)
         );
     }
 
@@ -514,12 +538,12 @@ service cloud.firestore {
     }
 
     match /{path=**}/messages/{messageId} {
-      allow read: if isSuperAdmin();
+      allow read: if isFullCourseAdmin();
       allow create, update, delete: if false;
     }
 
     match /{path=**}/threads/{threadId} {
-      allow read: if canViewAllCourses();
+      allow read: if isFullCourseAdmin();
       allow create, update, delete: if false;
     }
 

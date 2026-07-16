@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 
 import '../models/auth_session.dart';
 import '../models/course.dart';
+import '../services/chat_thread_resolver.dart';
 import '../services/firestore_chat_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/time_format.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/polished_state_card.dart';
 import '../widgets/screen_header.dart';
+import '../widgets/unread_badge.dart';
 import 'chat_screen.dart';
 
 class AdminInboxScreen extends StatefulWidget {
@@ -23,8 +25,11 @@ class AdminInboxScreen extends StatefulWidget {
 class _AdminInboxScreenState extends State<AdminInboxScreen> {
   static const _pageSize = 5;
 
+  final searchController = TextEditingController();
   final List<AdminInboxThread> _threads = [];
   DocumentSnapshot<Map<String, dynamic>>? _cursor;
+  _InboxFilter _filter = _InboxFilter.all;
+  String _searchQuery = '';
   bool _loading = true;
   bool _loadingMore = false;
   bool _hasMore = false;
@@ -33,6 +38,12 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
   Map<String, Course> get _coursesById => {
     for (final course in widget.session.courses) course.id: course,
   };
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -87,6 +98,9 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final visibleThreads = _filteredThreads;
+    final filterCounts = _filterCounts;
+
     return AppScaffold(
       title: 'Admin Inbox',
       showLogout: false,
@@ -122,15 +136,38 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
               color: AppColors.primary,
             )
           else ...[
-            _InboxSummary(count: _threads.length),
-            const SizedBox(height: 12),
-            ..._threads.map(
-              (thread) => _AdminInboxTile(
-                thread: thread,
-                course: _coursesById[thread.courseId],
-                onTap: () => _openThread(thread),
+            _InboxSummary(
+              loadedCount: _threads.length,
+              visibleCount: visibleThreads.length,
+              unreadCount: _threads.fold(
+                0,
+                (total, thread) => total + thread.adminUnreadCount,
               ),
             ),
+            const SizedBox(height: 12),
+            _InboxControls(
+              controller: searchController,
+              selectedFilter: _filter,
+              filterCounts: filterCounts,
+              onFilterChanged: (filter) => setState(() => _filter = filter),
+              onSearchChanged: (value) {
+                setState(() => _searchQuery = value);
+              },
+            ),
+            const SizedBox(height: 12),
+            if (visibleThreads.isEmpty)
+              _FilteredInboxEmptyState(
+                hasMore: _hasMore,
+                onLoadMore: () => _load(reset: false),
+              )
+            else
+              ...visibleThreads.map(
+                (thread) => _AdminInboxTile(
+                  thread: thread,
+                  course: _coursesById[thread.courseId],
+                  onTap: () => _openThread(thread),
+                ),
+              ),
             const SizedBox(height: 12),
             _LoadMoreInboxCard(
               loaded: _threads.length,
@@ -141,6 +178,64 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  List<AdminInboxThread> get _filteredThreads {
+    final query = _searchQuery.trim().toLowerCase();
+
+    return _threads
+        .where((thread) {
+          if (!_matchesFilter(thread)) return false;
+          if (query.isEmpty) return true;
+
+          final course = _coursesById[thread.courseId];
+          return _matchesSearch(thread, course, query);
+        })
+        .toList(growable: false);
+  }
+
+  Map<_InboxFilter, int> get _filterCounts {
+    return {
+      for (final filter in _InboxFilter.values)
+        filter: _threads
+            .where((thread) => _matchesSpecificFilter(thread, filter))
+            .length,
+    };
+  }
+
+  bool _matchesFilter(AdminInboxThread thread) {
+    return _matchesSpecificFilter(thread, _filter);
+  }
+
+  bool _matchesSpecificFilter(AdminInboxThread thread, _InboxFilter filter) {
+    return switch (filter) {
+      _InboxFilter.all => true,
+      _InboxFilter.unread => thread.adminUnreadCount > 0,
+      _InboxFilter.teacherChats =>
+        thread.isTeacherChat || thread.isStudentTeacherChat,
+      _InboxFilter.contactPersonChats => thread.isContactPersonChat,
+      _InboxFilter.announcements => thread.isAnnouncement,
+    };
+  }
+
+  bool _matchesSearch(AdminInboxThread thread, Course? course, String query) {
+    final values = [
+      thread.courseId,
+      course?.displayName,
+      course?.category,
+      course?.teacherName,
+      course?.keyPersonName,
+      _threadTitle(thread, course),
+      _resolvedStudentName(thread, course),
+      thread.title,
+      thread.lastMessage,
+      thread.lastSenderName,
+      thread.lastSenderRole,
+    ];
+
+    return values.whereType<String>().any(
+      (value) => value.toLowerCase().contains(query),
     );
   }
 
@@ -164,10 +259,29 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
   }
 }
 
-class _InboxSummary extends StatelessWidget {
-  final int count;
+enum _InboxFilter {
+  all('All', Icons.all_inbox_rounded),
+  unread('Unread', Icons.mark_chat_unread_rounded),
+  teacherChats('Teacher chats', Icons.school_rounded),
+  contactPersonChats('Contact-person chats', Icons.verified_user_rounded),
+  announcements('Announcements', Icons.campaign_rounded);
 
-  const _InboxSummary({required this.count});
+  final String label;
+  final IconData icon;
+
+  const _InboxFilter(this.label, this.icon);
+}
+
+class _InboxSummary extends StatelessWidget {
+  final int loadedCount;
+  final int visibleCount;
+  final int unreadCount;
+
+  const _InboxSummary({
+    required this.loadedCount,
+    required this.visibleCount,
+    required this.unreadCount,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -194,17 +308,138 @@ class _InboxSummary extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              'Showing $count loaded chats. Use Load more to keep reads light.',
-              style: const TextStyle(
-                color: AppColors.ink,
-                fontWeight: FontWeight.w800,
-                height: 1.25,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Newest chats, loaded in small batches',
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w900,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '$visibleCount visible from $loadedCount loaded chats.',
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
+                ),
+              ],
             ),
           ),
+          if (unreadCount > 0) ...[
+            const SizedBox(width: 10),
+            UnreadBadge(count: unreadCount, compact: true),
+          ],
         ],
       ),
+    );
+  }
+}
+
+class _InboxControls extends StatelessWidget {
+  final TextEditingController controller;
+  final _InboxFilter selectedFilter;
+  final Map<_InboxFilter, int> filterCounts;
+  final ValueChanged<_InboxFilter> onFilterChanged;
+  final ValueChanged<String> onSearchChanged;
+
+  const _InboxControls({
+    required this.controller,
+    required this.selectedFilter,
+    required this.filterCounts,
+    required this.onFilterChanged,
+    required this.onSearchChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                labelText: 'Search inbox',
+                hintText: 'Course ID, course name, student, teacher...',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: controller.text.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Clear search',
+                        onPressed: () {
+                          controller.clear();
+                          onSearchChanged('');
+                        },
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+              ),
+              textInputAction: TextInputAction.search,
+              onChanged: onSearchChanged,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final filter in _InboxFilter.values)
+                  FilterChip(
+                    selected: selectedFilter == filter,
+                    avatar: Icon(filter.icon, size: 17),
+                    label: Text(
+                      '${filter.label} (${filterCounts[filter] ?? 0})',
+                    ),
+                    onSelected: (_) => onFilterChanged(filter),
+                    showCheckmark: false,
+                    selectedColor: AppColors.primary.withValues(alpha: 0.14),
+                    side: BorderSide(
+                      color: selectedFilter == filter
+                          ? AppColors.primary.withValues(alpha: 0.34)
+                          : AppColors.border,
+                    ),
+                    labelStyle: TextStyle(
+                      color: selectedFilter == filter
+                          ? AppColors.primaryDark
+                          : AppColors.muted,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FilteredInboxEmptyState extends StatelessWidget {
+  final bool hasMore;
+  final VoidCallback onLoadMore;
+
+  const _FilteredInboxEmptyState({
+    required this.hasMore,
+    required this.onLoadMore,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PolishedStateCard(
+      icon: Icons.filter_alt_off_rounded,
+      title: 'No matching loaded chats',
+      message: hasMore
+          ? 'Try another filter or load more recent chats to continue searching.'
+          : 'Try another filter or search term.',
+      color: AppColors.warning,
+      actionLabel: hasMore ? 'Load 5 more' : null,
+      onAction: hasMore ? onLoadMore : null,
     );
   }
 }
@@ -224,6 +459,7 @@ class _AdminInboxTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = _threadColor(thread);
     final courseName = course?.displayName ?? 'Course ${thread.courseId}';
+    final compact = MediaQuery.sizeOf(context).width < 390;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -233,17 +469,20 @@ class _AdminInboxTile extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(16),
+              if (!compact) ...[
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(_threadIcon(thread), color: color, size: 23),
                 ),
-                child: Icon(_threadIcon(thread), color: color, size: 23),
-              ),
-              const SizedBox(width: 12),
+                const SizedBox(width: 12),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -264,7 +503,10 @@ class _AdminInboxTile extends StatelessWidget {
                         ),
                         if (thread.adminUnreadCount > 0) ...[
                           const SizedBox(width: 8),
-                          _UnreadBadge(count: thread.adminUnreadCount),
+                          UnreadBadge(
+                            count: thread.adminUnreadCount,
+                            compact: true,
+                          ),
                         ],
                       ],
                     ),
@@ -311,8 +553,10 @@ class _AdminInboxTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+              if (!compact) ...[
+                const SizedBox(width: 8),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+              ],
             ],
           ),
         ),
@@ -339,31 +583,6 @@ class _TypePill extends StatelessWidget {
         label,
         style: TextStyle(
           color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
-  }
-}
-
-class _UnreadBadge extends StatelessWidget {
-  final int count;
-
-  const _UnreadBadge({required this.count});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.danger.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        '$count new',
-        style: const TextStyle(
-          color: AppColors.danger,
           fontSize: 11,
           fontWeight: FontWeight.w900,
         ),
@@ -436,7 +655,7 @@ String? _resolvedStudentName(AdminInboxThread thread, Course? course) {
   if (explicitName.isNotEmpty) return explicitName;
 
   final studentId = thread.isContactPersonChat
-      ? FirestoreChatService.keyPersonStudentLmsUserId(thread.threadId)
+      ? ChatThreadResolver.studentIdFromContactPersonThreadId(thread.threadId)
       : thread.threadId;
   final normalizedStudentId = studentId?.trim();
   if (normalizedStudentId == null || normalizedStudentId.isEmpty) return null;

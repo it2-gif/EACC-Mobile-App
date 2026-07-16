@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/auth_session.dart';
 import '../models/course.dart';
-import '../services/firestore_chat_service.dart';
+import '../services/chat_thread_resolver.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/polished_state_card.dart';
@@ -104,7 +104,7 @@ class _AdminChatsScreenState extends State<AdminChatsScreen> {
         _ChatItem(
           courseId: course.id,
           courseName: course.displayName,
-          threadId: FirestoreChatService.adminTeacherThreadId,
+          threadId: ChatThreadResolver.adminTeacherThreadId,
           personName: course.teacherName?.trim().isNotEmpty == true
               ? course.teacherName!.trim()
               : 'Course Teacher',
@@ -119,7 +119,7 @@ class _AdminChatsScreenState extends State<AdminChatsScreen> {
           (student) => _ChatItem(
             courseId: course.id,
             courseName: course.displayName,
-            threadId: student.id,
+            threadId: ChatThreadResolver.studentTeacherThreadId(student.id),
             personName: student.name,
             roleLabel: 'Student',
             subtitle:

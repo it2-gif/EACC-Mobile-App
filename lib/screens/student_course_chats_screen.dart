@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../models/auth_session.dart';
 import '../models/course.dart';
+import '../services/chat_thread_resolver.dart';
 import '../services/firestore_chat_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/time_format.dart';
@@ -22,9 +23,11 @@ class StudentCourseChatsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final courseName = course.displayName;
-    final studentThreadId = session.lmsUser.lmsUserId;
-    final keyPersonThreadId = FirestoreChatService.keyPersonStudentThreadId(
-      studentThreadId,
+    final studentThreadId = ChatThreadResolver.studentTeacherThreadId(
+      session.lmsUser.lmsUserId,
+    );
+    final keyPersonThreadId = ChatThreadResolver.studentContactPersonThreadId(
+      session.lmsUser.lmsUserId,
     );
     final teacherDisplayName = _teacherDisplayName(course);
     final keyPersonName = course.keyPersonName?.trim();
@@ -96,8 +99,9 @@ class StudentCourseChatsScreen extends StatelessWidget {
                   ),
                   builder: (context, snapshot) {
                     final data = snapshot.data?.data();
-                    final unread =
-                        (data?['student_unread_count'] as num?)?.toInt() ?? 0;
+                    final unread = FirestoreChatService.readStudentUnreadCount(
+                      data,
+                    );
                     final lastMessage =
                         data?['last_message']?.toString() ??
                         'Chat directly with $teacherDisplayName';
@@ -138,7 +142,7 @@ class StudentCourseChatsScreen extends StatelessWidget {
                     builder: (context, snapshot) {
                       final data = snapshot.data?.data();
                       final unread =
-                          (data?['student_unread_count'] as num?)?.toInt() ?? 0;
+                          FirestoreChatService.readStudentUnreadCount(data);
                       final lastMessage =
                           data?['last_message']?.toString() ??
                           'Chat directly with $keyPersonDisplayName';
@@ -217,7 +221,7 @@ class _AnnouncementChatTile extends StatelessWidget {
                 title: 'Announcement chat',
                 currentUserRole: 'student',
                 courseId: course.id,
-                threadId: FirestoreChatService.announcementThreadId,
+                threadId: ChatThreadResolver.announcementThreadId,
                 senderName: session.appUser.name,
                 threadStudentName: session.appUser.name,
               ),
@@ -252,6 +256,8 @@ class _ChatChoiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 390;
+
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
@@ -259,25 +265,28 @@ class _ChatChoiceCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(18),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 54,
-                height: 54,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      color.withValues(alpha: 0.15),
-                      color.withValues(alpha: 0.06),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              if (!compact) ...[
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        color.withValues(alpha: 0.15),
+                        color.withValues(alpha: 0.06),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: color.withValues(alpha: 0.18)),
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: color.withValues(alpha: 0.18)),
+                  child: Icon(icon, color: color),
                 ),
-                child: Icon(icon, color: color),
-              ),
-              const SizedBox(width: 14),
+                const SizedBox(width: 14),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -357,20 +366,23 @@ class _ChatChoiceCard extends StatelessWidget {
                     ),
                   ],
                   const SizedBox(height: 8),
-                  Container(
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: AppColors.border),
+                  if (!compact) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppColors.primaryDark,
+                        size: 19,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.chevron_right_rounded,
-                      color: AppColors.primaryDark,
-                      size: 19,
-                    ),
-                  ),
+                  ],
                 ],
               ),
             ],

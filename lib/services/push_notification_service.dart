@@ -11,7 +11,7 @@ import '../models/course.dart';
 import '../screens/chat_screen.dart';
 import '../utils/notification_sound.dart';
 import 'auth_session_manager.dart';
-import 'firestore_chat_service.dart';
+import 'chat_thread_resolver.dart';
 import 'notification_api.dart';
 import 'web_fcm_token.dart';
 
@@ -374,11 +374,11 @@ class PushNotificationService {
     final resolvedStudentName = studentName?.trim();
     final resolvedSenderName = senderName?.trim();
     final isAnnouncementThread =
-        threadId == FirestoreChatService.announcementThreadId;
+        threadId == ChatThreadResolver.announcementThreadId;
     final isAdminTeacherThread =
-        threadId == FirestoreChatService.adminTeacherThreadId;
+        threadId == ChatThreadResolver.adminTeacherThreadId;
     final isKeyPersonStudentThread =
-        FirestoreChatService.isKeyPersonStudentThreadId(threadId);
+        ChatThreadResolver.isStudentContactPersonThreadId(threadId);
     final role = session.appUser.role;
 
     late final String title;
