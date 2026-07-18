@@ -675,28 +675,36 @@ class FirestoreChatService {
 
     final perCourseLimit = offset + pageSize + 1;
     final snapshots = await Future.wait(
-      ids.map((courseId) {
-        return _threadsRef(courseId: courseId)
-            .orderBy('last_message_at', descending: true)
-            .limit(perCourseLimit)
-            .get();
+      ids.map((courseId) async {
+        try {
+          return await _threadsRef(courseId: courseId)
+              .orderBy('last_message_at', descending: true)
+              .limit(perCourseLimit)
+              .get();
+        } on FirebaseException catch (error) {
+          if (error.code == 'permission-denied') return null;
+          rethrow;
+        }
       }),
     );
 
-    final threads = snapshots
-        .expand((snapshot) => snapshot.docs)
-        .map(_adminInboxThreadFromDoc)
-        .where((thread) => thread.lastMessage.trim().isNotEmpty)
-        .toList(growable: false)
-      ..sort((a, b) {
-        final aTime = a.lastMessageAt?.millisecondsSinceEpoch ?? 0;
-        final bTime = b.lastMessageAt?.millisecondsSinceEpoch ?? 0;
-        return bTime.compareTo(aTime);
-      });
+    final threads =
+        snapshots
+            .whereType<QuerySnapshot<Map<String, dynamic>>>()
+            .expand((snapshot) => snapshot.docs)
+            .map(_adminInboxThreadFromDoc)
+            .where((thread) => thread.lastMessage.trim().isNotEmpty)
+            .toList(growable: false)
+          ..sort((a, b) {
+            final aTime = a.lastMessageAt?.millisecondsSinceEpoch ?? 0;
+            final bTime = b.lastMessageAt?.millisecondsSinceEpoch ?? 0;
+            return bTime.compareTo(aTime);
+          });
 
-    final pageItems = threads.skip(offset).take(pageSize).toList(
-      growable: false,
-    );
+    final pageItems = threads
+        .skip(offset)
+        .take(pageSize)
+        .toList(growable: false);
 
     return AdminInboxPage(
       items: pageItems,
