@@ -608,10 +608,6 @@ class _AdminLiveInboxPanelsState extends State<_AdminLiveInboxPanels> {
   }
 
   Future<AdminInboxPage> _loadInbox() {
-    if (_usesGlobalAdminInbox(widget.session)) {
-      return FirestoreChatService.getAdminInboxPage(pageSize: 8);
-    }
-
     return FirestoreChatService.getAdminInboxPageForCourses(
       courseIds: widget.session.courses.map((course) => course.id),
       pageSize: 8,
