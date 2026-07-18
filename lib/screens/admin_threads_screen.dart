@@ -146,40 +146,54 @@ class AdminThreadsScreen extends StatelessWidget {
                 ),
                 if (items.isNotEmpty) const _AdminThreadSection('Students'),
                 for (final student in items) ...[
-                  _AdminThreadTile(
-                    title: student.name,
-                    subtitle: 'Teacher chat - $teacherTitle',
-                    iconLabel: student.name.isNotEmpty
-                        ? student.name[0].toUpperCase()
-                        : '?',
-                    color: AppColors.primary,
-                    badge: _ThreadBadge(
-                      label: 'TEACHER',
-                      color: AppColors.primary,
+                  StreamBuilder<int>(
+                    stream: FirestoreChatService.getAdminUnreadCount(
+                      courseId: courseId,
+                      threadId: ChatThreadResolver.studentTeacherThreadId(
+                        student.id,
+                      ),
                     ),
-                    onTap: () {
-                      final threadId =
-                          ChatThreadResolver.studentTeacherThreadId(student.id);
-                      final title = _studentThreadTitle(
-                        student.name,
-                        teacherTitle,
-                      );
-
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ChatScreen(
-                            title: title,
-                            currentUserRole: 'admin',
-                            courseId: courseId,
-                            threadId: threadId,
-                            senderName: session.appUser.name,
-                            threadStudentName: student.name,
-                            isSuperAdmin: session.appUser.isSuperAdmin,
-                            canManageAllMessages:
-                                session.appUser.canViewAllCourses,
-                          ),
+                    builder: (context, snapshot) {
+                      final unread = snapshot.data ?? 0;
+                      return _AdminThreadTile(
+                        title: student.name,
+                        subtitle: 'Teacher chat - $teacherTitle',
+                        iconLabel: student.name.isNotEmpty
+                            ? student.name[0].toUpperCase()
+                            : '?',
+                        color: AppColors.primary,
+                        unreadCount: unread,
+                        badge: _ThreadBadge(
+                          label: 'TEACHER',
+                          color: AppColors.primary,
                         ),
+                        onTap: () {
+                          final threadId =
+                              ChatThreadResolver.studentTeacherThreadId(
+                                student.id,
+                              );
+                          final title = _studentThreadTitle(
+                            student.name,
+                            teacherTitle,
+                          );
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(
+                                title: title,
+                                currentUserRole: 'admin',
+                                courseId: courseId,
+                                threadId: threadId,
+                                senderName: session.appUser.name,
+                                threadStudentName: student.name,
+                                isSuperAdmin: session.appUser.isSuperAdmin,
+                                canManageAllMessages:
+                                    session.appUser.canViewAllCourses,
+                              ),
+                            ),
+                          );
+                        },
                       );
                     },
                   ),

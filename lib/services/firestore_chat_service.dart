@@ -658,55 +658,6 @@ class FirestoreChatService {
     );
   }
 
-  static Future<AdminInboxPage> getAdminInboxPageForCourses({
-    required Iterable<String> courseIds,
-    int pageSize = 5,
-    int offset = 0,
-  }) async {
-    final ids = courseIds
-        .map((courseId) => courseId.trim())
-        .where((courseId) => courseId.isNotEmpty)
-        .toSet()
-        .toList(growable: false);
-
-    if (ids.isEmpty) {
-      return const AdminInboxPage(items: [], cursor: null, hasMore: false);
-    }
-
-    final perCourseLimit = offset + pageSize + 1;
-    final snapshots = await Future.wait(
-      ids.map((courseId) {
-        return _threadsRef(courseId: courseId)
-            .orderBy('last_message_at', descending: true)
-            .limit(perCourseLimit)
-            .get();
-      }),
-    );
-
-    final threads =
-        snapshots
-            .expand((snapshot) => snapshot.docs)
-            .map(_adminInboxThreadFromDoc)
-            .where((thread) => thread.lastMessage.trim().isNotEmpty)
-            .toList(growable: false)
-          ..sort((a, b) {
-            final aTime = a.lastMessageAt?.millisecondsSinceEpoch ?? 0;
-            final bTime = b.lastMessageAt?.millisecondsSinceEpoch ?? 0;
-            return bTime.compareTo(aTime);
-          });
-
-    final pageItems = threads
-        .skip(offset)
-        .take(pageSize)
-        .toList(growable: false);
-
-    return AdminInboxPage(
-      items: pageItems,
-      cursor: null,
-      hasMore: threads.length > offset + pageSize,
-    );
-  }
-
   static AdminInboxThread _adminInboxThreadFromDoc(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
   ) {

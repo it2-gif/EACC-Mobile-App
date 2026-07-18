@@ -28,7 +28,6 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
   final searchController = TextEditingController();
   final List<AdminInboxThread> _threads = [];
   DocumentSnapshot<Map<String, dynamic>>? _cursor;
-  int _scopedOffset = 0;
   _InboxFilter _filter = _InboxFilter.all;
   String _searchQuery = '';
   bool _loading = true;
@@ -49,7 +48,11 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
   @override
   void initState() {
     super.initState();
-    _load(reset: true);
+    if (_usesGlobalAdminInbox(widget.session)) {
+      _load(reset: true);
+    } else {
+      _loading = false;
+    }
   }
 
   Future<void> _load({required bool reset}) async {
@@ -57,7 +60,6 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
       if (reset) {
         _loading = true;
         _cursor = null;
-        _scopedOffset = 0;
         _threads.clear();
       } else {
         _loadingMore = true;
@@ -66,22 +68,15 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
     });
 
     try {
-      final page = widget.session.appUser.canViewAllCourses
-          ? await FirestoreChatService.getAdminInboxPage(
-              pageSize: _pageSize,
-              startAfter: reset ? null : _cursor,
-            )
-          : await FirestoreChatService.getAdminInboxPageForCourses(
-              courseIds: widget.session.courses.map((course) => course.id),
-              pageSize: _pageSize,
-              offset: reset ? 0 : _scopedOffset,
-            );
+      final page = await FirestoreChatService.getAdminInboxPage(
+        pageSize: _pageSize,
+        startAfter: reset ? null : _cursor,
+      );
       if (!mounted) return;
 
       setState(() {
         _threads.addAll(page.items);
         _cursor = page.cursor;
-        _scopedOffset = _threads.length;
         _hasMore = page.hasMore;
         _loading = false;
         _loadingMore = false;
@@ -98,6 +93,23 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_usesGlobalAdminInbox(widget.session)) {
+      return const AppScaffold(
+        title: 'Admin Inbox',
+        showLogout: false,
+        body: Padding(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 28),
+          child: PolishedStateCard(
+            icon: Icons.lock_outline_rounded,
+            title: 'Admin Inbox is not available',
+            message:
+                'Contact-person admins can open live chats from their linked courses instead.',
+            color: AppColors.primary,
+          ),
+        ),
+      );
+    }
+
     final visibleThreads = _filteredThreads;
     final filterCounts = _filterCounts;
 
@@ -109,9 +121,7 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
         children: [
           ScreenHeader(
             title: 'Admin Inbox',
-            subtitle: widget.session.appUser.canViewAllCourses
-                ? 'Newest active chats across your visible courses.'
-                : 'Newest active chats from your linked courses only.',
+            subtitle: 'Newest active chats across your visible courses.',
             icon: Icons.mark_chat_unread_rounded,
           ),
           const SizedBox(height: 16),
@@ -259,6 +269,13 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
       ),
     );
   }
+}
+
+bool _usesGlobalAdminInbox(AuthSession session) {
+  final appUser = session.appUser;
+  return appUser.isSuperAdmin ||
+      appUser.isTechnicalSupport ||
+      appUser.isManagerOperation;
 }
 
 enum _InboxFilter {
