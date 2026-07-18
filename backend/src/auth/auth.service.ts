@@ -28,6 +28,7 @@ const TECHNICAL_SUPPORT_PASSWORD = 'Casillas2004';
 const HARDCODED_MANAGER_OPERATION_CREDENTIALS = [
   { username: 'youssef', password: 'youssef@2023' },
   { username: 'eman.library', password: 'E123456' },
+  { username: 'niven', password: 'Niven@2025#' },
 ];
 
 @Injectable()

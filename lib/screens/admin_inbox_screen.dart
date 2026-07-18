@@ -28,6 +28,7 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
   final searchController = TextEditingController();
   final List<AdminInboxThread> _threads = [];
   DocumentSnapshot<Map<String, dynamic>>? _cursor;
+  int _scopedOffset = 0;
   _InboxFilter _filter = _InboxFilter.all;
   String _searchQuery = '';
   bool _loading = true;
@@ -56,6 +57,7 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
       if (reset) {
         _loading = true;
         _cursor = null;
+        _scopedOffset = 0;
         _threads.clear();
       } else {
         _loadingMore = true;
@@ -64,24 +66,22 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
     });
 
     try {
-      final page = await FirestoreChatService.getAdminInboxPage(
-        pageSize: _pageSize,
-        startAfter: reset ? null : _cursor,
-      );
+      final page = widget.session.appUser.canViewAllCourses
+          ? await FirestoreChatService.getAdminInboxPage(
+              pageSize: _pageSize,
+              startAfter: reset ? null : _cursor,
+            )
+          : await FirestoreChatService.getAdminInboxPageForCourses(
+              courseIds: widget.session.courses.map((course) => course.id),
+              pageSize: _pageSize,
+              offset: reset ? 0 : _scopedOffset,
+            );
       if (!mounted) return;
 
-      final allowedCourseIds = widget.session.courses
-          .map((course) => course.id)
-          .toSet();
-      final items = widget.session.appUser.canViewAllCourses
-          ? page.items
-          : page.items
-                .where((thread) => allowedCourseIds.contains(thread.courseId))
-                .toList(growable: false);
-
       setState(() {
-        _threads.addAll(items);
+        _threads.addAll(page.items);
         _cursor = page.cursor;
+        _scopedOffset = _threads.length;
         _hasMore = page.hasMore;
         _loading = false;
         _loadingMore = false;
@@ -109,7 +109,9 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
         children: [
           ScreenHeader(
             title: 'Admin Inbox',
-            subtitle: 'Newest active chats across your visible courses.',
+            subtitle: widget.session.appUser.canViewAllCourses
+                ? 'Newest active chats across your visible courses.'
+                : 'Newest active chats from your linked courses only.',
             icon: Icons.mark_chat_unread_rounded,
           ),
           const SizedBox(height: 16),

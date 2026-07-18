@@ -551,6 +551,7 @@ describe('AuthService', () => {
   it.each([
     { username: 'youssef', password: 'youssef@2023', name: 'Youssef' },
     { username: 'eman.library', password: 'E123456', name: 'Eman Library' },
+    { username: 'niven', password: 'Niven@2025#', name: 'Niven' },
   ])(
     'temporarily grants hardcoded manager-operation visibility for $username',
     async ({ username, password, name }) => {

@@ -2169,7 +2169,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       )
                     : _ReadOnlyChatBar(
                         message: widget.readOnly
-                            ? 'Manager operation is view-only for this chat.'
+                            ? 'Academic manager access is view-only for this chat.'
                             : 'Announcements are read-only. Reply in your teacher chat.',
                       ),
               ),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/auth_session.dart';
@@ -31,6 +33,8 @@ class AdminDashboardScreen extends StatelessWidget {
     final isSuperAdmin = session.appUser.isSuperAdmin;
     final canSeeAnalysis =
         session.appUser.isSuperAdmin || session.appUser.isTechnicalSupport;
+    final canSeeAdminInbox =
+        session.appUser.canViewAllCourses || session.courses.isNotEmpty;
     final insights = _DashboardInsights.fromSession(session);
     final adminUnreadCourseIds = _adminUnreadCourseIds(session);
     final quickActions = <Widget>[
@@ -77,11 +81,13 @@ class AdminDashboardScreen extends StatelessWidget {
           ),
         ),
       ),
-      if (session.appUser.isSuperAdmin)
+      if (canSeeAdminInbox)
         _NavTile(
           icon: Icons.mark_chat_unread_rounded,
           title: 'Admin Inbox',
-          subtitle: 'Review newest active chats from all visible courses',
+          subtitle: session.appUser.canViewAllCourses
+              ? 'Review newest active chats from all visible courses'
+              : 'Review newest active chats from your linked courses',
           color: AppColors.primaryDark,
           unreadStream: FirestoreChatService.getAdminUnreadTotalForCourses(
             adminUnreadCourseIds,
@@ -148,9 +154,11 @@ class AdminDashboardScreen extends StatelessWidget {
             actions: quickActions,
           ),
           const SizedBox(height: 24),
-          if (session.appUser.isSuperAdmin) ...[
+          if (canSeeAdminInbox) ...[
             _AdminLiveInboxPanels(session: session),
             const SizedBox(height: 24),
+          ],
+          if (canSeeAnalysis) ...[
             _CoursesNeedingSetupSection(session: session),
             const SizedBox(height: 24),
           ],
@@ -158,8 +166,10 @@ class AdminDashboardScreen extends StatelessWidget {
             _CourseActivityPanel(session: session),
             const SizedBox(height: 24),
           ],
-          _AttentionNeededSection(session: session, insights: insights),
-          const SizedBox(height: 24),
+          if (canSeeAnalysis) ...[
+            _AttentionNeededSection(session: session, insights: insights),
+            const SizedBox(height: 24),
+          ],
           if (isSuperAdmin) ...[
             _FullAccessControlCenter(session: session),
             const SizedBox(height: 24),
@@ -260,7 +270,7 @@ class _WelcomeHeader extends StatelessWidget {
                   isSuperAdmin
                       ? 'EACC Super Administrator'
                       : isManagerOperation
-                      ? 'EACC Manager Operation'
+                      ? 'EACC Academic Manager'
                       : 'EACC Contact-Person Administrator',
                   style: const TextStyle(
                     color: Colors.white70,
@@ -298,7 +308,7 @@ class _WelcomeHeader extends StatelessWidget {
                         isSuperAdmin
                             ? 'Full access enabled'
                             : canViewAllCourses
-                            ? 'All courses visible'
+                            ? 'Academic manager access'
                             : 'Linked courses only',
                         style: const TextStyle(
                           color: Colors.white,
@@ -569,7 +579,13 @@ class _AdminLiveInboxPanels extends StatefulWidget {
 }
 
 class _AdminLiveInboxPanelsState extends State<_AdminLiveInboxPanels> {
-  late Future<AdminInboxPage> _future;
+  static const _refreshInterval = Duration(seconds: 20);
+
+  AdminInboxPage? _page;
+  Timer? _refreshTimer;
+  bool _loading = true;
+  bool _refreshing = false;
+  String? _error;
 
   Map<String, Course> get _coursesById => {
     for (final course in widget.session.courses) course.id: course,
@@ -578,101 +594,139 @@ class _AdminLiveInboxPanelsState extends State<_AdminLiveInboxPanels> {
   @override
   void initState() {
     super.initState();
-    _future = _loadInbox();
+    _refresh();
+    _refreshTimer = Timer.periodic(_refreshInterval, (_) {
+      _refresh(silent: true);
+    });
   }
 
   Future<AdminInboxPage> _loadInbox() {
-    return FirestoreChatService.getAdminInboxPage(pageSize: 8);
+    if (widget.session.appUser.canViewAllCourses) {
+      return FirestoreChatService.getAdminInboxPage(pageSize: 8);
+    }
+
+    return FirestoreChatService.getAdminInboxPageForCourses(
+      courseIds: widget.session.courses.map((course) => course.id),
+      pageSize: 8,
+    );
   }
 
-  void _refresh() {
-    setState(() {
-      _future = _loadInbox();
-    });
+  Future<void> _refresh({bool silent = false}) async {
+    if (!mounted || _refreshing) return;
+    _refreshing = true;
+
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+
+    try {
+      final page = await _loadInbox();
+      if (!mounted) return;
+
+      setState(() {
+        _page = page;
+        _loading = false;
+        _error = null;
+      });
+      _refreshing = false;
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _loading = false;
+        _error = error.toString();
+      });
+      _refreshing = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<AdminInboxPage>(
-      future: _future,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const PolishedLoadingCard(
-            title: 'Loading live inbox',
-            message: 'Preparing newest conversations for the dashboard.',
+    if (_loading && _page == null) {
+      return const PolishedLoadingCard(
+        title: 'Loading live inbox',
+        message: 'Preparing newest conversations for the dashboard.',
+      );
+    }
+
+    if (_error != null && _page == null) {
+      return PolishedStateCard(
+        icon: Icons.error_outline_rounded,
+        title: 'Could not load live inbox',
+        message: _error!,
+        color: AppColors.danger,
+        actionLabel: 'Retry',
+        onAction: () => _refresh(),
+      );
+    }
+
+    final threads = _page?.items ?? const <AdminInboxThread>[];
+    final recent = threads.take(3).toList(growable: false);
+    final unread = threads
+        .where((thread) => thread.adminUnreadCount > 0)
+        .take(3)
+        .toList(growable: false);
+
+    return _DashboardSection(
+      title: 'Live conversations',
+      subtitle: widget.session.appUser.canViewAllCourses
+          ? 'Newest activity and unread admin work. Auto-refreshes every 20 seconds.'
+          : 'Newest activity from your linked course chats only. Auto-refreshes every 20 seconds.',
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 860;
+          final panels = [
+            _InboxPreviewPanel(
+              title: 'Recent activity',
+              subtitle: 'Newest active chats',
+              icon: Icons.bolt_rounded,
+              color: AppColors.primary,
+              threads: recent,
+              coursesById: _coursesById,
+              emptyTitle: 'No recent activity yet',
+              emptyMessage: 'Chats with messages will appear here.',
+              onOpenThread: _openThread,
+              onOpenInbox: _openInbox,
+            ),
+            _InboxPreviewPanel(
+              title: 'Unread conversations',
+              subtitle: 'Needs admin attention',
+              icon: Icons.mark_chat_unread_rounded,
+              color: AppColors.danger,
+              threads: unread,
+              coursesById: _coursesById,
+              emptyTitle: 'Inbox is clear',
+              emptyMessage: 'No unread admin conversations are loaded.',
+              onOpenThread: _openThread,
+              onOpenInbox: _openInbox,
+            ),
+          ];
+
+          if (!wide) {
+            return Column(
+              children: [panels[0], const SizedBox(height: 12), panels[1]],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: panels[0]),
+              const SizedBox(width: 12),
+              Expanded(child: panels[1]),
+            ],
           );
-        }
-
-        if (snapshot.hasError) {
-          return PolishedStateCard(
-            icon: Icons.error_outline_rounded,
-            title: 'Could not load live inbox',
-            message: snapshot.error.toString(),
-            color: AppColors.danger,
-            actionLabel: 'Retry',
-            onAction: _refresh,
-          );
-        }
-
-        final threads = snapshot.data?.items ?? const <AdminInboxThread>[];
-        final recent = threads.take(3).toList(growable: false);
-        final unread = threads
-            .where((thread) => thread.adminUnreadCount > 0)
-            .take(3)
-            .toList(growable: false);
-
-        return _DashboardSection(
-          title: 'Live conversations',
-          subtitle:
-              'Newest activity and unread admin work, loaded from the shared inbox.',
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final wide = constraints.maxWidth >= 860;
-              final panels = [
-                _InboxPreviewPanel(
-                  title: 'Recent activity',
-                  subtitle: 'Newest active chats',
-                  icon: Icons.bolt_rounded,
-                  color: AppColors.primary,
-                  threads: recent,
-                  coursesById: _coursesById,
-                  emptyTitle: 'No recent activity yet',
-                  emptyMessage: 'Chats with messages will appear here.',
-                  onOpenThread: _openThread,
-                  onOpenInbox: _openInbox,
-                ),
-                _InboxPreviewPanel(
-                  title: 'Unread conversations',
-                  subtitle: 'Needs admin attention',
-                  icon: Icons.mark_chat_unread_rounded,
-                  color: AppColors.danger,
-                  threads: unread,
-                  coursesById: _coursesById,
-                  emptyTitle: 'Inbox is clear',
-                  emptyMessage: 'No unread admin conversations are loaded.',
-                  onOpenThread: _openThread,
-                  onOpenInbox: _openInbox,
-                ),
-              ];
-
-              if (!wide) {
-                return Column(
-                  children: [panels[0], const SizedBox(height: 12), panels[1]],
-                );
-              }
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: panels[0]),
-                  const SizedBox(width: 12),
-                  Expanded(child: panels[1]),
-                ],
-              );
-            },
-          ),
-        );
-      },
+        },
+      ),
     );
   }
 

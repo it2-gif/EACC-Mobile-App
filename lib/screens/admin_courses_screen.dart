@@ -205,7 +205,7 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
             subtitle: isSuperAdmin
                 ? 'Full access is enabled. Search a course ID to view its chats.'
                 : isManagerOperation
-                ? 'Manager operation is active. Search a course ID to view its chats.'
+                ? 'Academic manager access is active. Search a course ID to view its chats.'
                 : widget.session.courses.isEmpty
                 ? 'No courses are linked to your contact-person account yet.'
                 : 'Contact-person access is active. You can monitor only your linked courses.',
@@ -244,7 +244,7 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
               courses: courses,
               titleOverride: isManagerOperation
                   ? showingManagerLinkedCourses
-                        ? 'Assigned portfolio overview'
+                        ? 'Academic portfolio overview'
                         : 'Course directory overview'
                   : null,
             ),
@@ -294,7 +294,7 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
                   ? 'No active courses'
                   : 'No linked courses',
               subtitle: showingManagerLinkedCourses
-                  ? 'Courses assigned to your manager-operation profile will appear here.'
+                  ? 'Courses assigned to your academic manager profile will appear here.'
                   : canViewAllCourses
                   ? 'Courses will appear here after they are synced.'
                   : 'Ask a full-access admin to assign you as contact person in the LMS, then log in again.',
@@ -368,7 +368,7 @@ class _ManagerCourseScopeTabs extends StatelessWidget {
               _ManagerScopeButton(
                 selected: selectedIndex == 0,
                 icon: Icons.assignment_ind_rounded,
-                title: 'Assigned Portfolio',
+                title: 'Academic Portfolio',
                 subtitle: '$assignedCount linked courses',
                 onTap: () => onChanged(0),
               ),
@@ -637,7 +637,7 @@ class _AccessSummary extends StatelessWidget {
                         (isSuperAdmin
                             ? 'Full access admin'
                             : canViewAllCourses
-                            ? 'Manager operation courses and students'
+                            ? 'Academic manager courses and students'
                             : 'Contact manager courses and students'),
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
