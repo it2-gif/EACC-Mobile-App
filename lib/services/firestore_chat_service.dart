@@ -636,9 +636,26 @@ class FirestoreChatService {
     int pageSize = 5,
     DocumentSnapshot<Map<String, dynamic>>? startAfter,
   }) async {
-    // Keep this legacy API safe. UI inboxes now use getAdminInboxPageForCourses
-    // so every role reads only course documents already visible to its session.
-    return const AdminInboxPage(items: [], cursor: null, hasMore: false);
+    Query<Map<String, dynamic>> query = _db
+        .collectionGroup('threads')
+        .orderBy('last_message_at', descending: true)
+        .limit(pageSize + 1);
+
+    if (startAfter != null) {
+      query = query.startAfterDocument(startAfter);
+    }
+
+    final snapshot = await query.get();
+    final visibleDocs = snapshot.docs.take(pageSize).toList(growable: false);
+
+    return AdminInboxPage(
+      items: visibleDocs
+          .map(_adminInboxThreadFromDoc)
+          .where((thread) => thread.lastMessage.trim().isNotEmpty)
+          .toList(growable: false),
+      cursor: visibleDocs.isEmpty ? startAfter : visibleDocs.last,
+      hasMore: snapshot.docs.length > pageSize,
+    );
   }
 
   static Future<AdminInboxPage> getAdminInboxPageForCourses({
@@ -658,22 +675,16 @@ class FirestoreChatService {
 
     final perCourseLimit = offset + pageSize + 1;
     final snapshots = await Future.wait(
-      ids.map((courseId) async {
-        try {
-          return await _threadsRef(courseId: courseId)
-              .orderBy('last_message_at', descending: true)
-              .limit(perCourseLimit)
-              .get();
-        } on FirebaseException catch (error) {
-          if (error.code == 'permission-denied') return null;
-          rethrow;
-        }
+      ids.map((courseId) {
+        return _threadsRef(courseId: courseId)
+            .orderBy('last_message_at', descending: true)
+            .limit(perCourseLimit)
+            .get();
       }),
     );
 
     final threads =
         snapshots
-            .whereType<QuerySnapshot<Map<String, dynamic>>>()
             .expand((snapshot) => snapshot.docs)
             .map(_adminInboxThreadFromDoc)
             .where((thread) => thread.lastMessage.trim().isNotEmpty)

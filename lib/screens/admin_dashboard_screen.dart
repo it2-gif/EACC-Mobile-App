@@ -33,8 +33,8 @@ class AdminDashboardScreen extends StatelessWidget {
     final isSuperAdmin = session.appUser.isSuperAdmin;
     final canSeeAnalysis =
         session.appUser.isSuperAdmin || session.appUser.isTechnicalSupport;
-    final usesGlobalAdminInbox = _usesGlobalAdminInbox(session);
-    final canSeeAdminInbox = usesGlobalAdminInbox || session.courses.isNotEmpty;
+    final canSeeAdminInbox =
+        session.appUser.canViewAllCourses || session.courses.isNotEmpty;
     final insights = _DashboardInsights.fromSession(session);
     final adminUnreadCourseIds = _adminUnreadCourseIds(session);
     final quickActions = <Widget>[
@@ -85,7 +85,7 @@ class AdminDashboardScreen extends StatelessWidget {
         _NavTile(
           icon: Icons.mark_chat_unread_rounded,
           title: 'Admin Inbox',
-          subtitle: usesGlobalAdminInbox
+          subtitle: session.appUser.canViewAllCourses
               ? 'Review newest active chats from all visible courses'
               : 'Review newest active chats from your linked courses',
           color: AppColors.primaryDark,
@@ -197,13 +197,6 @@ Iterable<String> _adminUnreadCourseIds(AuthSession session) {
             (adminName.isNotEmpty && keyPersonName == adminName);
       })
       .map((course) => course.id);
-}
-
-bool _usesGlobalAdminInbox(AuthSession session) {
-  final appUser = session.appUser;
-  return appUser.isSuperAdmin ||
-      appUser.isTechnicalSupport ||
-      appUser.isManagerOperation;
 }
 
 // ─── Welcome header ─────────────────────────────────────────────────────────
@@ -608,6 +601,10 @@ class _AdminLiveInboxPanelsState extends State<_AdminLiveInboxPanels> {
   }
 
   Future<AdminInboxPage> _loadInbox() {
+    if (widget.session.appUser.canViewAllCourses) {
+      return FirestoreChatService.getAdminInboxPage(pageSize: 8);
+    }
+
     return FirestoreChatService.getAdminInboxPageForCourses(
       courseIds: widget.session.courses.map((course) => course.id),
       pageSize: 8,
@@ -681,7 +678,7 @@ class _AdminLiveInboxPanelsState extends State<_AdminLiveInboxPanels> {
 
     return _DashboardSection(
       title: 'Live conversations',
-      subtitle: _usesGlobalAdminInbox(widget.session)
+      subtitle: widget.session.appUser.canViewAllCourses
           ? 'Newest activity and unread admin work. Auto-refreshes every 20 seconds.'
           : 'Newest activity from your linked course chats only. Auto-refreshes every 20 seconds.',
       child: LayoutBuilder(
