@@ -33,8 +33,8 @@ class AdminDashboardScreen extends StatelessWidget {
     final isSuperAdmin = session.appUser.isSuperAdmin;
     final canSeeAnalysis =
         session.appUser.isSuperAdmin || session.appUser.isTechnicalSupport;
-    final canSeeAdminInbox =
-        session.appUser.canViewAllCourses || session.courses.isNotEmpty;
+    final usesGlobalAdminInbox = _usesGlobalAdminInbox(session);
+    final canSeeAdminInbox = usesGlobalAdminInbox || session.courses.isNotEmpty;
     final insights = _DashboardInsights.fromSession(session);
     final adminUnreadCourseIds = _adminUnreadCourseIds(session);
     final quickActions = <Widget>[
@@ -85,7 +85,7 @@ class AdminDashboardScreen extends StatelessWidget {
         _NavTile(
           icon: Icons.mark_chat_unread_rounded,
           title: 'Admin Inbox',
-          subtitle: session.appUser.canViewAllCourses
+          subtitle: usesGlobalAdminInbox
               ? 'Review newest active chats from all visible courses'
               : 'Review newest active chats from your linked courses',
           color: AppColors.primaryDark,
@@ -197,6 +197,13 @@ Iterable<String> _adminUnreadCourseIds(AuthSession session) {
             (adminName.isNotEmpty && keyPersonName == adminName);
       })
       .map((course) => course.id);
+}
+
+bool _usesGlobalAdminInbox(AuthSession session) {
+  final appUser = session.appUser;
+  return appUser.isSuperAdmin ||
+      appUser.isTechnicalSupport ||
+      appUser.isManagerOperation;
 }
 
 // ─── Welcome header ─────────────────────────────────────────────────────────
@@ -601,7 +608,7 @@ class _AdminLiveInboxPanelsState extends State<_AdminLiveInboxPanels> {
   }
 
   Future<AdminInboxPage> _loadInbox() {
-    if (widget.session.appUser.canViewAllCourses) {
+    if (_usesGlobalAdminInbox(widget.session)) {
       return FirestoreChatService.getAdminInboxPage(pageSize: 8);
     }
 
@@ -678,7 +685,7 @@ class _AdminLiveInboxPanelsState extends State<_AdminLiveInboxPanels> {
 
     return _DashboardSection(
       title: 'Live conversations',
-      subtitle: widget.session.appUser.canViewAllCourses
+      subtitle: _usesGlobalAdminInbox(widget.session)
           ? 'Newest activity and unread admin work. Auto-refreshes every 20 seconds.'
           : 'Newest activity from your linked course chats only. Auto-refreshes every 20 seconds.',
       child: LayoutBuilder(

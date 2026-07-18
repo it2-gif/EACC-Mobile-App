@@ -66,7 +66,7 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
     });
 
     try {
-      final page = widget.session.appUser.canViewAllCourses
+      final page = _usesGlobalAdminInbox(widget.session)
           ? await FirestoreChatService.getAdminInboxPage(
               pageSize: _pageSize,
               startAfter: reset ? null : _cursor,
@@ -109,7 +109,7 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
         children: [
           ScreenHeader(
             title: 'Admin Inbox',
-            subtitle: widget.session.appUser.canViewAllCourses
+            subtitle: _usesGlobalAdminInbox(widget.session)
                 ? 'Newest active chats across your visible courses.'
                 : 'Newest active chats from your linked courses only.',
             icon: Icons.mark_chat_unread_rounded,
@@ -259,6 +259,13 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
       ),
     );
   }
+}
+
+bool _usesGlobalAdminInbox(AuthSession session) {
+  final appUser = session.appUser;
+  return appUser.isSuperAdmin ||
+      appUser.isTechnicalSupport ||
+      appUser.isManagerOperation;
 }
 
 enum _InboxFilter {
