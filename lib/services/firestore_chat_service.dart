@@ -636,26 +636,9 @@ class FirestoreChatService {
     int pageSize = 5,
     DocumentSnapshot<Map<String, dynamic>>? startAfter,
   }) async {
-    Query<Map<String, dynamic>> query = _db
-        .collectionGroup('threads')
-        .orderBy('last_message_at', descending: true)
-        .limit(pageSize + 1);
-
-    if (startAfter != null) {
-      query = query.startAfterDocument(startAfter);
-    }
-
-    final snapshot = await query.get();
-    final visibleDocs = snapshot.docs.take(pageSize).toList(growable: false);
-
-    return AdminInboxPage(
-      items: visibleDocs
-          .map(_adminInboxThreadFromDoc)
-          .where((thread) => thread.lastMessage.trim().isNotEmpty)
-          .toList(growable: false),
-      cursor: visibleDocs.isEmpty ? startAfter : visibleDocs.last,
-      hasMore: snapshot.docs.length > pageSize,
-    );
+    // Keep this legacy API safe. UI inboxes now use getAdminInboxPageForCourses
+    // so every role reads only course documents already visible to its session.
+    return const AdminInboxPage(items: [], cursor: null, hasMore: false);
   }
 
   static Future<AdminInboxPage> getAdminInboxPageForCourses({
