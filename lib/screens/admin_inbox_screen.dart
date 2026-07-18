@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../models/auth_session.dart';
@@ -27,7 +26,6 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
 
   final searchController = TextEditingController();
   final List<AdminInboxThread> _threads = [];
-  DocumentSnapshot<Map<String, dynamic>>? _cursor;
   int _scopedOffset = 0;
   _InboxFilter _filter = _InboxFilter.all;
   String _searchQuery = '';
@@ -56,7 +54,6 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
     setState(() {
       if (reset) {
         _loading = true;
-        _cursor = null;
         _scopedOffset = 0;
         _threads.clear();
       } else {
@@ -66,21 +63,15 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
     });
 
     try {
-      final page = _usesGlobalAdminInbox(widget.session)
-          ? await FirestoreChatService.getAdminInboxPage(
-              pageSize: _pageSize,
-              startAfter: reset ? null : _cursor,
-            )
-          : await FirestoreChatService.getAdminInboxPageForCourses(
-              courseIds: widget.session.courses.map((course) => course.id),
-              pageSize: _pageSize,
-              offset: reset ? 0 : _scopedOffset,
-            );
+      final page = await FirestoreChatService.getAdminInboxPageForCourses(
+        courseIds: widget.session.courses.map((course) => course.id),
+        pageSize: _pageSize,
+        offset: reset ? 0 : _scopedOffset,
+      );
       if (!mounted) return;
 
       setState(() {
         _threads.addAll(page.items);
-        _cursor = page.cursor;
         _scopedOffset = _threads.length;
         _hasMore = page.hasMore;
         _loading = false;
@@ -110,7 +101,7 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
           ScreenHeader(
             title: 'Admin Inbox',
             subtitle: _usesGlobalAdminInbox(widget.session)
-                ? 'Newest active chats across your visible courses.'
+                ? 'Newest active chats across your loaded courses.'
                 : 'Newest active chats from your linked courses only.',
             icon: Icons.mark_chat_unread_rounded,
           ),
