@@ -13,6 +13,7 @@ import {
 } from '../lms/contracts/lms-types';
 
 const LMS_SOURCE = 'eacc_lms';
+const AUTH_SYNC_TRANSACTION_TIMEOUT_MS = 60_000;
 
 @Injectable()
 export class AuthSyncService {
@@ -21,43 +22,49 @@ export class AuthSyncService {
   async syncLmsUser(lmsUser: NormalizedLmsUser) {
     const role = toPrismaRole(lmsUser.role);
 
-    return this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.upsert({
-        where: {
-          lmsSource_lmsUserId_role: {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const user = await tx.user.upsert({
+          where: {
+            lmsSource_lmsUserId_role: {
+              lmsSource: LMS_SOURCE,
+              lmsUserId: lmsUser.lmsUserId,
+              role,
+            },
+          },
+          create: {
             lmsSource: LMS_SOURCE,
             lmsUserId: lmsUser.lmsUserId,
             role,
+            name: lmsUser.name,
+            email: lmsUser.email,
+            status: UserStatus.ACTIVE,
+            lastLoginAt: new Date(),
           },
-        },
-        create: {
-          lmsSource: LMS_SOURCE,
-          lmsUserId: lmsUser.lmsUserId,
-          role,
-          name: lmsUser.name,
-          email: lmsUser.email,
-          status: UserStatus.ACTIVE,
-          lastLoginAt: new Date(),
-        },
-        update: {
-          name: lmsUser.name,
-          email: lmsUser.email,
-          status: UserStatus.ACTIVE,
-          lastLoginAt: new Date(),
-        },
-      });
+          update: {
+            name: lmsUser.name,
+            email: lmsUser.email,
+            status: UserStatus.ACTIVE,
+            lastLoginAt: new Date(),
+          },
+        });
 
-      const courses = await Promise.all(
-        lmsUser.courses.map((course) =>
-          this.syncCourseMembership(tx, user.id, role, course),
-        ),
-      );
+        const courses = await Promise.all(
+          lmsUser.courses.map((course) =>
+            this.syncCourseMembership(tx, user.id, role, course),
+          ),
+        );
 
-      return {
-        user,
-        courses,
-      };
-    });
+        return {
+          user,
+          courses,
+        };
+      },
+      {
+        maxWait: 10_000,
+        timeout: AUTH_SYNC_TRANSACTION_TIMEOUT_MS,
+      },
+    );
   }
 
   private async syncCourseMembership(
