@@ -40,6 +40,13 @@ const dashboardPaths: Record<LmsUserRole, string> = {
   admin: '/front.php',
 };
 
+const lmsBrowserHeaders = {
+  'user-agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36',
+  'accept-language': 'en-US,en;q=0.9',
+  'cache-control': 'no-cache',
+};
+
 @Injectable()
 export class EaccLmsClient implements LmsClient {
   constructor(private readonly config: ConfigService<Environment, true>) {}
@@ -107,8 +114,9 @@ export class EaccLmsClient implements LmsClient {
 
     let response: Response;
 
-    try {
-      response = await fetch(endpoint, {
+    response = await this.fetchLms(
+      endpoint,
+      {
         method: 'POST',
         headers: {
           accept: 'text/html,application/json',
@@ -117,11 +125,10 @@ export class EaccLmsClient implements LmsClient {
         },
         body,
         redirect: 'follow',
-        signal: AbortSignal.timeout(timeout),
-      });
-    } catch {
-      throw new LmsUnavailableError();
-    }
+      },
+      timeout,
+      `login ${credentials.role}`,
+    );
 
     const responseText = await response.text();
 
@@ -135,6 +142,9 @@ export class EaccLmsClient implements LmsClient {
     }
 
     if (!response.ok) {
+      console.warn(
+        `[LMS] login ${credentials.role} returned ${response.status} ${response.statusText}`,
+      );
       throw new LmsUnavailableError();
     }
 
@@ -258,8 +268,9 @@ export class EaccLmsClient implements LmsClient {
 
     let response: Response;
 
-    try {
-      response = await fetch(endpoint, {
+    response = await this.fetchLms(
+      endpoint,
+      {
         method: 'POST',
         headers: {
           accept: 'text/html,application/json',
@@ -268,11 +279,10 @@ export class EaccLmsClient implements LmsClient {
         },
         body,
         redirect: 'follow',
-        signal: AbortSignal.timeout(timeout),
-      });
-    } catch {
-      throw new LmsUnavailableError();
-    }
+      },
+      timeout,
+      'admin session login',
+    );
 
     const responseText = await response.text();
 
@@ -286,6 +296,9 @@ export class EaccLmsClient implements LmsClient {
     }
 
     if (!response.ok) {
+      console.warn(
+        `[LMS] admin session login returned ${response.status} ${response.statusText}`,
+      );
       throw new LmsUnavailableError();
     }
 
@@ -371,18 +384,57 @@ export class EaccLmsClient implements LmsClient {
   ): Promise<string> {
     let response: Response;
 
-    try {
-      response = await fetch(new URL('/login.php', baseUrl), {
+    response = await this.fetchLms(
+      new URL('/login.php', baseUrl),
+      {
         headers: { accept: 'text/html' },
-        signal: AbortSignal.timeout(timeout),
-      });
-    } catch {
+      },
+      timeout,
+      'create session',
+    );
+
+    if (!response.ok) {
+      console.warn(
+        `[LMS] create session returned ${response.status} ${response.statusText}`,
+      );
       throw new LmsUnavailableError();
     }
 
-    if (!response.ok) throw new LmsUnavailableError();
-
     return extractSessionCookie(response.headers) ?? '';
+  }
+
+  private async fetchLms(
+    url: URL,
+    init: RequestInit,
+    timeout: number,
+    action: string,
+  ): Promise<Response> {
+    const attempts = 2;
+
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        return await fetch(url, {
+          ...init,
+          headers: {
+            ...lmsBrowserHeaders,
+            ...(init.headers as Record<string, string> | undefined),
+          },
+          signal: AbortSignal.timeout(timeout),
+        });
+      } catch (error) {
+        console.warn(
+          `[LMS] ${action} request failed on attempt ${attempt}/${attempts}: ${formatLmsFetchError(
+            error,
+          )}`,
+        );
+
+        if (attempt < attempts) {
+          await sleep(350);
+        }
+      }
+    }
+
+    throw new LmsUnavailableError();
   }
 
   private async loadDashboard(
@@ -575,18 +627,18 @@ export class EaccLmsClient implements LmsClient {
   ): Promise<string> {
     let response: Response;
 
-    try {
-      response = await fetch(url, {
+    response = await this.fetchLms(
+      url,
+      {
         headers: {
           accept: 'text/html',
           ...(sessionCookie ? { cookie: sessionCookie } : {}),
         },
         redirect: 'follow',
-        signal: AbortSignal.timeout(timeout),
-      });
-    } catch {
-      throw new LmsUnavailableError();
-    }
+      },
+      timeout,
+      `load ${url.pathname}`,
+    );
 
     const html = await response.text();
     if (!response.ok || looksLikeLoginPage(html)) {
@@ -1474,6 +1526,18 @@ function extractSessionCookie(headers: Headers): string | undefined {
 
 function mergeSessionCookie(currentCookie: string, headers: Headers): string {
   return extractSessionCookie(headers) ?? currentCookie;
+}
+
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function formatLmsFetchError(error: unknown): string {
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}`;
+  }
+
+  return String(error);
 }
 
 function looksLikeLoginPage(html: string): boolean {
