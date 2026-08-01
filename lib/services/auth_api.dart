@@ -60,8 +60,49 @@ class AuthApi {
     required String path,
     required String method,
   }) async {
-    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
-    if (idToken == null) {
+    final response = await _sendAuthorizedAdminCourseRequest(
+      path: path,
+      method: method,
+      forceRefreshToken: false,
+    );
+    final body = _decodeResponseBody(response.body);
+
+    if (_shouldRetryWithFreshFirebaseToken(response.statusCode, body)) {
+      final retryResponse = await _sendAuthorizedAdminCourseRequest(
+        path: path,
+        method: method,
+        forceRefreshToken: true,
+      );
+      final retryBody = _decodeResponseBody(retryResponse.body);
+
+      if (retryResponse.statusCode < 200 || retryResponse.statusCode >= 300) {
+        throw AuthApiException(_readErrorMessage(retryBody));
+      }
+
+      return Course.fromBackendJson(retryBody);
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw AuthApiException(_readErrorMessage(body));
+    }
+
+    return Course.fromBackendJson(body);
+  }
+
+  Future<http.Response> _sendAuthorizedAdminCourseRequest({
+    required String path,
+    required String method,
+    required bool forceRefreshToken,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw const AuthApiException(
+        'Your secure session expired. Please log in again.',
+      );
+    }
+
+    final idToken = await user.getIdToken(forceRefreshToken);
+    if (idToken == null || idToken.isEmpty) {
       throw const AuthApiException(
         'Your secure session expired. Please log in again.',
       );
@@ -73,14 +114,28 @@ class AuthApi {
         'Authorization': 'Bearer $idToken',
       });
     final streamed = await _client.send(request);
-    final response = await http.Response.fromStream(streamed);
+    return http.Response.fromStream(streamed);
+  }
 
-    final body = _decodeResponseBody(response.body);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(body['message'] ?? 'Course not found');
+  bool _shouldRetryWithFreshFirebaseToken(
+    int statusCode,
+    Map<String, dynamic> body,
+  ) {
+    if (statusCode != 401) return false;
+
+    final code = body['code'];
+    if (code == 'INVALID_FIREBASE_TOKEN' ||
+        code == 'FIREBASE_TOKEN_INVALID' ||
+        code == 'FIREBASE_TOKEN_EXPIRED') {
+      return true;
     }
 
-    return Course.fromBackendJson(body);
+    final message = body['message'];
+    if (message is! String) return false;
+
+    final normalized = message.toLowerCase();
+    return normalized.contains('firebase session') &&
+        (normalized.contains('invalid') || normalized.contains('expired'));
   }
 
   Map<String, dynamic> _decodeResponseBody(String rawBody) {

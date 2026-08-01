@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { UserRole } from '../../generated/prisma/enums';
+import { CourseStatus, UserRole } from '../../generated/prisma/enums';
 
 jest.mock('../firebase/firebase-token.service', () => ({
   FirebaseTokenService: class FirebaseTokenService {},
@@ -74,16 +74,18 @@ describe('AuthService', () => {
       password: 'password',
     });
 
-    expect(firebaseTokens.createCustomToken).toHaveBeenCalledWith({
-      appUserId: synced.user.id,
-      lmsUserId: '3937',
-      displayName: 'Esam Test',
-      role: 'student',
-      courseIds: ['2191'],
-      isSuperAdmin: false,
-      canViewAllCourses: false,
-      isTechnicalSupport: false,
-    });
+    expect(firebaseTokens.createCustomToken).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appUserId: synced.user.id,
+        lmsUserId: '3937',
+        displayName: 'Esam Test',
+        role: 'student',
+        courseIds: ['2191'],
+        isSuperAdmin: false,
+        canViewAllCourses: false,
+        isTechnicalSupport: false,
+      }),
+    );
     expect(result.firebase).toEqual({ customToken: 'firebase-token' });
     expect(result.nextStep).toBe('ready');
   });
@@ -411,10 +413,7 @@ describe('AuthService', () => {
     expect(result.appUser.canViewAllCourses).toBe(true);
     expect(lmsClient.authenticate).toHaveBeenCalledWith(
       expect.objectContaining({
-        hints: expect.objectContaining({
-          hasFullAccess: false,
-          canViewAllCourses: false,
-        }),
+        hints: { knownCourseIds: [] },
       }),
     );
     expect(firebaseTokens.createCustomToken).toHaveBeenCalledWith(
@@ -425,12 +424,13 @@ describe('AuthService', () => {
     );
   });
 
-  it('grants abdelrahman both super-admin and technical-support access', async () => {
+  it('grants super-admin and technical-support access from LMS flags', async () => {
     const lmsUser = {
       lmsUserId: '92',
       role: 'admin' as const,
       name: 'abdelrahman',
-      isSuperAdmin: false,
+      isSuperAdmin: true,
+      isTechnicalSupport: true,
       courses: [],
     };
     const synced = {
@@ -475,10 +475,7 @@ describe('AuthService', () => {
     expect(result.appUser.isTechnicalSupport).toBe(true);
     expect(lmsClient.authenticate).toHaveBeenCalledWith(
       expect.objectContaining({
-        hints: expect.objectContaining({
-          hasFullAccess: true,
-          canViewAllCourses: true,
-        }),
+        hints: { knownCourseIds: [] },
       }),
     );
     expect(firebaseTokens.createCustomToken).toHaveBeenCalledWith(
@@ -540,10 +537,7 @@ describe('AuthService', () => {
     expect(result.appUser.canViewAllCourses).toBe(false);
     expect(lmsClient.authenticate).toHaveBeenCalledWith(
       expect.objectContaining({
-        hints: expect.objectContaining({
-          hasFullAccess: false,
-          canViewAllCourses: false,
-        }),
+        hints: { knownCourseIds: [] },
       }),
     );
   });
@@ -553,14 +547,14 @@ describe('AuthService', () => {
     { username: 'eman.library', password: 'E123456', name: 'Eman Library' },
     { username: 'niven', password: 'Niven@2025#', name: 'Niven' },
   ])(
-    'temporarily grants hardcoded manager-operation visibility for $username',
+    'grants manager-operation visibility from the LMS flag for $username',
     async ({ username, password, name }) => {
       const lmsUser = {
         lmsUserId: '77',
         role: 'admin' as const,
         name,
         isSuperAdmin: false,
-        isManagerOperation: false,
+        isManagerOperation: true,
         courses: [
           {
             lmsCourseId: '2203',
@@ -645,8 +639,7 @@ describe('AuthService', () => {
       expect(lmsClient.authenticate).toHaveBeenCalledWith(
         expect.objectContaining({
           hints: expect.objectContaining({
-            hasFullAccess: false,
-            canViewAllCourses: true,
+            knownCourseIds: [],
           }),
         }),
       );
@@ -659,4 +652,144 @@ describe('AuthService', () => {
       );
     },
   );
+
+  it('archives active app courses missing from the full-access LMS open-course list', async () => {
+    const lmsUser = {
+      lmsUserId: '14',
+      role: 'admin' as const,
+      name: 'Esam',
+      isSuperAdmin: true,
+      isManagerOperation: false,
+      isCourseCatalogComplete: true,
+      courses: [
+        {
+          lmsCourseId: '2203',
+          name: 'Open Course',
+          category: 'Preparation',
+        },
+      ],
+    };
+    const synced = {
+      user: {
+        id: 'admin-uuid',
+        role: 'ADMIN',
+        name: 'Esam',
+        email: null,
+      },
+      courses: [],
+    };
+    const lmsClient = { authenticate: jest.fn().mockResolvedValue(lmsUser) };
+    const authSync = { syncLmsUser: jest.fn().mockResolvedValue(synced) };
+    const prisma = {
+      course: {
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([
+            {
+              id: 'course-uuid',
+              lmsCourseId: '2203',
+              name: 'Open Course',
+              category: 'Preparation',
+              keyPersonLmsUserId: null,
+              keyPersonName: null,
+              memberships: [],
+            },
+          ]),
+        updateMany: jest.fn().mockResolvedValue({ count: 24 }),
+      },
+    };
+    const firebaseTokens = {
+      createCustomToken: jest.fn().mockResolvedValue('firebase-token'),
+    };
+    const config = {
+      get: jest.fn().mockReturnValue('test'),
+    } as unknown as ConfigService;
+    const service = new AuthService(
+      lmsClient as never,
+      authSync as never,
+      prisma as never,
+      firebaseTokens as never,
+      config as never,
+    );
+
+    const result = await service.login({
+      role: 'admin',
+      username: 'esam',
+      password: 'password',
+    });
+
+    expect(prisma.course.updateMany).toHaveBeenCalledWith({
+      where: {
+        lmsSource: 'eacc_lms',
+        status: CourseStatus.ACTIVE,
+        lmsCourseId: { notIn: ['2203'] },
+      },
+      data: { status: CourseStatus.ARCHIVED },
+    });
+    expect(result.courses).toHaveLength(1);
+    expect(result.courses[0].lmsCourseId).toBe('2203');
+  });
+  it('does not archive cached courses when the LMS open-course list is incomplete', async () => {
+    const lmsUser = {
+      lmsUserId: '14',
+      role: 'admin' as const,
+      name: 'Esam',
+      isSuperAdmin: true,
+      isManagerOperation: false,
+      isCourseCatalogComplete: false,
+      courses: [
+        {
+          lmsCourseId: '2203',
+          name: 'Visible Page 1 Course',
+          category: 'Preparation',
+        },
+      ],
+    };
+    const synced = {
+      user: {
+        id: 'admin-uuid',
+        role: 'ADMIN',
+        name: 'Esam',
+        email: null,
+      },
+      courses: [
+        {
+          id: 'course-uuid',
+          lmsCourseId: '2203',
+          name: 'Visible Page 1 Course',
+          category: 'Preparation',
+        },
+      ],
+    };
+    const lmsClient = { authenticate: jest.fn().mockResolvedValue(lmsUser) };
+    const authSync = { syncLmsUser: jest.fn().mockResolvedValue(synced) };
+    const prisma = {
+      course: {
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn(),
+      },
+    };
+    const firebaseTokens = {
+      createCustomToken: jest.fn().mockResolvedValue('firebase-token'),
+    };
+    const config = {
+      get: jest.fn().mockReturnValue('test'),
+    } as unknown as ConfigService;
+    const service = new AuthService(
+      lmsClient as never,
+      authSync as never,
+      prisma as never,
+      firebaseTokens as never,
+      config as never,
+    );
+
+    await service.login({
+      role: 'admin',
+      username: 'esam',
+      password: 'password',
+    });
+
+    expect(prisma.course.updateMany).not.toHaveBeenCalled();
+  });
 });

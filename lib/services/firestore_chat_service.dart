@@ -635,7 +635,23 @@ class FirestoreChatService {
   static Future<AdminInboxPage> getAdminInboxPage({
     int pageSize = 5,
     DocumentSnapshot<Map<String, dynamic>>? startAfter,
+    Iterable<String>? courseIds,
+    int loadedCount = 0,
   }) async {
+    final scopedCourseIds = courseIds
+        ?.map((courseId) => courseId.trim())
+        .where((courseId) => courseId.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    if (scopedCourseIds != null) {
+      return _getScopedAdminInboxPage(
+        courseIds: scopedCourseIds,
+        pageSize: pageSize,
+        loadedCount: loadedCount,
+      );
+    }
+
     Query<Map<String, dynamic>> query = _db
         .collectionGroup('threads')
         .orderBy('last_message_at', descending: true)
@@ -656,6 +672,51 @@ class FirestoreChatService {
       cursor: visibleDocs.isEmpty ? startAfter : visibleDocs.last,
       hasMore: snapshot.docs.length > pageSize,
     );
+  }
+
+  static Future<AdminInboxPage> _getScopedAdminInboxPage({
+    required List<String> courseIds,
+    required int pageSize,
+    required int loadedCount,
+  }) async {
+    if (courseIds.isEmpty) {
+      return const AdminInboxPage(items: [], cursor: null, hasMore: false);
+    }
+
+    final snapshots = await Future.wait(
+      courseIds.map((courseId) => _threadsRef(courseId: courseId).get()),
+    );
+
+    final threads =
+        snapshots
+            .expand((snapshot) => snapshot.docs)
+            .map(_adminInboxThreadFromDoc)
+            .where((thread) => thread.lastMessage.trim().isNotEmpty)
+            .toList(growable: false)
+          ..sort(_compareAdminInboxThreadsByNewest);
+
+    final visibleThreads = threads
+        .skip(loadedCount)
+        .take(pageSize)
+        .toList(growable: false);
+
+    return AdminInboxPage(
+      items: visibleThreads,
+      cursor: null,
+      hasMore: threads.length > loadedCount + pageSize,
+    );
+  }
+
+  static int _compareAdminInboxThreadsByNewest(
+    AdminInboxThread a,
+    AdminInboxThread b,
+  ) {
+    final aDate = a.lastMessageAt?.toDate();
+    final bDate = b.lastMessageAt?.toDate();
+    if (aDate == null && bDate == null) return 0;
+    if (aDate == null) return 1;
+    if (bDate == null) return -1;
+    return bDate.compareTo(aDate);
   }
 
   static AdminInboxThread _adminInboxThreadFromDoc(

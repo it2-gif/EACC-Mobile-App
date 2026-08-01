@@ -18,23 +18,48 @@ export interface AdminUserListEntry {
   shortName: string;
   isSuperAdmin?: boolean;
   isManagerOperation?: boolean;
+  isTechnicalSupport?: boolean;
   detailsPath?: string;
 }
 
 export interface AdminAccessFlags {
   isSuperAdmin?: boolean;
   isManagerOperation?: boolean;
+  isTechnicalSupport?: boolean;
 }
 
+export interface AdminCourseTableSummary {
+  totalCount?: number;
+  visibleRowCount: number;
+  isComplete: boolean;
+}
+
+export function parseAdminCourseTableSummary(
+  html: string,
+): AdminCourseTableSummary {
+  const $ = cheerio.load(html);
+  const visibleRowCount = findAdminCourseRows($).length;
+  const totalCount = readAdminCourseTotalCount($);
+
+  return {
+    totalCount,
+    visibleRowCount,
+    isComplete: totalCount === undefined || visibleRowCount >= totalCount,
+  };
+}
 export function parseAdminCoursesHtml(
   html: string,
   keyPersonLmsUserId: string,
   keyPersonName: string,
 ): NormalizedLmsCourse[] {
   const $ = cheerio.load(html);
-  const courses = new Map<string, NormalizedLmsCourse>();
+  const rows = findAdminCourseRows($);
+  const candidates: Array<{
+    course: NormalizedLmsCourse;
+    isOpenRow: boolean;
+  }> = [];
 
-  $('tr').each((_, row) => {
+  rows.each((_, row) => {
     const element = $(row);
     const cellElements = element.find('td').toArray();
     const cells = cellElements.map((cell) => cleanText($(cell).text()));
@@ -75,14 +100,25 @@ export function parseAdminCoursesHtml(
 
     if (!name) return;
 
-    courses.set(lmsCourseId, {
-      lmsCourseId,
-      name,
-      category: department,
-      keyPersonLmsUserId,
-      keyPersonName,
+    candidates.push({
+      course: {
+        lmsCourseId,
+        name,
+        category: department,
+        keyPersonLmsUserId,
+        keyPersonName,
+      },
+      isOpenRow: isOpenCourseRow(element),
     });
   });
+
+  const rowsToUse = candidates.some((candidate) => candidate.isOpenRow)
+    ? candidates.filter((candidate) => candidate.isOpenRow)
+    : candidates;
+  const courses = new Map<string, NormalizedLmsCourse>();
+  for (const candidate of rowsToUse) {
+    courses.set(candidate.course.lmsCourseId, candidate.course);
+  }
 
   return [...courses.values()];
 }
@@ -153,11 +189,16 @@ export function parseAdminFromUserList(
         .map((header) => normalizeFieldName($(header).text()));
       const fullAccessIndex = headers.findIndex(isFullAccessField);
       const managerOperationIndex = headers.findIndex(isManagerOperationField);
+      const technicalSupportIndex = headers.findIndex(isTechnicalSupportField);
       const fullAccessCell =
         fullAccessIndex >= 0 ? $(cells[fullAccessIndex]) : undefined;
       const managerOperationCell =
         managerOperationIndex >= 0
           ? $(cells[managerOperationIndex])
+          : undefined;
+      const technicalSupportCell =
+        technicalSupportIndex >= 0
+          ? $(cells[technicalSupportIndex])
           : undefined;
       const isSuperAdmin =
         readFullAccessControl($, $(row)) ??
@@ -168,6 +209,11 @@ export function parseAdminFromUserList(
         readManagerOperationControl($, $(row)) ??
         (managerOperationCell
           ? readExactEnabled(managerOperationCell.text())
+          : undefined);
+      const isTechnicalSupport =
+        readTechnicalSupportControl($, $(row)) ??
+        (technicalSupportCell
+          ? readExactEnabled(technicalSupportCell.text())
           : undefined);
       const detailsPath = $(row)
         .find('a[href]')
@@ -183,6 +229,7 @@ export function parseAdminFromUserList(
         shortName,
         ...(isSuperAdmin === undefined ? {} : { isSuperAdmin }),
         ...(isManagerOperation === undefined ? {} : { isManagerOperation }),
+        ...(isTechnicalSupport === undefined ? {} : { isTechnicalSupport }),
         ...(detailsPath ? { detailsPath } : {}),
       };
       return false; // break $.each
@@ -199,10 +246,14 @@ export function parseAdminAccessFlagsHtml(html: string): AdminAccessFlags {
   const isManagerOperation =
     readManagerOperationControl($, $.root()) ??
     readInlineManagerOperation(html);
+  const isTechnicalSupport =
+    readTechnicalSupportControl($, $.root()) ??
+    readInlineTechnicalSupport(html);
 
   return {
     ...(isSuperAdmin === undefined ? {} : { isSuperAdmin }),
     ...(isManagerOperation === undefined ? {} : { isManagerOperation }),
+    ...(isTechnicalSupport === undefined ? {} : { isTechnicalSupport }),
   };
 }
 
@@ -215,6 +266,29 @@ function readManagerOperationControl(
   element.find('[name]').each((_, control) => {
     const fieldName = normalizeFieldName($(control).attr('name') ?? '');
     if (!isManagerOperationField(fieldName)) return;
+
+    const value = readBooleanControlValue($, control);
+    if (value === true) {
+      result = true;
+      return false;
+    }
+    if (value === false && result === undefined) {
+      result = false;
+    }
+  });
+
+  return result;
+}
+
+function readTechnicalSupportControl(
+  $: CheerioRoot,
+  element: ReturnType<CheerioRoot>,
+): boolean | undefined {
+  let result: boolean | undefined;
+
+  element.find('[name]').each((_, control) => {
+    const fieldName = normalizeFieldName($(control).attr('name') ?? '');
+    if (!isTechnicalSupportField(fieldName)) return;
 
     const value = readBooleanControlValue($, control);
     if (value === true) {
@@ -309,6 +383,10 @@ function isManagerOperationField(value: string): boolean {
   );
 }
 
+function isTechnicalSupportField(value: string): boolean {
+  return value === 'tec' || value === 'tech' || value === 'technicalsupport';
+}
+
 function isAdminDetailsPath(href: string, adminId: string): boolean {
   if (/delete|remove/i.test(href)) return false;
 
@@ -342,6 +420,15 @@ function readInlineManagerOperation(html: string): boolean | undefined {
   ]);
 }
 
+function readInlineTechnicalSupport(html: string): boolean | undefined {
+  return readInlineBooleanFlag(html, [
+    'tec',
+    'tech',
+    'technical_support',
+    'technicalsupport',
+  ]);
+}
+
 function readInlineBooleanFlag(
   html: string,
   compactKeys: string[],
@@ -363,20 +450,54 @@ function readInlineBooleanFlag(
 
 export function parseAdminCourseIdsHtml(html: string): string[] {
   const $ = cheerio.load(html);
+  const rows = findAdminCourseRows($);
+  const rowCandidates: Array<{ id: string; isOpenRow: boolean }> = [];
+
+  rows.each((_, row) => {
+    const element = $(row);
+    const id =
+      element
+        .find('a[href*="wcid="]')
+        .toArray()
+        .map((link) => courseIdPattern.exec($(link).attr('href') ?? '')?.[1])
+        .find((value): value is string => Boolean(value)) ??
+      element
+        .find('td')
+        .toArray()
+        .map((cell) => cleanText($(cell).text()))
+        .find((value) => /^\d+$/.test(value));
+
+    if (id) rowCandidates.push({ id, isOpenRow: isOpenCourseRow(element) });
+  });
+
+  if (rowCandidates.some((candidate) => candidate.isOpenRow)) {
+    return [
+      ...new Set(
+        rowCandidates
+          .filter((candidate) => candidate.isOpenRow)
+          .map((candidate) => candidate.id),
+      ),
+    ];
+  }
+
+  if (rowCandidates.length > 0) {
+    return [...new Set(rowCandidates.map((candidate) => candidate.id))];
+  }
+
+  const openCourses = $('#Open');
+  const linkSelector =
+    openCourses.length > 0 ? '#Open a[href*="wcid="]' : 'a[href*="wcid="]';
   const courseIds = new Set<string>();
 
   // Primary: standard anchor href attributes.
-  $('a[href*="wcid="]').each((_, link) => {
+  $(linkSelector).each((_, link) => {
     const id = courseIdPattern.exec($(link).attr('href') ?? '')?.[1];
     if (id) courseIds.add(id);
   });
 
-  // Fallback: scan the entire raw HTML for every wcid= occurrence.
-  // This catches course IDs embedded in JavaScript onclick handlers,
-  // data-* attributes, form action URLs, and any other inline context
-  // that the DOM selector above would miss (e.g. LMS pages that use
-  // JS-driven navigation instead of plain <a href> links).
-  for (const match of html.matchAll(/[?&]wcid=([A-Za-z0-9_-]+)/gi)) {
+  // Fallback: scan the scoped raw HTML for every wcid= occurrence.
+  const scopedHtml = openCourses.length > 0 ? (openCourses.html() ?? '') : html;
+  for (const match of scopedHtml.matchAll(/[?&]wcid=([A-Za-z0-9_-]+)/gi)) {
     if (match[1]) courseIds.add(match[1]);
   }
 
@@ -484,6 +605,46 @@ function isCourseName(value: string): boolean {
 
 function cleanText(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
+}
+
+function readAdminCourseTotalCount($: CheerioRoot): number | undefined {
+  const pageText = cleanText($('body').text());
+  const totalClasses = /\bTotal\s+Classes\s*:\s*(\d+)\b/i.exec(pageText)?.[1];
+  const dataTablesTotal =
+    /\bShowing\s+\d+\s+to\s+\d+\s+of\s+(\d+)\s+entries\b/i.exec(pageText)?.[1];
+  const value = totalClasses ?? dataTablesTotal;
+  return value ? Number(value) : undefined;
+}
+function findAdminCourseRows($: CheerioRoot): ReturnType<CheerioRoot> {
+  const tableRows = $('#example2 tbody tr');
+  if (tableRows.length > 0) return tableRows;
+
+  const openRows = $('#Open tr');
+  if (openRows.length > 0) return openRows;
+
+  return $('tr');
+}
+
+function isOpenCourseRow(element: ReturnType<CheerioRoot>): boolean {
+  const marker = [
+    element.attr('class') ?? '',
+    element.attr('style') ?? '',
+    element.attr('data-status') ?? '',
+    element.attr('data-course-status') ?? '',
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  return (
+    /\b(open|active|working|success|table-success)\b/.test(marker) ||
+    marker.includes('background-color: green') ||
+    marker.includes('background: green') ||
+    marker.includes('#c3e6cb') ||
+    marker.includes('#d4edda') ||
+    marker.includes('rgb(195, 230, 203)') ||
+    marker.includes('rgb(212, 237, 218)') ||
+    marker.includes('lightgreen')
+  );
 }
 
 function readMultilineCell(

@@ -58,6 +58,10 @@ export function parseLmsResponse(
     expectedRole === 'admin'
       ? hasAdminManagerOperation(data) || hasAdminManagerOperation(root)
       : false;
+  const isTechnicalSupport =
+    expectedRole === 'admin'
+      ? hasAdminTechnicalSupport(data) || hasAdminTechnicalSupport(root)
+      : false;
 
   if (responseRole && normalizeRole(responseRole) !== expectedRole) {
     throw new InvalidLmsResponseError();
@@ -70,6 +74,7 @@ export function parseLmsResponse(
     email,
     isSuperAdmin,
     isManagerOperation,
+    isTechnicalSupport,
     courses: readCourses(
       data.courses ?? root.courses,
       root.admin ?? data.admin,
@@ -103,6 +108,11 @@ export function parseLmsPhpArrayResponse(
     'managerOperation',
     'manager_op',
     'managerOp',
+    'tec',
+    'tech',
+    'technical_support',
+    'technicalSupport',
+    'isTechnicalSupport',
   ];
 
   for (const key of keys) {
@@ -219,6 +229,18 @@ function hasAdminManagerOperation(data: JsonObject): boolean {
   return managerOperation === 1;
 }
 
+function hasAdminTechnicalSupport(data: JsonObject): boolean {
+  const technicalSupport = readOptionalNumber(data, [
+    'tec',
+    'tech',
+    'technical_support',
+    'technicalSupport',
+    'isTechnicalSupport',
+  ]);
+
+  return technicalSupport === 1;
+}
+
 function asObject(value: unknown): JsonObject {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new InvalidLmsResponseError();
@@ -313,3 +335,4 @@ function normalizeRole(value: string): LmsUserRole | undefined {
 
   return undefined;
 }
+

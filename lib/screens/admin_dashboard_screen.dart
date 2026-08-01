@@ -33,7 +33,7 @@ class AdminDashboardScreen extends StatelessWidget {
     final isSuperAdmin = session.appUser.isSuperAdmin;
     final canSeeAnalysis =
         session.appUser.isSuperAdmin || session.appUser.isTechnicalSupport;
-    final canSeeAdminInbox = _usesGlobalAdminInbox(session);
+    final canSeeAdminInbox = _canUseAdminInbox(session);
     final insights = _DashboardInsights.fromSession(session);
     final adminUnreadCourseIds = _adminUnreadCourseIds(session);
     final quickActions = <Widget>[
@@ -84,7 +84,9 @@ class AdminDashboardScreen extends StatelessWidget {
         _NavTile(
           icon: Icons.mark_chat_unread_rounded,
           title: 'Admin Inbox',
-          subtitle: 'Review newest active chats from all visible courses',
+          subtitle: _usesGlobalAdminInbox(session)
+              ? 'Review newest active chats from all visible courses'
+              : 'Review newest chats from your linked courses only',
           color: AppColors.primaryDark,
           unreadStream: FirestoreChatService.getAdminUnreadTotalForCourses(
             adminUnreadCourseIds,
@@ -203,6 +205,19 @@ bool _usesGlobalAdminInbox(AuthSession session) {
       appUser.isManagerOperation;
 }
 
+bool _canUseAdminInbox(AuthSession session) {
+  return _usesGlobalAdminInbox(session) || session.courses.isNotEmpty;
+}
+
+List<String>? _adminInboxCourseScope(AuthSession session) {
+  if (_usesGlobalAdminInbox(session)) return null;
+
+  return session.courses
+      .map((course) => course.id.trim())
+      .where((courseId) => courseId.isNotEmpty)
+      .toSet()
+      .toList(growable: false);
+}
 // ─── Welcome header ─────────────────────────────────────────────────────────
 
 class _WelcomeHeader extends StatelessWidget {
@@ -312,7 +327,7 @@ class _WelcomeHeader extends StatelessWidget {
                         isSuperAdmin
                             ? 'Full access enabled'
                             : canViewAllCourses
-                            ? 'Academic manager access'
+                            ? 'Manager operation access'
                             : 'Linked courses only',
                         style: const TextStyle(
                           color: Colors.white,
@@ -447,7 +462,7 @@ class _TodayOverviewSection extends StatelessWidget {
                 width: itemWidth,
                 child: _OverviewCard(
                   icon: Icons.menu_book_rounded,
-                  label: 'Courses',
+                  label: 'Active courses',
                   value: insights.courses,
                   helper: 'Available to this admin',
                   color: AppColors.primary,
@@ -605,7 +620,10 @@ class _AdminLiveInboxPanelsState extends State<_AdminLiveInboxPanels> {
   }
 
   Future<AdminInboxPage> _loadInbox() {
-    return FirestoreChatService.getAdminInboxPage(pageSize: 8);
+    return FirestoreChatService.getAdminInboxPage(
+      pageSize: 8,
+      courseIds: _adminInboxCourseScope(widget.session),
+    );
   }
 
   Future<void> _refresh({bool silent = false}) async {
@@ -675,8 +693,9 @@ class _AdminLiveInboxPanelsState extends State<_AdminLiveInboxPanels> {
 
     return _DashboardSection(
       title: 'Live conversations',
-      subtitle:
-          'Newest activity and unread admin work. Auto-refreshes every 20 seconds.',
+      subtitle: _usesGlobalAdminInbox(widget.session)
+          ? 'Newest activity and unread admin work. Auto-refreshes every 20 seconds.'
+          : 'Newest linked-course activity. Auto-refreshes every 20 seconds.',
       child: LayoutBuilder(
         builder: (context, constraints) {
           final wide = constraints.maxWidth >= 860;
@@ -2780,3 +2799,5 @@ class _NavTile extends StatelessWidget {
     return tile;
   }
 }
+
+

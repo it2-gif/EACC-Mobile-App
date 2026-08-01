@@ -15,15 +15,6 @@ export interface LmsLoginCredentials {
      * listed on the admin's LMS dashboard page.
      */
     knownCourseIds?: string[];
-    /**
-     * Authorization decision made by AuthService before LMS course discovery.
-     * LMS response fields must not promote an admin independently.
-     */
-    hasFullAccess?: boolean;
-    /**
-     * Allows non-super-admin manager accounts to load every course/chat while
-     * keeping destructive super-admin permissions disabled.
-     */
     canViewAllCourses?: boolean;
   };
 }
@@ -51,6 +42,9 @@ export interface NormalizedLmsUser {
   email?: string;
   isSuperAdmin?: boolean;
   isManagerOperation?: boolean;
+  isTechnicalSupport?: boolean;
+  isAcademic?: boolean;
   canViewAllCourses?: boolean;
+  isCourseCatalogComplete?: boolean;
   courses: NormalizedLmsCourse[];
 }

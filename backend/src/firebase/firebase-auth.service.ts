@@ -25,6 +25,10 @@ export interface FirebaseIdentity {
   isSuperAdmin?: boolean;
   canViewAllCourses?: boolean;
   isTechnicalSupport?: boolean;
+  isManagerOperation?: boolean;
+  isContactPerson?: boolean;
+  isAcademic?: boolean;
+  adminType?: string | null;
 }
 
 @Injectable()
@@ -46,6 +50,12 @@ export class FirebaseAuthService {
       canViewAllCourses:
         identity.role === 'admin' && identity.canViewAllCourses === true,
       isTechnicalSupport: identity.isTechnicalSupport === true,
+      isManagerOperation:
+        identity.role === 'admin' && identity.isManagerOperation === true,
+      isContactPerson:
+        identity.role === 'admin' && identity.isContactPerson === true,
+      isAcademic: identity.role === 'admin' && identity.isAcademic === true,
+      adminType: identity.adminType ?? null,
     });
   }
 
@@ -100,3 +110,4 @@ export class FirebaseAuthService {
     return this.app;
   }
 }
+

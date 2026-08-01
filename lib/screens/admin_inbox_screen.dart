@@ -48,11 +48,7 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
   @override
   void initState() {
     super.initState();
-    if (_usesGlobalAdminInbox(widget.session)) {
-      _load(reset: true);
-    } else {
-      _loading = false;
-    }
+    _load(reset: true);
   }
 
   Future<void> _load({required bool reset}) async {
@@ -71,6 +67,8 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
       final page = await FirestoreChatService.getAdminInboxPage(
         pageSize: _pageSize,
         startAfter: reset ? null : _cursor,
+        courseIds: _adminInboxCourseScope(widget.session),
+        loadedCount: reset ? 0 : _threads.length,
       );
       if (!mounted) return;
 
@@ -84,7 +82,7 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = _friendlyInboxError(e);
         _loading = false;
         _loadingMore = false;
       });
@@ -93,102 +91,111 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_usesGlobalAdminInbox(widget.session)) {
+    final scopedCourseIds = _adminInboxCourseScope(widget.session);
+    final isScopedInbox = scopedCourseIds != null;
+
+    if (isScopedInbox && scopedCourseIds.isEmpty) {
       return const AppScaffold(
         title: 'Admin Inbox',
         showLogout: false,
         body: Padding(
           padding: EdgeInsets.fromLTRB(16, 16, 16, 28),
           child: PolishedStateCard(
-            icon: Icons.lock_outline_rounded,
-            title: 'Admin Inbox is not available',
+            icon: Icons.link_off_rounded,
+            title: 'No linked courses yet',
             message:
-                'Contact-person admins can open live chats from their linked courses instead.',
+                'Admin Inbox will show chats after the LMS links courses to this contact-person account.',
             color: AppColors.primary,
           ),
         ),
       );
     }
-
     final visibleThreads = _filteredThreads;
     final filterCounts = _filterCounts;
 
     return AppScaffold(
       title: 'Admin Inbox',
       showLogout: false,
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-        children: [
-          ScreenHeader(
-            title: 'Admin Inbox',
-            subtitle: 'Newest active chats across your visible courses.',
-            icon: Icons.mark_chat_unread_rounded,
-          ),
-          const SizedBox(height: 16),
-          if (_loading && _threads.isEmpty)
-            const PolishedLoadingCard(
-              title: 'Loading recent chats',
-              message: 'Fetching the newest 5 chat summaries only.',
-            )
-          else if (_error != null && _threads.isEmpty)
-            PolishedStateCard(
-              icon: Icons.error_outline_rounded,
-              title: 'Could not load inbox',
-              message: _error!,
-              color: AppColors.danger,
-              actionLabel: 'Retry',
-              onAction: () => _load(reset: true),
-            )
-          else if (_threads.isEmpty)
-            const PolishedStateCard(
-              icon: Icons.forum_outlined,
-              title: 'No active chats yet',
-              message:
-                  'Chats with messages will appear here from newest to oldest.',
-              color: AppColors.primary,
-            )
-          else ...[
-            _InboxSummary(
-              loadedCount: _threads.length,
-              visibleCount: visibleThreads.length,
-              unreadCount: _threads.fold(
-                0,
-                (total, thread) => total + thread.adminUnreadCount,
-              ),
+      body: RefreshIndicator(
+        onRefresh: () => _load(reset: true),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+          children: [
+            ScreenHeader(
+              title: 'Admin Inbox',
+              subtitle: isScopedInbox
+                  ? 'Newest active chats from your linked courses only.'
+                  : 'Newest active chats across your visible courses.',
+              icon: Icons.mark_chat_unread_rounded,
             ),
-            const SizedBox(height: 12),
-            _InboxControls(
-              controller: searchController,
-              selectedFilter: _filter,
-              filterCounts: filterCounts,
-              onFilterChanged: (filter) => setState(() => _filter = filter),
-              onSearchChanged: (value) {
-                setState(() => _searchQuery = value);
-              },
-            ),
-            const SizedBox(height: 12),
-            if (visibleThreads.isEmpty)
-              _FilteredInboxEmptyState(
-                hasMore: _hasMore,
-                onLoadMore: () => _load(reset: false),
+            const SizedBox(height: 16),
+            if (_loading && _threads.isEmpty)
+              const PolishedLoadingCard(
+                title: 'Loading recent chats',
+                message: 'Fetching the newest 5 chat summaries only.',
               )
-            else
-              ...visibleThreads.map(
-                (thread) => _AdminInboxTile(
-                  thread: thread,
-                  course: _coursesById[thread.courseId],
-                  onTap: () => _openThread(thread),
+            else if (_error != null && _threads.isEmpty)
+              PolishedStateCard(
+                icon: Icons.error_outline_rounded,
+                title: 'Could not load inbox',
+                message: _error!,
+                color: AppColors.danger,
+                actionLabel: 'Retry',
+                onAction: () => _load(reset: true),
+              )
+            else if (_threads.isEmpty)
+              const PolishedStateCard(
+                icon: Icons.forum_outlined,
+                title: 'No active chats yet',
+                message:
+                    'Chats with messages will appear here from newest to oldest.',
+                color: AppColors.primary,
+              )
+            else ...[
+              _InboxSummary(
+                loadedCount: _threads.length,
+                visibleCount: visibleThreads.length,
+                unreadCount: _threads.fold(
+                  0,
+                  (total, thread) => total + thread.adminUnreadCount,
                 ),
+                scopedCourseCount: scopedCourseIds?.length,
               ),
-            const SizedBox(height: 12),
-            _LoadMoreInboxCard(
-              loaded: _threads.length,
-              hasMore: _hasMore,
-              loading: _loadingMore,
-              onLoadMore: () => _load(reset: false),
-            ),
+              const SizedBox(height: 12),
+              _InboxControls(
+                controller: searchController,
+                selectedFilter: _filter,
+                filterCounts: filterCounts,
+                onFilterChanged: (filter) => setState(() => _filter = filter),
+                onSearchChanged: (value) {
+                  setState(() => _searchQuery = value);
+                },
+              ),
+              const SizedBox(height: 12),
+              if (visibleThreads.isEmpty)
+                _FilteredInboxEmptyState(
+                  hasMore: _hasMore,
+                  onLoadMore: () => _load(reset: false),
+                )
+              else
+                ...visibleThreads.map(
+                  (thread) => _AdminInboxTile(
+                    thread: thread,
+                    course: _coursesById[thread.courseId],
+                    onTap: () => _openThread(thread),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              _LoadMoreInboxCard(
+                loaded: _threads.length,
+                hasMore: _hasMore,
+                loading: _loadingMore,
+                onLoadMore: () => _load(reset: false),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -271,11 +278,38 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
   }
 }
 
+String _friendlyInboxError(Object error) {
+  if (error is FirebaseException) {
+    if (error.code == 'failed-precondition') {
+      return 'Firebase needs an index for this inbox query. Create the index from the Firebase Console link, then retry.';
+    }
+    if (error.code == 'permission-denied') {
+      return 'Your Firebase session does not have permission to read this inbox. Please logout and login again.';
+    }
+    if (error.code == 'unauthenticated') {
+      return 'Your Firebase session expired. Please logout and login again.';
+    }
+    return error.message ?? error.code;
+  }
+
+  return error.toString();
+}
+
 bool _usesGlobalAdminInbox(AuthSession session) {
   final appUser = session.appUser;
   return appUser.isSuperAdmin ||
       appUser.isTechnicalSupport ||
       appUser.isManagerOperation;
+}
+
+List<String>? _adminInboxCourseScope(AuthSession session) {
+  if (_usesGlobalAdminInbox(session)) return null;
+
+  return session.courses
+      .map((course) => course.id.trim())
+      .where((courseId) => courseId.isNotEmpty)
+      .toSet()
+      .toList(growable: false);
 }
 
 enum _InboxFilter {
@@ -295,11 +329,13 @@ class _InboxSummary extends StatelessWidget {
   final int loadedCount;
   final int visibleCount;
   final int unreadCount;
+  final int? scopedCourseCount;
 
   const _InboxSummary({
     required this.loadedCount,
     required this.visibleCount,
     required this.unreadCount,
+    this.scopedCourseCount,
   });
 
   @override
@@ -330,8 +366,10 @@ class _InboxSummary extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Newest chats, loaded in small batches',
+                Text(
+                  scopedCourseCount == null
+                      ? 'Newest chats, loaded in small batches'
+                      : 'Scoped inbox for linked courses',
                   style: TextStyle(
                     color: AppColors.ink,
                     fontWeight: FontWeight.w900,

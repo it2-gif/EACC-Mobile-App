@@ -35,7 +35,10 @@ describe('AuthSyncService', () => {
     const tx = {
       user: { upsert: jest.fn().mockResolvedValue(user) },
       course: { upsert: jest.fn().mockResolvedValue(course) },
-      courseMembership: { upsert: jest.fn().mockResolvedValue({}) },
+      courseMembership: {
+        upsert: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
     };
     const prisma = {
       $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) =>
@@ -118,7 +121,10 @@ describe('AuthSyncService', () => {
           .mockResolvedValueOnce(student),
       },
       course: { upsert: jest.fn().mockResolvedValue(course) },
-      courseMembership: { upsert: jest.fn().mockResolvedValue({}) },
+      courseMembership: {
+        upsert: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
     };
     const prisma = {
       $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) =>
@@ -204,7 +210,10 @@ describe('AuthSyncService', () => {
           .mockResolvedValueOnce(teacher),
       },
       course: { upsert: jest.fn().mockResolvedValue(course) },
-      courseMembership: { upsert: jest.fn().mockResolvedValue({}) },
+      courseMembership: {
+        upsert: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
     };
     const prisma = {
       $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) =>
@@ -262,5 +271,87 @@ describe('AuthSyncService', () => {
         }),
       }),
     );
+  });
+
+  it('inactivates stale active teacher and student memberships when LMS sends the current roster', async () => {
+    const admin = {
+      id: 'admin-1',
+      role: UserRole.ADMIN,
+      name: 'Admin One',
+      email: null,
+    };
+    const teacher = {
+      id: 'teacher-current',
+      role: UserRole.TEACHER,
+      name: 'Current Teacher',
+      email: null,
+    };
+    const student = {
+      id: 'student-current',
+      role: UserRole.STUDENT,
+      name: 'Current Student',
+      email: null,
+    };
+    const course = {
+      id: 'course-1',
+      lmsCourseId: '2203',
+      name: 'Preparation IELTS - IELTS',
+      category: 'Preparation',
+    };
+    const tx = {
+      user: {
+        upsert: jest
+          .fn()
+          .mockResolvedValueOnce(admin)
+          .mockResolvedValueOnce(teacher)
+          .mockResolvedValueOnce(student),
+      },
+      course: { upsert: jest.fn().mockResolvedValue(course) },
+      courseMembership: {
+        upsert: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
+    const prisma = {
+      $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+
+    const service = new AuthSyncService(prisma as never);
+    await service.syncLmsUser({
+      lmsUserId: 'admin-lms-id',
+      role: 'admin',
+      name: 'Admin One',
+      courses: [
+        {
+          lmsCourseId: '2203',
+          name: 'Preparation IELTS - IELTS',
+          category: 'Preparation',
+          teacherLmsUserId: '721258',
+          teacherName: 'Current Teacher',
+          students: [{ lmsUserId: '9001', name: 'Current Student' }],
+        },
+      ],
+    });
+
+    expect(tx.courseMembership.updateMany).toHaveBeenCalledWith({
+      where: {
+        courseId: 'course-1',
+        role: UserRole.TEACHER,
+        status: MembershipStatus.ACTIVE,
+        userId: { notIn: ['teacher-current'] },
+      },
+      data: expect.objectContaining({ status: MembershipStatus.INACTIVE }),
+    });
+    expect(tx.courseMembership.updateMany).toHaveBeenCalledWith({
+      where: {
+        courseId: 'course-1',
+        role: UserRole.STUDENT,
+        status: MembershipStatus.ACTIVE,
+        userId: { notIn: ['student-current'] },
+      },
+      data: expect.objectContaining({ status: MembershipStatus.INACTIVE }),
+    });
   });
 });

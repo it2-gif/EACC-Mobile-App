@@ -184,7 +184,7 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
     final showingManagerLinkedCourses =
         isManagerOperation && managerCourseTabIndex == 0;
     final hasSearchText = searchQuery.trim().isNotEmpty;
-    final courses = showingManagerLinkedCourses
+        final courses = showingManagerLinkedCourses
         ? managerLinkedCourses
         : isManagerOperation
         ? (searchedCourse != null ? [searchedCourse!] : const <Course>[])
@@ -205,7 +205,7 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
             subtitle: isSuperAdmin
                 ? 'Full access is enabled. Search a course ID to view its chats.'
                 : isManagerOperation
-                ? 'Academic manager access is active. Search a course ID to view its chats.'
+                ? 'Manager operation access is active. Search a course ID to view its chats.'
                 : widget.session.courses.isEmpty
                 ? 'No courses are linked to your contact-person account yet.'
                 : 'Contact-person access is active. You can monitor only your linked courses.',
@@ -244,7 +244,7 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
               courses: courses,
               titleOverride: isManagerOperation
                   ? showingManagerLinkedCourses
-                        ? 'Academic portfolio overview'
+                        ? 'Manager operation portfolio overview'
                         : 'Course directory overview'
                   : null,
             ),
@@ -294,7 +294,7 @@ class _AdminCoursesScreenState extends State<AdminCoursesScreen> {
                   ? 'No active courses'
                   : 'No linked courses',
               subtitle: showingManagerLinkedCourses
-                  ? 'Courses assigned to your academic manager profile will appear here.'
+                  ? 'Courses assigned to your manager operation profile will appear here.'
                   : canViewAllCourses
                   ? 'Courses will appear here after they are synced.'
                   : 'Ask a full-access admin to assign you as contact person in the LMS, then log in again.',
@@ -637,7 +637,7 @@ class _AccessSummary extends StatelessWidget {
                         (isSuperAdmin
                             ? 'Full access admin'
                             : canViewAllCourses
-                            ? 'Academic manager courses and students'
+                            ? 'Manager operation courses and students'
                             : 'Contact manager courses and students'),
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
@@ -759,6 +759,7 @@ class _AdminCourseCard extends StatefulWidget {
 
 class _AdminCourseCardState extends State<_AdminCourseCard> {
   int? _lastUnreadCount;
+  bool _isOpeningCourse = false;
 
   @override
   Widget build(BuildContext context) {
@@ -825,14 +826,30 @@ class _AdminCourseCardState extends State<_AdminCourseCard> {
           );
         }
 
-        return CourseCard(
-          course: widget.course,
-          unreadCount: totalUnread,
-          unreadLabel: totalUnread == 1
-              ? '1 unread total'
-              : '$totalUnread unread total',
-          customBadges: customBadges.isNotEmpty ? customBadges : null,
-          onTap: _openThreads,
+        return Stack(
+          children: [
+            CourseCard(
+              course: widget.course,
+              unreadCount: totalUnread,
+              unreadLabel: totalUnread == 1
+                  ? '1 unread total'
+                  : '$totalUnread unread total',
+              customBadges: customBadges.isNotEmpty ? customBadges : null,
+              onTap: _openThreads,
+            ),
+            if (_isOpeningCourse)
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: const Center(
+                    child: _CourseOpeningPill(),
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );
@@ -867,18 +884,92 @@ class _AdminCourseCardState extends State<_AdminCourseCard> {
         (adminName.isNotEmpty && keyPersonName == adminName);
   }
 
-  void _openThreads() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AdminThreadsScreen(
-          courseId: widget.course.id,
-          courseName: widget.course.displayTitle,
-          teacherName: widget.course.teacherName,
-          keyPersonName: widget.course.keyPersonName,
-          students: widget.course.students,
-          session: widget.session,
+  Future<void> _openThreads() async {
+    if (_isOpeningCourse) return;
+
+    setState(() => _isOpeningCourse = true);
+
+    try {
+      final course = await _loadCourseForOpen();
+      if (!mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AdminThreadsScreen(
+            courseId: course.id,
+            courseName: course.displayTitle,
+            teacherName: course.teacherName,
+            keyPersonName: course.keyPersonName,
+            students: course.students,
+            session: widget.session,
+          ),
         ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not load this course roster: ${error.toString().replaceFirst('Exception: ', '')}',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isOpeningCourse = false);
+    }
+  }
+
+  Future<Course> _loadCourseForOpen() async {
+    final appUser = widget.session.appUser;
+    final shouldUseOnDemandDetail =
+        appUser.canViewAllCourses || appUser.isManagerOperation;
+    if (!shouldUseOnDemandDetail) return widget.course;
+
+    final api = AuthApi();
+    final cachedCourse = await api.fetchCourse(widget.course.id);
+    if (cachedCourse.students.isNotEmpty) return cachedCourse;
+
+    return api.refreshCourse(widget.course.id);
+  }
+}
+
+class _CourseOpeningPill extends StatelessWidget {
+  const _CourseOpeningPill();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.ink.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox.square(
+            dimension: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          SizedBox(width: 10),
+          Text(
+            'Loading course roster...',
+            style: TextStyle(
+              color: AppColors.ink,
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -907,3 +998,7 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
+
+
+
+

@@ -23,13 +23,14 @@ import {
 import { AuthSyncService } from './auth-sync.service';
 import { LmsLoginDto } from './dto/lms-login.dto';
 
-const TECHNICAL_SUPPORT_USERNAME = 'abdelrahman';
-const TECHNICAL_SUPPORT_PASSWORD = 'Casillas2004';
-const HARDCODED_MANAGER_OPERATION_CREDENTIALS = [
-  { username: 'youssef', password: 'youssef@2023' },
-  { username: 'eman.library', password: 'E123456' },
-  { username: 'niven', password: 'Niven@2025#' },
-];
+const LMS_SOURCE = 'eacc_lms';
+
+type AdminType =
+  | 'contact_person'
+  | 'operation_manager'
+  | 'super_admin'
+  | 'super_admin_technical_support'
+  | 'academic';
 
 @Injectable()
 export class AuthService {
@@ -43,19 +44,6 @@ export class AuthService {
 
   async login(credentials: LmsLoginDto) {
     try {
-      const hasTechnicalSupportCredentials =
-        credentials.role === 'admin' &&
-        this.matchesHardcodedTechnicalSupport(credentials);
-      const hasHardcodedManagerOperationCredentials =
-        credentials.role === 'admin' &&
-        this.matchesHardcodedCredentials(
-          credentials,
-          HARDCODED_MANAGER_OPERATION_CREDENTIALS,
-        );
-      const hasPreAuthFullAccess = hasTechnicalSupportCredentials;
-      const hasPreAuthAllCourses =
-        hasPreAuthFullAccess || hasHardcodedManagerOperationCredentials;
-
       // For admin logins, pre-fetch course IDs that are ALREADY known to belong
       // to this admin in our DB. These are passed as hints to the LMS client so
       // it can skip straight to verifying only the admin's own courses (fast path
@@ -84,36 +72,26 @@ export class AuthService {
 
       const lmsUser = await this.lmsClient.authenticate({
         ...credentials,
-        ...(knownCourseIds || hasPreAuthAllCourses
+        ...(knownCourseIds
           ? {
-              hints: {
-                ...(knownCourseIds ? { knownCourseIds } : {}),
-                hasFullAccess: hasPreAuthFullAccess,
-                canViewAllCourses: hasPreAuthAllCourses,
-              },
+              hints: { knownCourseIds },
             }
           : {}),
       });
       const synced = await this.authSync.syncLmsUser(lmsUser);
-      const isTechnicalSupport = hasTechnicalSupportCredentials;
-      const isSuperAdmin =
-        lmsUser.role === 'admin' &&
-        (lmsUser.isSuperAdmin === true || isTechnicalSupport);
-      const isManagerOperation =
-        lmsUser.role === 'admin' &&
-        !isSuperAdmin &&
-        (lmsUser.isManagerOperation === true ||
-          hasHardcodedManagerOperationCredentials);
-      const canViewAllCourses =
-        lmsUser.role === 'admin' &&
-        (isSuperAdmin || isManagerOperation || isTechnicalSupport);
+      const adminAccess = this.resolveAdminAccess(
+        lmsUser,
+        credentials.username,
+      );
       const adminCourses =
-        lmsUser.role === 'admin' && canViewAllCourses
+        lmsUser.role === 'admin' && adminAccess.canViewAllCourses
           ? await this.loadAdminCourses(
               lmsUser.lmsUserId,
               credentials.username.trim().toLowerCase(),
               lmsUser.name,
-              canViewAllCourses,
+              adminAccess.canViewAllCourses,
+              adminAccess.isSuperAdmin &&
+                lmsUser.isCourseCatalogComplete === true,
               lmsUser.courses,
             )
           : null;
@@ -121,7 +99,7 @@ export class AuthService {
         adminCourses ??
         (await this.loadSessionCourses(synced.courses, lmsUser.courses));
       const courseIds =
-        isManagerOperation && !isSuperAdmin
+        adminAccess.isManagerOperation && !adminAccess.isSuperAdmin
           ? []
           : sessionCourses.map((course) => course.lmsCourseId);
       const firebaseCustomToken = await this.firebaseTokens.createCustomToken({
@@ -130,29 +108,21 @@ export class AuthService {
         displayName: synced.user.name,
         role: lmsUser.role,
         courseIds,
-        isSuperAdmin,
-        canViewAllCourses,
-        isTechnicalSupport,
+        ...adminAccess,
       });
 
       return {
         status: 'authenticated',
         user: {
           ...lmsUser,
-          isSuperAdmin,
-          isManagerOperation,
-          canViewAllCourses,
-          isTechnicalSupport,
+          ...adminAccess,
         },
         appUser: {
           id: synced.user.id,
           role: synced.user.role.toLowerCase(),
           name: synced.user.name,
           email: synced.user.email,
-          isSuperAdmin,
-          isManagerOperation,
-          canViewAllCourses,
-          isTechnicalSupport,
+          ...adminAccess,
         },
         courses: sessionCourses,
         firebase: { customToken: firebaseCustomToken },
@@ -188,25 +158,64 @@ export class AuthService {
     }
   }
 
-  private matchesHardcodedTechnicalSupport(credentials: LmsLoginDto): boolean {
-    return (
-      credentials.username.trim().toLowerCase() ===
-        TECHNICAL_SUPPORT_USERNAME &&
-      credentials.password === TECHNICAL_SUPPORT_PASSWORD
-    );
-  }
+  private resolveAdminAccess(
+    lmsUser: {
+      role: string;
+      isSuperAdmin?: boolean;
+      isManagerOperation?: boolean;
+      isTechnicalSupport?: boolean;
+      isAcademic?: boolean;
+    },
+    loginUsername: string,
+  ) {
+    if (lmsUser.role !== 'admin') {
+      return {
+        adminType: null,
+        isContactPerson: false,
+        isSuperAdmin: false,
+        isManagerOperation: false,
+        isTechnicalSupport: false,
+        isAcademic: false,
+        canViewAllCourses: false,
+      };
+    }
 
-  private matchesHardcodedCredentials(
-    credentials: LmsLoginDto,
-    allowedCredentials: Array<{ username: string; password: string }>,
-  ): boolean {
-    const username = credentials.username.trim().toLowerCase();
+    const isSuperAdmin = lmsUser.isSuperAdmin === true;
+    const isTechnicalSupport =
+      isSuperAdmin && lmsUser.isTechnicalSupport === true;
+    const isManagerOperation =
+      !isSuperAdmin && lmsUser.isManagerOperation === true;
+    const isAcademic =
+      !isSuperAdmin &&
+      !isManagerOperation &&
+      (lmsUser.isAcademic === true ||
+        loginUsername.trim().toLowerCase() === 'niven' ||
+        loginUsername.trim().toLowerCase() === 'neven');
+    const canViewAllCourses = isSuperAdmin || isManagerOperation || isAcademic;
+    const isContactPerson =
+      !isSuperAdmin &&
+      !isManagerOperation &&
+      !isTechnicalSupport &&
+      !isAcademic;
+    const adminType: AdminType = isAcademic
+      ? 'academic'
+      : isSuperAdmin && isTechnicalSupport
+        ? 'super_admin_technical_support'
+        : isSuperAdmin
+          ? 'super_admin'
+          : isManagerOperation
+            ? 'operation_manager'
+            : 'contact_person';
 
-    return allowedCredentials.some(
-      (allowed) =>
-        allowed.username === username &&
-        allowed.password === credentials.password,
-    );
+    return {
+      adminType,
+      isContactPerson,
+      isSuperAdmin,
+      isManagerOperation,
+      isTechnicalSupport,
+      isAcademic,
+      canViewAllCourses,
+    };
   }
 
   private async loadAdminCourses(
@@ -214,8 +223,13 @@ export class AuthService {
     loginUsername: string,
     adminName: string,
     canViewAllCourses: boolean,
+    syncGlobalCourseSet: boolean,
     lmsCourses: NormalizedLmsCourse[] = [],
   ) {
+    if (syncGlobalCourseSet) {
+      await this.archiveCoursesMissingFromLms(lmsCourses);
+    }
+
     const courseWhere = canViewAllCourses
       ? { status: CourseStatus.ACTIVE }
       : {
@@ -299,6 +313,26 @@ export class AuthService {
     });
   }
 
+  private async archiveCoursesMissingFromLms(
+    lmsCourses: NormalizedLmsCourse[],
+  ) {
+    const activeLmsCourseIds = lmsCourses
+      .map((course) => course.lmsCourseId.trim())
+      .filter(Boolean);
+
+    if (activeLmsCourseIds.length === 0) return;
+
+    await this.prisma.course.updateMany({
+      where: {
+        lmsSource: LMS_SOURCE,
+        status: CourseStatus.ACTIVE,
+        lmsCourseId: { notIn: [...new Set(activeLmsCourseIds)] },
+      },
+      data: {
+        status: CourseStatus.ARCHIVED,
+      },
+    });
+  }
   private async loadSessionCourses(
     syncedCourses: Array<{
       id: string;

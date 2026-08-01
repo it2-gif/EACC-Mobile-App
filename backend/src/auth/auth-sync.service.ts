@@ -119,8 +119,33 @@ export class AuthSyncService {
       },
     });
 
-    await this.syncCourseTeacher(tx, course.id, lmsCourse);
-    await this.syncCourseStudents(tx, course.id, lmsCourse.students ?? []);
+    const activeTeacherUserId = await this.syncCourseTeacher(
+      tx,
+      course.id,
+      lmsCourse,
+    );
+    if (activeTeacherUserId) {
+      await this.inactivateOtherCourseMemberships(
+        tx,
+        course.id,
+        UserRole.TEACHER,
+        [activeTeacherUserId],
+      );
+    }
+
+    if (lmsCourse.students !== undefined) {
+      const activeStudentUserIds = await this.syncCourseStudents(
+        tx,
+        course.id,
+        lmsCourse.students,
+      );
+      await this.inactivateOtherCourseMemberships(
+        tx,
+        course.id,
+        UserRole.STUDENT,
+        activeStudentUserIds,
+      );
+    }
 
     return course;
   }
@@ -132,7 +157,7 @@ export class AuthSyncService {
   ) {
     const lmsUserId = lmsCourse.teacherLmsUserId?.trim();
     const name = lmsCourse.teacherName?.trim();
-    if (!lmsUserId || !name) return;
+    if (!lmsUserId || !name) return undefined;
 
     const user = await tx.user.upsert({
       where: {
@@ -175,6 +200,8 @@ export class AuthSyncService {
         syncedAt: new Date(),
       },
     });
+
+    return user.id;
   }
 
   private async syncCourseStudents(
@@ -182,6 +209,8 @@ export class AuthSyncService {
     courseId: string,
     students: NonNullable<NormalizedLmsCourse['students']>,
   ) {
+    const activeStudentUserIds: string[] = [];
+
     for (const student of students) {
       const lmsUserId = student.lmsUserId.trim();
       const name = student.name.trim();
@@ -208,6 +237,8 @@ export class AuthSyncService {
         },
       });
 
+      activeStudentUserIds.push(user.id);
+
       await tx.courseMembership.upsert({
         where: {
           courseId_userId_role: {
@@ -229,9 +260,30 @@ export class AuthSyncService {
         },
       });
     }
+
+    return activeStudentUserIds;
+  }
+
+  private async inactivateOtherCourseMemberships(
+    tx: PrismaTransaction,
+    courseId: string,
+    role: UserRole,
+    activeUserIds: string[],
+  ) {
+    await tx.courseMembership.updateMany({
+      where: {
+        courseId,
+        role,
+        status: MembershipStatus.ACTIVE,
+        ...(activeUserIds.length > 0 ? { userId: { notIn: activeUserIds } } : {}),
+      },
+      data: {
+        status: MembershipStatus.INACTIVE,
+        syncedAt: new Date(),
+      },
+    });
   }
 }
-
 type PrismaTransaction = Parameters<
   Parameters<PrismaService['$transaction']>[0]
 >[0];

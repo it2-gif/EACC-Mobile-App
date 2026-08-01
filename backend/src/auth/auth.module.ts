@@ -4,10 +4,12 @@ import { LmsModule } from '../lms/lms.module';
 import { AuthController } from './auth.controller';
 import { AuthSyncService } from './auth-sync.service';
 import { AuthService } from './auth.service';
+import { LoginRateLimiterService } from './login-rate-limiter.service';
 
 @Module({
   imports: [LmsModule, DatabaseModule],
   controllers: [AuthController],
-  providers: [AuthService, AuthSyncService],
+  providers: [AuthService, AuthSyncService, LoginRateLimiterService],
 })
 export class AuthModule {}
+

@@ -18,6 +18,7 @@ import {
   parseAdminCourseEditHtml,
   parseAdminCourseIdsHtml,
   parseAdminCoursesHtml,
+  parseAdminCourseTableSummary,
   parseAdminFromUserList,
   parseAdminSidebarName,
   parseAdminCourseStudentsHtml,
@@ -39,6 +40,17 @@ const dashboardPaths: Record<LmsUserRole, string> = {
   teacher: '/teacher/index.php',
   admin: '/front.php',
 };
+
+interface AdminCourseCatalog {
+  courses: NormalizedLmsCourse[];
+  isComplete: boolean;
+  expectedCount?: number;
+}
+
+interface AdminCourseLoadResult {
+  courses: NormalizedLmsCourse[];
+  isCourseCatalogComplete?: boolean;
+}
 
 const lmsBrowserHeaders = {
   'user-agent':
@@ -76,11 +88,12 @@ export class EaccLmsClient implements LmsClient {
 
     if (!course) return undefined;
 
-    const catalog = await this.loadAdminCourseCatalog(
+    const catalogResult = await this.loadAdminCourseCatalog(
       baseUrl,
       sessionCookie,
       timeout,
     );
+    const catalog = catalogResult.courses;
     const catalogCourse = catalog.find(
       (entry) => entry.lmsCourseId === course.lmsCourseId,
     );
@@ -154,21 +167,15 @@ export class EaccLmsClient implements LmsClient {
       credentials.role,
     );
     if (parsedUser !== undefined) {
-      const user =
-        credentials.role === 'admin'
-          ? {
-              ...parsedUser,
-              isSuperAdmin:
-                parsedUser.isSuperAdmin === true ||
-                credentials.hints?.hasFullAccess === true,
-            }
-          : parsedUser;
+      const user = { ...parsedUser };
 
       if (credentials.role === 'admin') {
         console.log(
           `[AdminLoginResponse] user="${credentials.username}" fullAccess=${
             user.isSuperAdmin === true ? 1 : 0
-          } managerOperation=${user.isManagerOperation === true ? 1 : 0}`,
+          } managerOperation=${
+            user.isManagerOperation === true ? 1 : 0
+          } technicalSupport=${user.isTechnicalSupport === true ? 1 : 0}`,
         );
       }
 
@@ -371,7 +378,9 @@ export class EaccLmsClient implements LmsClient {
         password,
       });
 
-      return this.loadAdminCourseCatalog(baseUrl, sessionCookie, timeout);
+      return (
+        await this.loadAdminCourseCatalog(baseUrl, sessionCookie, timeout)
+      ).courses;
     } catch (error) {
       console.log('[AdminCourses] sync catalog login failed:', error);
       return [];
@@ -459,7 +468,8 @@ export class EaccLmsClient implements LmsClient {
       const parsedAdmin = {
         ...parseAdminIdentity(
           credentials!.username,
-          `${loginResponseHtml}\n${html}`,
+          `${loginResponseHtml}
+${html}`,
         ),
       };
       const admin = await this.resolveAdminIdentity(
@@ -469,17 +479,19 @@ export class EaccLmsClient implements LmsClient {
         parsedAdmin,
         credentials!.username,
       );
+      const courseLoad = await this.loadAdminCoursesForAccess(
+        url.origin,
+        sessionCookie,
+        timeout,
+        html,
+        admin,
+        credentials!,
+      );
 
       return {
         ...admin,
-        courses: await this.loadAdminCoursesForAccess(
-          url.origin,
-          sessionCookie,
-          timeout,
-          html,
-          admin,
-          credentials!,
-        ),
+        courses: courseLoad.courses,
+        isCourseCatalogComplete: courseLoad.isCourseCatalogComplete,
       };
     }
 
@@ -505,17 +517,19 @@ export class EaccLmsClient implements LmsClient {
       admin,
       credentials.username,
     );
+    const courseLoad = await this.loadAdminCoursesForAccess(
+      dashboardUrl.origin,
+      sessionCookie,
+      timeout,
+      dashboardHtml,
+      verifiedAdmin,
+      credentials,
+    );
 
     return {
       ...verifiedAdmin,
-      courses: await this.loadAdminCoursesForAccess(
-        dashboardUrl.origin,
-        sessionCookie,
-        timeout,
-        dashboardHtml,
-        verifiedAdmin,
-        credentials,
-      ),
+      courses: courseLoad.courses,
+      isCourseCatalogComplete: courseLoad.isCourseCatalogComplete,
     };
   }
 
@@ -542,19 +556,29 @@ export class EaccLmsClient implements LmsClient {
             matchedAdmin.detailsPath,
           )
         : undefined;
+      const overrides = readAdminAccessOverrides(matchedAdmin.id);
       const isSuperAdmin =
         matchedAdmin.isSuperAdmin === true ||
         detailsAccess?.isSuperAdmin === true ||
-        admin.isSuperAdmin === true;
+        admin.isSuperAdmin === true ||
+        overrides.isSuperAdmin === true;
       const isManagerOperation =
         matchedAdmin.isManagerOperation === true ||
         detailsAccess?.isManagerOperation === true ||
-        admin.isManagerOperation === true;
+        admin.isManagerOperation === true ||
+        overrides.isManagerOperation === true;
+      const isTechnicalSupport =
+        matchedAdmin.isTechnicalSupport === true ||
+        detailsAccess?.isTechnicalSupport === true ||
+        admin.isTechnicalSupport === true ||
+        overrides.isTechnicalSupport === true;
 
       console.log(
         `[AdminAccess] user="${loginUsername}" id="${matchedAdmin.id}" fullAccess=${
           isSuperAdmin ? 1 : 0
-        } managerOperation=${isManagerOperation ? 1 : 0}`,
+        } managerOperation=${isManagerOperation ? 1 : 0} technicalSupport=${
+          isTechnicalSupport ? 1 : 0
+        }`,
       );
 
       return {
@@ -563,6 +587,7 @@ export class EaccLmsClient implements LmsClient {
         name: matchedAdmin.shortName,
         isSuperAdmin,
         isManagerOperation,
+        isTechnicalSupport,
       };
     } catch {
       return admin;
@@ -595,7 +620,7 @@ export class EaccLmsClient implements LmsClient {
     dashboardHtml: string,
     admin: NormalizedLmsUser,
     credentials: LmsLoginCredentials,
-  ): Promise<NormalizedLmsCourse[]> {
+  ): Promise<AdminCourseLoadResult> {
     if (
       admin.isSuperAdmin ||
       admin.isManagerOperation ||
@@ -609,15 +634,18 @@ export class EaccLmsClient implements LmsClient {
       );
     }
 
-    return this.loadAdminKeyPersonCoursesWithStudents(
-      baseUrl,
-      sessionCookie,
-      timeout,
-      dashboardHtml,
-      admin,
-      credentials.username,
-      credentials.hints?.knownCourseIds ?? [],
-    );
+    return {
+      courses: await this.loadAdminKeyPersonCoursesWithStudents(
+        baseUrl,
+        sessionCookie,
+        timeout,
+        dashboardHtml,
+        admin,
+        credentials.username,
+        credentials.hints?.knownCourseIds ?? [],
+      ),
+      isCourseCatalogComplete: true,
+    };
   }
 
   private async loadAuthenticatedHtml(
@@ -718,12 +746,13 @@ export class EaccLmsClient implements LmsClient {
     sessionCookie: string,
     timeout: number,
     dashboardHtml: string,
-  ): Promise<NormalizedLmsCourse[]> {
-    const catalog = await this.loadAdminCourseCatalog(
+  ): Promise<AdminCourseLoadResult> {
+    const catalogResult = await this.loadAdminCourseCatalog(
       baseUrl,
       sessionCookie,
       timeout,
     );
+    const catalog = catalogResult.courses;
     const courseIds = uniqueStrings([
       ...parseAdminCoursesHtml(dashboardHtml, '', '').map(
         (course) => course.lmsCourseId,
@@ -753,18 +782,20 @@ export class EaccLmsClient implements LmsClient {
       coursesWithCatalogNames,
     );
 
-    return Promise.all(
-      coursesWithTeacherNames.map((course) =>
-        this.loadAdminCourseStudents(baseUrl, sessionCookie, timeout, course),
-      ),
-    );
+    // Full-access admins can see many courses. Loading every roster during
+    // login causes repeated LMS timeouts, so roster details are loaded later
+    // by the course detail/refresh endpoints when a specific course is opened.
+    return {
+      courses: coursesWithTeacherNames,
+      isCourseCatalogComplete: catalogResult.isComplete,
+    };
   }
 
   private async loadAdminCourseCatalog(
     baseUrl: string,
     sessionCookie: string,
     timeout: number,
-  ): Promise<NormalizedLmsCourse[]> {
+  ): Promise<AdminCourseCatalog> {
     try {
       const html = await this.loadAuthenticatedHtml(
         new URL('/courses.php', baseUrl),
@@ -772,13 +803,21 @@ export class EaccLmsClient implements LmsClient {
         timeout,
       );
       const courses = parseAdminCoursesHtml(html, '', '');
+      const summary = parseAdminCourseTableSummary(html);
+      const completeness = summary.isComplete
+        ? 'complete'
+        : `incomplete ${summary.visibleRowCount}/${summary.totalCount ?? 'unknown'}`;
       console.log(
-        `[AdminCourses] /courses.php -> ${courses.length} course records found`,
+        `[AdminCourses] /courses.php -> ${courses.length} course records found (${completeness})`,
       );
-      return courses;
+      return {
+        courses,
+        isComplete: summary.isComplete,
+        expectedCount: summary.totalCount,
+      };
     } catch (error) {
       console.log('[AdminCourses] /courses.php catalog failed:', error);
-      return [];
+      return { courses: [], isComplete: false };
     }
   }
 
@@ -1327,6 +1366,44 @@ function tryParseJson(value: string): { value: unknown } | undefined {
   }
 }
 
+function readAdminAccessOverrides(adminLmsUserId: string): {
+  isSuperAdmin?: boolean;
+  isManagerOperation?: boolean;
+  isTechnicalSupport?: boolean;
+} {
+  const overrides = new Map<string, string[]>([
+    // Temporary LMS-ID fallbacks for admin flags that are not exposed on every
+    // HTML fallback page. Structured login responses still take precedence.
+    ['13', ['manager_operation']],
+    ['92', ['technical_support']],
+  ]);
+
+  for (const entry of (process.env.LMS_ADMIN_ACCESS_OVERRIDES ?? '').split(
+    ',',
+  )) {
+    const [rawId, rawFlags] = entry.split(':');
+    const id = rawId?.trim();
+    const flags = rawFlags
+      ?.split('|')
+      .map((flag) => flag.trim().toLowerCase())
+      .filter(Boolean);
+    if (id && flags && flags.length > 0) {
+      overrides.set(id, flags);
+    }
+  }
+
+  const flags = overrides.get(adminLmsUserId.trim()) ?? [];
+
+  return {
+    isSuperAdmin:
+      flags.includes('full_access') || flags.includes('super_admin'),
+    isManagerOperation:
+      flags.includes('manager_operation') || flags.includes('m_operation'),
+    isTechnicalSupport:
+      flags.includes('technical_support') || flags.includes('tec'),
+  };
+}
+
 function parseStructuredLmsResponse(
   responseText: string,
   role: LmsUserRole,
@@ -1378,6 +1455,7 @@ function parseAdminIdentity(username: string, html: string): NormalizedLmsUser {
     name: displayName,
     isSuperAdmin: hasAdminFullAccess(html),
     isManagerOperation: hasAdminManagerOperation(html),
+    isTechnicalSupport: hasAdminTechnicalSupport(html),
     courses: [],
   };
 }
@@ -1449,6 +1527,10 @@ function hasAdminManagerOperation(html: string): boolean {
     'manageroperation',
     'managerop',
   ]);
+}
+
+function hasAdminTechnicalSupport(html: string): boolean {
+  return hasAdminBooleanFlag(html, ['tec', 'tech', 'technicalsupport']);
 }
 
 function hasAdminBooleanFlag(html: string, compactKeys: string[]): boolean {
