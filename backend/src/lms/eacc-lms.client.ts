@@ -204,9 +204,46 @@ export class EaccLmsClient implements LmsClient {
         parsedUser = rawParsedUser;
         parsedResponseHeaders = rawResponse.headers;
       } else {
-        console.warn(
-          `[AdminLoginResponse] user="${credentials.username}" could not parse app response; status=${response.status}; url=${response.url}; preview="${previewLmsResponse(responseText)}"`,
-        );
+        const apiRedirectUrl = readMetaRefreshUrl(rawResponseText, endpoint);
+        if (apiRedirectUrl !== undefined) {
+          const apiResponse = await this.fetchLms(
+            apiRedirectUrl,
+            {
+              headers: {
+                accept: 'text/html,application/json',
+                cookie: mergeSessionCookie(sessionCookie, rawResponse.headers),
+              },
+              redirect: 'follow',
+            },
+            timeout,
+            'login admin data api response',
+          );
+          const apiResponseText = await apiResponse.text();
+
+          if (
+            apiResponse.url.includes('login=failed') ||
+            apiResponse.status === 401 ||
+            apiResponse.status === 403 ||
+            apiResponseText.includes('Username Not Found')
+          ) {
+            throw new InvalidLmsCredentialsError();
+          }
+
+          const apiParsedUser = parseStructuredLmsResponse(
+            apiResponseText,
+            credentials.role,
+          );
+          if (apiParsedUser !== undefined) {
+            parsedUser = apiParsedUser;
+            parsedResponseHeaders = apiResponse.headers;
+          }
+        }
+
+        if (parsedUser === undefined) {
+          console.warn(
+            `[AdminLoginResponse] user="${credentials.username}" could not parse app response; status=${response.status}; url=${response.url}; preview="${previewLmsResponse(responseText)}"`,
+          );
+        }
       }
     }
 
@@ -1422,6 +1459,14 @@ function tryParseJson(value: string): { value: unknown } | undefined {
 
 function previewLmsResponse(value: string): string {
   return value.replace(/\s+/g, ' ').trim().slice(0, 220);
+}
+
+function readMetaRefreshUrl(html: string, baseUrl: URL): URL | undefined {
+  const match = /<meta\b[^>]*http-equiv\s*=\s*["']?refresh["']?[^>]*content\s*=\s*["'][^"']*url\s*=\s*([^"'>\s]+)["'][^>]*>/i.exec(
+    html,
+  );
+  const target = match?.[1]?.trim();
+  return target ? new URL(target, baseUrl) : undefined;
 }
 
 function readAdminAccessOverrides(
