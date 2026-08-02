@@ -180,6 +180,24 @@ describe('parseLmsResponse', () => {
 )`,
       'admin',
     );
+    const academicOperation = parseLmsPhpArrayResponse(
+      `Array
+(
+    [admin_name] => Array
+        (
+            [0] => Array
+                (
+                    [shortname] => Niven
+                    [id] => 78
+                    [fullaccese] => 0
+                    [m_operation] => 1
+                    [tec] => 0
+                    [manage-techers] => 1
+                )
+        )
+)`,
+      'admin',
+    );
     const contactPerson = parseLmsPhpArrayResponse(
       `Array
 (
@@ -208,6 +226,12 @@ describe('parseLmsResponse', () => {
     expect(managerOperationWithExtraLmsFlag?.name).toBe('Youssef');
     expect(managerOperationWithExtraLmsFlag?.isSuperAdmin).toBe(false);
     expect(managerOperationWithExtraLmsFlag?.isManagerOperation).toBe(true);
+    expect(managerOperationWithExtraLmsFlag?.isAcademic).toBe(false);
+    expect(academicOperation?.lmsUserId).toBe('78');
+    expect(academicOperation?.name).toBe('Niven');
+    expect(academicOperation?.isSuperAdmin).toBe(false);
+    expect(academicOperation?.isManagerOperation).toBe(true);
+    expect(academicOperation?.isAcademic).toBe(true);
     expect(contactPerson?.lmsUserId).toBe('91');
     expect(contactPerson?.isSuperAdmin).toBe(false);
     expect(contactPerson?.isManagerOperation).toBe(false);

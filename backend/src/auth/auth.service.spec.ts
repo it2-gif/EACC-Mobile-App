@@ -405,7 +405,7 @@ describe('AuthService', () => {
     const result = await service.login({
       role: 'admin',
       username: 'lms.fullaccess',
-      password: '123#@!0',
+      password: 'fake-password',
     });
 
     expect(result.appUser.isSuperAdmin).toBe(true);
@@ -428,7 +428,7 @@ describe('AuthService', () => {
     const lmsUser = {
       lmsUserId: '92',
       role: 'admin' as const,
-      name: 'abdelrahman',
+      name: 'Technical Support Admin',
       isSuperAdmin: true,
       isTechnicalSupport: true,
       courses: [],
@@ -437,7 +437,7 @@ describe('AuthService', () => {
       user: {
         id: 'support-admin-uuid',
         role: 'ADMIN',
-        name: 'abdelrahman',
+        name: 'Technical Support Admin',
         email: null,
       },
       courses: [],
@@ -465,8 +465,8 @@ describe('AuthService', () => {
 
     const result = await service.login({
       role: 'admin',
-      username: 'abdelrahman',
-      password: 'Casillas2004',
+      username: 'Technical Support Admin',
+      password: 'fake-password',
     });
 
     expect(result.appUser.isSuperAdmin).toBe(true);
@@ -528,8 +528,8 @@ describe('AuthService', () => {
 
     const result = await service.login({
       role: 'admin',
-      username: 'esam',
-      password: '123#@!0',
+      username: 'legacy.super.admin',
+      password: 'fake-password',
     });
 
     expect(result.appUser.isSuperAdmin).toBe(false);
@@ -543,9 +543,8 @@ describe('AuthService', () => {
   });
 
   it.each([
-    { username: 'youssef', password: 'youssef@2023', name: 'Youssef' },
-    { username: 'eman.library', password: 'E123456', name: 'Eman Library' },
-    { username: 'niven', password: 'Niven@2025#', name: 'Niven' },
+    { username: 'manager.operation.one', password: 'fake-password', name: 'Manager Operation One' },
+    { username: 'manager.operation.two', password: 'fake-password', name: 'Manager Operation Two' },
   ])(
     'grants manager-operation visibility from the LMS flag for $username',
     async ({ username, password, name }) => {
@@ -653,6 +652,72 @@ describe('AuthService', () => {
     },
   );
 
+  it('grants academic access from the LMS manage-teachers flag or temporary Niven fallback', async () => {
+    const lmsUser = {
+      lmsUserId: '78',
+      role: 'admin' as const,
+      name: 'Niven',
+      isSuperAdmin: false,
+      isManagerOperation: true,
+      isAcademic: false,
+      courses: [
+        {
+          lmsCourseId: '2203',
+          name: 'Preparation IELTS - IELTS',
+          category: 'Preparation',
+          students: [{ lmsUserId: '9001', name: 'Student From LMS' }],
+        },
+      ],
+    };
+    const synced = {
+      user: {
+        id: 'academic-uuid',
+        role: 'ADMIN',
+        name: 'Niven',
+        email: null,
+      },
+      courses: [],
+    };
+    const lmsClient = { authenticate: jest.fn().mockResolvedValue(lmsUser) };
+    const authSync = { syncLmsUser: jest.fn().mockResolvedValue(synced) };
+    const prisma = {
+      course: {
+        findMany: jest.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]),
+      },
+    };
+    const firebaseTokens = {
+      createCustomToken: jest.fn().mockResolvedValue('firebase-token'),
+    };
+    const config = {
+      get: jest.fn().mockReturnValue('test'),
+    } as unknown as ConfigService;
+    const service = new AuthService(
+      lmsClient as never,
+      authSync as never,
+      prisma as never,
+      firebaseTokens as never,
+      config as never,
+    );
+
+    const result = await service.login({
+      role: 'admin',
+      username: 'niven',
+      password: 'fake-password',
+    });
+
+    expect(result.appUser.adminType).toBe('academic');
+    expect(result.appUser.isAcademic).toBe(true);
+    expect(result.appUser.isManagerOperation).toBe(true);
+    expect(result.appUser.canViewAllCourses).toBe(true);
+    expect(firebaseTokens.createCustomToken).toHaveBeenCalledWith(
+      expect.objectContaining({
+        adminType: 'academic',
+        isAcademic: true,
+        isManagerOperation: true,
+        canViewAllCourses: true,
+      }),
+    );
+  });
   it('archives active app courses missing from the full-access LMS open-course list', async () => {
     const lmsUser = {
       lmsUserId: '14',
@@ -715,7 +780,7 @@ describe('AuthService', () => {
 
     const result = await service.login({
       role: 'admin',
-      username: 'esam',
+      username: 'legacy.super.admin',
       password: 'password',
     });
 
@@ -786,7 +851,7 @@ describe('AuthService', () => {
 
     await service.login({
       role: 'admin',
-      username: 'esam',
+      username: 'legacy.super.admin',
       password: 'password',
     });
 

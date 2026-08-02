@@ -134,6 +134,66 @@ describe('parseAdminFromUserList', () => {
     });
   });
 
+  it('reads academic teacher-manager access from admin detail forms', () => {
+    const flags = parseAdminAccessFlagsHtml(`
+      <form>
+        <input type="hidden" name="fullaccese" value="0" />
+        <input type="hidden" name="m_operation" value="1" />
+        <input type="hidden" name="tec" value="0" />
+        <input type="hidden" name="manage-techers" value="1" />
+      </form>
+    `);
+
+    expect(flags).toEqual({
+      isSuperAdmin: false,
+      isManagerOperation: true,
+      isTechnicalSupport: false,
+      isAcademic: true,
+    });
+  });
+
+  it('reads academic teacher-manager access from admin list rows', () => {
+    const admin = parseAdminFromUserList(
+      `
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Shortname</th>
+            <th>Username</th>
+            <th>Fullaccese</th>
+            <th>M Operation</th>
+            <th>Tec</th>
+            <th>Manage Techers</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>78</td>
+            <td>Niven</td>
+            <td>academic.manager</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+          </tr>
+        </tbody>
+      </table>
+    `,
+      'academic.manager',
+    );
+
+    expect(admin).toEqual(
+      expect.objectContaining({
+        id: '78',
+        shortName: 'Niven',
+        isSuperAdmin: false,
+        isManagerOperation: true,
+        isTechnicalSupport: false,
+        isAcademic: true,
+      }),
+    );
+  });
   it('uses selected admin role option values instead of the first select option', () => {
     const flags = parseAdminAccessFlagsHtml(`
       <form>

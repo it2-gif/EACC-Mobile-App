@@ -30,9 +30,9 @@ import { parseTeacherDashboardHtml } from './eacc-lms.teacher-parser';
 import { parseLmsPhpArrayResponse, parseLmsResponse } from './eacc-lms.parser';
 
 const loginPaths: Record<LmsUserRole, string> = {
-  student: '/members/login_1.php',
-  teacher: '/teacher/login_1.php',
-  admin: '/login_1.php',
+  student: '/members/login_1_app.php',
+  teacher: '/teacher/login_1_app.php',
+  admin: '/login_1_app.php',
 };
 
 const dashboardPaths: Record<LmsUserRole, string> = {
@@ -162,10 +162,54 @@ export class EaccLmsClient implements LmsClient {
     }
 
     const dashboardUrl = new URL(dashboardPaths[credentials.role], baseUrl);
-    const parsedUser = parseStructuredLmsResponse(
-      responseText,
-      credentials.role,
-    );
+    let parsedUser = parseStructuredLmsResponse(responseText, credentials.role);
+    let parsedResponseHeaders = response.headers;
+
+    if (parsedUser === undefined && credentials.role === 'admin') {
+      const rawResponse = await this.fetchLms(
+        endpoint,
+        {
+          method: 'POST',
+          headers: {
+            accept: 'text/html,application/json',
+            'content-type': 'application/x-www-form-urlencoded',
+            ...(sessionCookie ? { cookie: sessionCookie } : {}),
+          },
+          body: new URLSearchParams({
+            ty: credentials.role,
+            username: credentials.username,
+            inputPassword: credentials.password,
+          }),
+          redirect: 'manual',
+        },
+        timeout,
+        'login admin raw response',
+      );
+      const rawResponseText = await rawResponse.text();
+
+      if (
+        rawResponse.url.includes('login=failed') ||
+        rawResponse.status === 401 ||
+        rawResponse.status === 403 ||
+        rawResponseText.includes('Username Not Found')
+      ) {
+        throw new InvalidLmsCredentialsError();
+      }
+
+      const rawParsedUser = parseStructuredLmsResponse(
+        rawResponseText,
+        credentials.role,
+      );
+      if (rawParsedUser !== undefined) {
+        parsedUser = rawParsedUser;
+        parsedResponseHeaders = rawResponse.headers;
+      } else {
+        console.warn(
+          `[AdminLoginResponse] user="${credentials.username}" could not parse app response; status=${response.status}; url=${response.url}; preview="${previewLmsResponse(responseText)}"`,
+        );
+      }
+    }
+
     if (parsedUser !== undefined) {
       const user = { ...parsedUser };
 
@@ -175,7 +219,7 @@ export class EaccLmsClient implements LmsClient {
             user.isSuperAdmin === true ? 1 : 0
           } managerOperation=${
             user.isManagerOperation === true ? 1 : 0
-          } technicalSupport=${user.isTechnicalSupport === true ? 1 : 0}`,
+          } technicalSupport=${user.isTechnicalSupport === true ? 1 : 0} academic=${user.isAcademic === true ? 1 : 0}`,
         );
       }
 
@@ -184,7 +228,7 @@ export class EaccLmsClient implements LmsClient {
           ...user,
           courses: await this.loadTeacherCoursesWithStudents(
             baseUrl,
-            mergeSessionCookie(sessionCookie, response.headers),
+            mergeSessionCookie(sessionCookie, parsedResponseHeaders),
             timeout,
             user.courses.map((course) => ({
               ...course,
@@ -201,7 +245,7 @@ export class EaccLmsClient implements LmsClient {
 
       return this.loadAdminCoursesForUser(
         dashboardUrl,
-        mergeSessionCookie(sessionCookie, response.headers),
+        mergeSessionCookie(sessionCookie, parsedResponseHeaders),
         timeout,
         user,
         credentials,
@@ -210,7 +254,7 @@ export class EaccLmsClient implements LmsClient {
 
     const user = await this.loadDashboard(
       dashboardUrl,
-      mergeSessionCookie(sessionCookie, response.headers),
+      mergeSessionCookie(sessionCookie, parsedResponseHeaders),
       timeout,
       credentials.role,
       credentials,
@@ -223,7 +267,7 @@ export class EaccLmsClient implements LmsClient {
           credentials.role === 'student' ? '/members/lms' : '/teacher/lms',
           baseUrl,
         ),
-        mergeSessionCookie(sessionCookie, response.headers),
+        mergeSessionCookie(sessionCookie, parsedResponseHeaders),
         timeout,
       );
 
@@ -236,7 +280,7 @@ export class EaccLmsClient implements LmsClient {
       if (credentials.role === 'teacher') {
         const coursesWithStudents = await this.loadTeacherCoursesWithStudents(
           baseUrl,
-          mergeSessionCookie(sessionCookie, response.headers),
+          mergeSessionCookie(sessionCookie, parsedResponseHeaders),
           timeout,
           courses.map((course) => ({
             ...course,
@@ -575,13 +619,18 @@ ${html}`,
         detailsAccess?.isTechnicalSupport === true ||
         admin.isTechnicalSupport === true ||
         overrides.isTechnicalSupport === true;
+      const isAcademic =
+        matchedAdmin.isAcademic === true ||
+        detailsAccess?.isAcademic === true ||
+        admin.isAcademic === true ||
+        overrides.isAcademic === true;
 
       console.log(
         `[AdminAccess] user="${loginUsername}" id="${matchedAdmin.id}" fullAccess=${
           isSuperAdmin ? 1 : 0
         } managerOperation=${isManagerOperation ? 1 : 0} technicalSupport=${
           isTechnicalSupport ? 1 : 0
-        }`,
+        } academic=${isAcademic ? 1 : 0}`,
       );
 
       return {
@@ -591,6 +640,7 @@ ${html}`,
         isSuperAdmin,
         isManagerOperation,
         isTechnicalSupport,
+        isAcademic,
       };
     } catch {
       return admin;
@@ -627,6 +677,7 @@ ${html}`,
     if (
       admin.isSuperAdmin ||
       admin.isManagerOperation ||
+      admin.isAcademic ||
       credentials.hints?.canViewAllCourses === true
     ) {
       return this.loadAdminAllCoursesWithStudents(
@@ -1369,6 +1420,10 @@ function tryParseJson(value: string): { value: unknown } | undefined {
   }
 }
 
+function previewLmsResponse(value: string): string {
+  return value.replace(/\s+/g, ' ').trim().slice(0, 220);
+}
+
 function readAdminAccessOverrides(
   adminLmsUserId: string,
   configuredOverrides?: string,
@@ -1376,6 +1431,7 @@ function readAdminAccessOverrides(
   isSuperAdmin?: boolean;
   isManagerOperation?: boolean;
   isTechnicalSupport?: boolean;
+  isAcademic?: boolean;
 } {
   const overrides = new Map<string, string[]>();
 
@@ -1400,6 +1456,11 @@ function readAdminAccessOverrides(
       flags.includes('manager_operation') || flags.includes('m_operation'),
     isTechnicalSupport:
       flags.includes('technical_support') || flags.includes('tec'),
+    isAcademic:
+      flags.includes('academic') ||
+      flags.includes('teacher_manager') ||
+      flags.includes('manage_teachers') ||
+      flags.includes('manage_techers'),
   };
 }
 
@@ -1530,6 +1591,17 @@ function hasAdminManagerOperation(html: string): boolean {
 
 function hasAdminTechnicalSupport(html: string): boolean {
   return hasAdminBooleanFlag(html, ['tec', 'tech', 'technicalsupport']);
+}
+
+function hasAdminAcademic(html: string): boolean {
+  return hasAdminBooleanFlag(html, [
+    'managetechers',
+    'manageteachers',
+    'manageteacher',
+    'academic',
+    'isacademic',
+    'teachermanager',
+  ]);
 }
 
 function hasAdminBooleanFlag(html: string, compactKeys: string[]): boolean {

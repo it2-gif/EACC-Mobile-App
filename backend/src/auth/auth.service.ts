@@ -79,10 +79,7 @@ export class AuthService {
           : {}),
       });
       const synced = await this.authSync.syncLmsUser(lmsUser);
-      const adminAccess = this.resolveAdminAccess(
-        lmsUser,
-        credentials.username,
-      );
+      const adminAccess = this.resolveAdminAccess(lmsUser, credentials.username);
       const adminCourses =
         lmsUser.role === 'admin' && adminAccess.canViewAllCourses
           ? await this.loadAdminCourses(
@@ -99,7 +96,8 @@ export class AuthService {
         adminCourses ??
         (await this.loadSessionCourses(synced.courses, lmsUser.courses));
       const courseIds =
-        adminAccess.isManagerOperation && !adminAccess.isSuperAdmin
+        (adminAccess.isManagerOperation || adminAccess.isAcademic) &&
+        !adminAccess.isSuperAdmin
           ? []
           : sessionCourses.map((course) => course.lmsCourseId);
       const firebaseCustomToken = await this.firebaseTokens.createCustomToken({
@@ -183,14 +181,14 @@ export class AuthService {
     const isSuperAdmin = lmsUser.isSuperAdmin === true;
     const isTechnicalSupport =
       isSuperAdmin && lmsUser.isTechnicalSupport === true;
-    const isManagerOperation =
-      !isSuperAdmin && lmsUser.isManagerOperation === true;
+    const normalizedLoginUsername = loginUsername.trim().toLowerCase();
     const isAcademic =
       !isSuperAdmin &&
-      !isManagerOperation &&
       (lmsUser.isAcademic === true ||
-        loginUsername.trim().toLowerCase() === 'niven' ||
-        loginUsername.trim().toLowerCase() === 'neven');
+        normalizedLoginUsername === 'niven' ||
+        normalizedLoginUsername === 'neven');
+    const isManagerOperation =
+      !isSuperAdmin && lmsUser.isManagerOperation === true;
     const canViewAllCourses = isSuperAdmin || isManagerOperation || isAcademic;
     const isContactPerson =
       !isSuperAdmin &&

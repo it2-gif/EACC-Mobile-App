@@ -138,6 +138,7 @@ class AdminDashboardScreen extends StatelessWidget {
             name: session.appUser.name,
             isSuperAdmin: session.appUser.isSuperAdmin,
             isManagerOperation: session.appUser.isManagerOperation,
+            isAcademic: session.appUser.isAcademic,
             canViewAllCourses: session.appUser.canViewAllCourses,
           ),
           const SizedBox(height: 14),
@@ -224,12 +225,14 @@ class _WelcomeHeader extends StatelessWidget {
   final String name;
   final bool isSuperAdmin;
   final bool isManagerOperation;
+  final bool isAcademic;
   final bool canViewAllCourses;
 
   const _WelcomeHeader({
     required this.name,
     required this.isSuperAdmin,
     required this.isManagerOperation,
+    required this.isAcademic,
     required this.canViewAllCourses,
   });
 
@@ -288,6 +291,8 @@ class _WelcomeHeader extends StatelessWidget {
                 Text(
                   isSuperAdmin
                       ? 'EACC Super Administrator'
+                      : isAcademic
+                      ? 'EACC Academic Manager'
                       : isManagerOperation
                       ? 'EACC Operation Manager'
                       : 'EACC Contact-Person Administrator',
@@ -326,6 +331,8 @@ class _WelcomeHeader extends StatelessWidget {
                       Text(
                         isSuperAdmin
                             ? 'Full access enabled'
+                            : isAcademic
+                            ? 'Academic access'
                             : canViewAllCourses
                             ? 'Operation manager access'
                             : 'Linked courses only',

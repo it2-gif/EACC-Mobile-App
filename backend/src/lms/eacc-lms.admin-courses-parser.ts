@@ -19,6 +19,7 @@ export interface AdminUserListEntry {
   isSuperAdmin?: boolean;
   isManagerOperation?: boolean;
   isTechnicalSupport?: boolean;
+  isAcademic?: boolean;
   detailsPath?: string;
 }
 
@@ -26,6 +27,7 @@ export interface AdminAccessFlags {
   isSuperAdmin?: boolean;
   isManagerOperation?: boolean;
   isTechnicalSupport?: boolean;
+  isAcademic?: boolean;
 }
 
 export interface AdminCourseTableSummary {
@@ -190,6 +192,7 @@ export function parseAdminFromUserList(
       const fullAccessIndex = headers.findIndex(isFullAccessField);
       const managerOperationIndex = headers.findIndex(isManagerOperationField);
       const technicalSupportIndex = headers.findIndex(isTechnicalSupportField);
+      const academicIndex = headers.findIndex(isAcademicField);
       const fullAccessCell =
         fullAccessIndex >= 0 ? $(cells[fullAccessIndex]) : undefined;
       const managerOperationCell =
@@ -200,6 +203,8 @@ export function parseAdminFromUserList(
         technicalSupportIndex >= 0
           ? $(cells[technicalSupportIndex])
           : undefined;
+      const academicCell =
+        academicIndex >= 0 ? $(cells[academicIndex]) : undefined;
       const isSuperAdmin =
         readFullAccessControl($, $(row)) ??
         (fullAccessCell
@@ -215,6 +220,9 @@ export function parseAdminFromUserList(
         (technicalSupportCell
           ? readExactEnabled(technicalSupportCell.text())
           : undefined);
+      const isAcademic =
+        readAcademicControl($, $(row)) ??
+        (academicCell ? readExactEnabled(academicCell.text()) : undefined);
       const detailsPath = $(row)
         .find('a[href]')
         .toArray()
@@ -230,6 +238,7 @@ export function parseAdminFromUserList(
         ...(isSuperAdmin === undefined ? {} : { isSuperAdmin }),
         ...(isManagerOperation === undefined ? {} : { isManagerOperation }),
         ...(isTechnicalSupport === undefined ? {} : { isTechnicalSupport }),
+      ...(isAcademic === undefined ? {} : { isAcademic }),
         ...(detailsPath ? { detailsPath } : {}),
       };
       return false; // break $.each
@@ -249,11 +258,13 @@ export function parseAdminAccessFlagsHtml(html: string): AdminAccessFlags {
   const isTechnicalSupport =
     readTechnicalSupportControl($, $.root()) ??
     readInlineTechnicalSupport(html);
+  const isAcademic = readAcademicControl($, $.root()) ?? readInlineAcademic(html);
 
   return {
     ...(isSuperAdmin === undefined ? {} : { isSuperAdmin }),
     ...(isManagerOperation === undefined ? {} : { isManagerOperation }),
     ...(isTechnicalSupport === undefined ? {} : { isTechnicalSupport }),
+    ...(isAcademic === undefined ? {} : { isAcademic }),
   };
 }
 
@@ -289,6 +300,29 @@ function readTechnicalSupportControl(
   element.find('[name]').each((_, control) => {
     const fieldName = normalizeFieldName($(control).attr('name') ?? '');
     if (!isTechnicalSupportField(fieldName)) return;
+
+    const value = readBooleanControlValue($, control);
+    if (value === true) {
+      result = true;
+      return false;
+    }
+    if (value === false && result === undefined) {
+      result = false;
+    }
+  });
+
+  return result;
+}
+
+function readAcademicControl(
+  $: CheerioRoot,
+  element: ReturnType<CheerioRoot>,
+): boolean | undefined {
+  let result: boolean | undefined;
+
+  element.find('[name]').each((_, control) => {
+    const fieldName = normalizeFieldName($(control).attr('name') ?? '');
+    if (!isAcademicField(fieldName)) return;
 
     const value = readBooleanControlValue($, control);
     if (value === true) {
@@ -387,6 +421,17 @@ function isTechnicalSupportField(value: string): boolean {
   return value === 'tec' || value === 'tech' || value === 'technicalsupport';
 }
 
+function isAcademicField(value: string): boolean {
+  return (
+    value === 'managetechers' ||
+    value === 'manageteachers' ||
+    value === 'manageteacher' ||
+    value === 'academic' ||
+    value === 'isacademic' ||
+    value === 'teachermanager'
+  );
+}
+
 function isAdminDetailsPath(href: string, adminId: string): boolean {
   if (/delete|remove/i.test(href)) return false;
 
@@ -426,6 +471,23 @@ function readInlineTechnicalSupport(html: string): boolean | undefined {
     'tech',
     'technical_support',
     'technicalsupport',
+  ]);
+}
+
+function readInlineAcademic(html: string): boolean | undefined {
+  return readInlineBooleanFlag(html, [
+    'manage-techers',
+    'manage_techers',
+    'managetechers',
+    'manage-teachers',
+    'manage_teachers',
+    'manageteachers',
+    'manage_teacher',
+    'manageteacher',
+    'academic',
+    'isacademic',
+    'teacher_manager',
+    'teachermanager',
   ]);
 }
 

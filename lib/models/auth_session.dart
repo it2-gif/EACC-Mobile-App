@@ -52,6 +52,7 @@ class LmsUser {
   final bool isManagerOperation;
   final bool canViewAllCourses;
   final bool isTechnicalSupport;
+  final bool isAcademic;
 
   const LmsUser({
     required this.lmsUserId,
@@ -61,12 +62,14 @@ class LmsUser {
     this.isManagerOperation = false,
     this.canViewAllCourses = false,
     this.isTechnicalSupport = false,
+    this.isAcademic = false,
   });
 
   factory LmsUser.fromJson(Map<String, dynamic> json) {
     final isSuperAdmin = json['isSuperAdmin'] == true;
     final isManagerOperation = json['isManagerOperation'] == true;
     final isTechnicalSupport = json['isTechnicalSupport'] == true;
+    final isAcademic = json['isAcademic'] == true;
 
     return LmsUser(
       lmsUserId: json['lmsUserId'] as String,
@@ -75,11 +78,13 @@ class LmsUser {
       isSuperAdmin: isSuperAdmin,
       isManagerOperation: isManagerOperation,
       isTechnicalSupport: isTechnicalSupport,
+      isAcademic: isAcademic,
       canViewAllCourses:
           json['canViewAllCourses'] == true ||
           isSuperAdmin ||
           isManagerOperation ||
-          isTechnicalSupport,
+          isTechnicalSupport ||
+          isAcademic,
     );
   }
 
@@ -92,6 +97,7 @@ class LmsUser {
       'isManagerOperation': isManagerOperation,
       'canViewAllCourses': canViewAllCourses,
       'isTechnicalSupport': isTechnicalSupport,
+      'isAcademic': isAcademic,
     };
   }
 }
@@ -105,6 +111,7 @@ class AppUser {
   final bool isManagerOperation;
   final bool canViewAllCourses;
   final bool isTechnicalSupport;
+  final bool isAcademic;
 
   const AppUser({
     required this.id,
@@ -115,6 +122,7 @@ class AppUser {
     this.isManagerOperation = false,
     this.canViewAllCourses = false,
     this.isTechnicalSupport = false,
+    this.isAcademic = false,
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json) {
@@ -122,6 +130,7 @@ class AppUser {
     final isSuperAdmin = json['isSuperAdmin'] == true;
     final isManagerOperation = json['isManagerOperation'] == true;
     final isTechnicalSupport = json['isTechnicalSupport'] == true;
+    final isAcademic = json['isAcademic'] == true;
 
     return AppUser(
       id: json['id'] as String,
@@ -131,11 +140,13 @@ class AppUser {
       isSuperAdmin: isSuperAdmin,
       isManagerOperation: isManagerOperation,
       isTechnicalSupport: isTechnicalSupport,
+      isAcademic: isAcademic,
       canViewAllCourses:
           json['canViewAllCourses'] == true ||
           isSuperAdmin ||
           isManagerOperation ||
-          isTechnicalSupport,
+          isTechnicalSupport ||
+          isAcademic,
     );
   }
 
@@ -149,6 +160,7 @@ class AppUser {
       'isManagerOperation': isManagerOperation,
       'canViewAllCourses': canViewAllCourses,
       'isTechnicalSupport': isTechnicalSupport,
+      'isAcademic': isAcademic,
     };
   }
 }
