@@ -289,7 +289,7 @@ class _WelcomeHeader extends StatelessWidget {
                   isSuperAdmin
                       ? 'EACC Super Administrator'
                       : isManagerOperation
-                      ? 'EACC Academic Manager'
+                      ? 'EACC Operation Manager'
                       : 'EACC Contact-Person Administrator',
                   style: const TextStyle(
                     color: Colors.white70,
@@ -327,7 +327,7 @@ class _WelcomeHeader extends StatelessWidget {
                         isSuperAdmin
                             ? 'Full access enabled'
                             : canViewAllCourses
-                            ? 'Manager operation access'
+                            ? 'Operation manager access'
                             : 'Linked courses only',
                         style: const TextStyle(
                           color: Colors.white,

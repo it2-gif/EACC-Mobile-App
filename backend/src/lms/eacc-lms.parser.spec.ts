@@ -162,6 +162,24 @@ describe('parseLmsResponse', () => {
 )`,
       'admin',
     );
+    const managerOperationWithExtraLmsFlag = parseLmsPhpArrayResponse(
+      `Array
+(
+    [admin_name] => Array
+        (
+            [0] => Array
+                (
+                    [shortname] => Youssef
+                    [id] => 32
+                    [fullaccese] => 0
+                    [m_operation] => 1
+                    [tec] => 0
+                    [manage-techers] => 0
+                )
+        )
+)`,
+      'admin',
+    );
     const contactPerson = parseLmsPhpArrayResponse(
       `Array
 (
@@ -186,6 +204,10 @@ describe('parseLmsResponse', () => {
     expect(managerOperation?.lmsUserId).toBe('13');
     expect(managerOperation?.isSuperAdmin).toBe(false);
     expect(managerOperation?.isManagerOperation).toBe(true);
+    expect(managerOperationWithExtraLmsFlag?.lmsUserId).toBe('32');
+    expect(managerOperationWithExtraLmsFlag?.name).toBe('Youssef');
+    expect(managerOperationWithExtraLmsFlag?.isSuperAdmin).toBe(false);
+    expect(managerOperationWithExtraLmsFlag?.isManagerOperation).toBe(true);
     expect(contactPerson?.lmsUserId).toBe('91');
     expect(contactPerson?.isSuperAdmin).toBe(false);
     expect(contactPerson?.isManagerOperation).toBe(false);

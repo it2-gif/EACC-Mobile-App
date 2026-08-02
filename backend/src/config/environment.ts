@@ -9,6 +9,7 @@ export interface Environment {
   ALLOWED_ORIGINS: string[];
   LMS_BASE_URL: string;
   LMS_REQUEST_TIMEOUT_MS: number;
+  LMS_ADMIN_ACCESS_OVERRIDES?: string;
   LMS_SYNC_ADMIN_USERNAME?: string;
   LMS_SYNC_ADMIN_PASSWORD?: string;
   FIREBASE_PROJECT_ID?: string;
@@ -31,6 +32,9 @@ export function validateEnvironment(
       values.LMS_REQUEST_TIMEOUT_MS,
       10000,
       'LMS_REQUEST_TIMEOUT_MS',
+    ),
+    LMS_ADMIN_ACCESS_OVERRIDES: readOptionalString(
+      values.LMS_ADMIN_ACCESS_OVERRIDES,
     ),
     ...readLmsSyncCredentials(values),
     ...readFirebaseCredentials(values),

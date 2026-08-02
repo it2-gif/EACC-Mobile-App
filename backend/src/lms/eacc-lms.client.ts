@@ -556,7 +556,10 @@ ${html}`,
             matchedAdmin.detailsPath,
           )
         : undefined;
-      const overrides = readAdminAccessOverrides(matchedAdmin.id);
+      const overrides = readAdminAccessOverrides(
+        matchedAdmin.id,
+        this.config.get('LMS_ADMIN_ACCESS_OVERRIDES', { infer: true }),
+      );
       const isSuperAdmin =
         matchedAdmin.isSuperAdmin === true ||
         detailsAccess?.isSuperAdmin === true ||
@@ -1366,21 +1369,17 @@ function tryParseJson(value: string): { value: unknown } | undefined {
   }
 }
 
-function readAdminAccessOverrides(adminLmsUserId: string): {
+function readAdminAccessOverrides(
+  adminLmsUserId: string,
+  configuredOverrides?: string,
+): {
   isSuperAdmin?: boolean;
   isManagerOperation?: boolean;
   isTechnicalSupport?: boolean;
 } {
-  const overrides = new Map<string, string[]>([
-    // Temporary LMS-ID fallbacks for admin flags that are not exposed on every
-    // HTML fallback page. Structured login responses still take precedence.
-    ['13', ['manager_operation']],
-    ['92', ['technical_support']],
-  ]);
+  const overrides = new Map<string, string[]>();
 
-  for (const entry of (process.env.LMS_ADMIN_ACCESS_OVERRIDES ?? '').split(
-    ',',
-  )) {
+  for (const entry of (configuredOverrides ?? '').split(',')) {
     const [rawId, rawFlags] = entry.split(':');
     const id = rawId?.trim();
     const flags = rawFlags
