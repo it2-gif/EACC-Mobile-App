@@ -41,7 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final role = selectedRole;
     final username = usernameController.text.trim();
-    final password = passwordController.text;
+    final password = passwordController.text.trim();
 
     if (username.isEmpty || password.isEmpty) {
       setState(() {

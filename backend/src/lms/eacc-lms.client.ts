@@ -122,7 +122,7 @@ export class EaccLmsClient implements LmsClient {
     const body = new URLSearchParams({
       ty: credentials.role,
       username: credentials.username,
-      inputPassword: credentials.password,
+      inputPassword: credentials.password.trim(),
     });
 
     let response: Response;
@@ -137,7 +137,7 @@ export class EaccLmsClient implements LmsClient {
           ...(sessionCookie ? { cookie: sessionCookie } : {}),
         },
         body,
-        redirect: 'follow',
+        redirect: credentials.role === 'admin' ? 'manual' : 'follow',
       },
       timeout,
       `login ${credentials.role}`,
@@ -146,11 +146,14 @@ export class EaccLmsClient implements LmsClient {
     const responseText = await response.text();
 
     if (
-      response.url.includes('login=failed') ||
+      isLoginFailedResponse(response, responseText, endpoint) ||
       response.status === 401 ||
       response.status === 403 ||
       responseText.includes('Username Not Found')
     ) {
+      console.warn(
+        `[LMS] invalid login response role=${credentials.role} user=${credentials.username} status=${response.status} url=${response.url} refresh=${readMetaRefreshUrl(responseText, endpoint)?.href ?? 'none'} preview="${previewLmsResponse(responseText)}"`,
+      );
       throw new InvalidLmsCredentialsError();
     }
 
@@ -166,84 +169,48 @@ export class EaccLmsClient implements LmsClient {
     let parsedResponseHeaders = response.headers;
 
     if (parsedUser === undefined && credentials.role === 'admin') {
-      const rawResponse = await this.fetchLms(
-        endpoint,
-        {
-          method: 'POST',
-          headers: {
-            accept: 'text/html,application/json',
-            'content-type': 'application/x-www-form-urlencoded',
-            ...(sessionCookie ? { cookie: sessionCookie } : {}),
+      const apiRedirectUrl = readMetaRefreshUrl(responseText, endpoint);
+      if (apiRedirectUrl !== undefined) {
+        const apiResponse = await this.fetchLms(
+          apiRedirectUrl,
+          {
+            headers: {
+              accept: 'text/html,application/json',
+              cookie: mergeSessionCookie(sessionCookie, response.headers),
+            },
+            redirect: 'follow',
           },
-          body: new URLSearchParams({
-            ty: credentials.role,
-            username: credentials.username,
-            inputPassword: credentials.password,
-          }),
-          redirect: 'manual',
-        },
-        timeout,
-        'login admin raw response',
-      );
-      const rawResponseText = await rawResponse.text();
+          timeout,
+          'login admin data api response',
+        );
+        const apiResponseText = await apiResponse.text();
 
-      if (
-        rawResponse.url.includes('login=failed') ||
-        rawResponse.status === 401 ||
-        rawResponse.status === 403 ||
-        rawResponseText.includes('Username Not Found')
-      ) {
-        throw new InvalidLmsCredentialsError();
+        if (
+          isLoginFailedResponse(apiResponse, apiResponseText, apiRedirectUrl) ||
+          apiResponse.status === 401 ||
+          apiResponse.status === 403 ||
+          apiResponseText.includes('Username Not Found')
+        ) {
+          console.warn(
+            `[LMS] invalid admin data api response user=${credentials.username} status=${apiResponse.status} url=${apiResponse.url} refresh=${readMetaRefreshUrl(apiResponseText, apiRedirectUrl)?.href ?? 'none'} preview="${previewLmsResponse(apiResponseText)}"`,
+          );
+          throw new InvalidLmsCredentialsError();
+        }
+
+        const apiParsedUser = parseStructuredLmsResponse(
+          apiResponseText,
+          credentials.role,
+        );
+        if (apiParsedUser !== undefined) {
+          parsedUser = apiParsedUser;
+          parsedResponseHeaders = apiResponse.headers;
+        }
       }
 
-      const rawParsedUser = parseStructuredLmsResponse(
-        rawResponseText,
-        credentials.role,
-      );
-      if (rawParsedUser !== undefined) {
-        parsedUser = rawParsedUser;
-        parsedResponseHeaders = rawResponse.headers;
-      } else {
-        const apiRedirectUrl = readMetaRefreshUrl(rawResponseText, endpoint);
-        if (apiRedirectUrl !== undefined) {
-          const apiResponse = await this.fetchLms(
-            apiRedirectUrl,
-            {
-              headers: {
-                accept: 'text/html,application/json',
-                cookie: mergeSessionCookie(sessionCookie, rawResponse.headers),
-              },
-              redirect: 'follow',
-            },
-            timeout,
-            'login admin data api response',
-          );
-          const apiResponseText = await apiResponse.text();
-
-          if (
-            apiResponse.url.includes('login=failed') ||
-            apiResponse.status === 401 ||
-            apiResponse.status === 403 ||
-            apiResponseText.includes('Username Not Found')
-          ) {
-            throw new InvalidLmsCredentialsError();
-          }
-
-          const apiParsedUser = parseStructuredLmsResponse(
-            apiResponseText,
-            credentials.role,
-          );
-          if (apiParsedUser !== undefined) {
-            parsedUser = apiParsedUser;
-            parsedResponseHeaders = apiResponse.headers;
-          }
-        }
-
-        if (parsedUser === undefined) {
-          console.warn(
-            `[AdminLoginResponse] user="${credentials.username}" could not parse app response; status=${response.status}; url=${response.url}; preview="${previewLmsResponse(responseText)}"`,
-          );
-        }
+      if (parsedUser === undefined) {
+        console.warn(
+          `[AdminLoginResponse] user="${credentials.username}" could not parse app response; status=${response.status}; url=${response.url}; preview="${previewLmsResponse(responseText)}"`,
+        );
       }
     }
 
@@ -280,13 +247,29 @@ export class EaccLmsClient implements LmsClient {
         return user;
       }
 
-      return this.loadAdminCoursesForUser(
-        dashboardUrl,
-        mergeSessionCookie(sessionCookie, parsedResponseHeaders),
-        timeout,
-        user,
-        credentials,
-      );
+      try {
+        return await this.loadAdminCoursesForUser(
+          dashboardUrl,
+          mergeSessionCookie(sessionCookie, parsedResponseHeaders),
+          timeout,
+          user,
+          credentials,
+        );
+      } catch (error) {
+        if (error instanceof InvalidLmsCredentialsError) {
+          console.warn(
+            `[AdminCourses] post-login course load failed for user="${credentials.username}" after the LMS app login was accepted; returning authenticated admin session without preloaded courses`,
+          );
+
+          return {
+            ...user,
+            courses: user.courses ?? [],
+            isCourseCatalogComplete: false,
+          };
+        }
+
+        throw error;
+      }
     }
 
     const user = await this.loadDashboard(
@@ -351,7 +334,7 @@ export class EaccLmsClient implements LmsClient {
     const body = new URLSearchParams({
       ty: 'admin',
       username: credentials.username,
-      inputPassword: credentials.password,
+      inputPassword: credentials.password.trim(),
     });
 
     let response: Response;
@@ -375,11 +358,14 @@ export class EaccLmsClient implements LmsClient {
     const responseText = await response.text();
 
     if (
-      response.url.includes('login=failed') ||
+      isLoginFailedResponse(response, responseText, endpoint) ||
       response.status === 401 ||
       response.status === 403 ||
       responseText.includes('Username Not Found')
     ) {
+      console.warn(
+        `[LMS] invalid login response role=admin user=${credentials.username} status=${response.status} url=${response.url} refresh=${readMetaRefreshUrl(responseText, endpoint)?.href ?? 'none'} preview="${previewLmsResponse(responseText)}"`,
+      );
       throw new InvalidLmsCredentialsError();
     }
 
@@ -1467,6 +1453,18 @@ function readMetaRefreshUrl(html: string, baseUrl: URL): URL | undefined {
   );
   const target = match?.[1]?.trim();
   return target ? new URL(target, baseUrl) : undefined;
+}
+
+function isLoginFailedResponse(
+  response: Response,
+  responseText: string,
+  baseUrl: URL,
+): boolean {
+  if (response.url.includes('login=failed')) return true;
+  if (responseText.includes('Username Not Found')) return true;
+
+  const refreshUrl = readMetaRefreshUrl(responseText, baseUrl);
+  return refreshUrl?.href.includes('login=failed') === true;
 }
 
 function readAdminAccessOverrides(
