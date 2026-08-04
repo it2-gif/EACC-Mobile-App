@@ -7,6 +7,7 @@ import '../services/push_notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/course_card.dart';
+import '../widgets/home_summary_strip.dart';
 import '../widgets/polished_state_card.dart';
 import '../widgets/screen_header.dart';
 import '../widgets/support_entry_card.dart';
@@ -30,7 +31,31 @@ class StudentCoursesScreen extends StatelessWidget {
             subtitle: session.courses.isEmpty
                 ? 'No open LMS courses are available for chat right now.'
                 : 'Choose a course to chat with your teacher.',
-            icon: Icons.school,
+            icon: Icons.school_rounded,
+            badge: 'Student workspace',
+          ),
+          const SizedBox(height: 12),
+          HomeSummaryStrip(
+            items: [
+              HomeSummaryItem(
+                icon: Icons.menu_book_rounded,
+                value: '',
+                label: 'Open courses',
+                color: AppColors.student,
+              ),
+              HomeSummaryItem(
+                icon: Icons.chat_bubble_rounded,
+                value: '',
+                label: 'Course chats',
+                color: AppColors.primary,
+              ),
+              HomeSummaryItem(
+                icon: Icons.school_rounded,
+                value: _teacherCount(session).toString(),
+                label: 'Teachers',
+                color: AppColors.teacher,
+              ),
+            ],
           ),
           const SizedBox(height: 18),
           if (session.courses.isEmpty)
@@ -43,6 +68,14 @@ class StudentCoursesScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+int _teacherCount(AuthSession session) {
+  return session.courses
+      .map((course) => course.teacherName?.trim().toLowerCase())
+      .where((teacher) => teacher != null && teacher.isNotEmpty)
+      .toSet()
+      .length;
 }
 
 class _StudentCourseCard extends StatefulWidget {

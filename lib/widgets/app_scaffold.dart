@@ -76,27 +76,67 @@ class AppScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final maxContentWidth = width >= 1100 ? 1080.0 : 760.0;
+    final compact = width < 430;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        toolbarHeight: width >= 900 ? 68 : 60,
-        title: Text(title),
+        toolbarHeight: width >= 900 ? 70 : 62,
+        titleSpacing: 16,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.primary, AppColors.primaryDark],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primaryDark.withValues(alpha: 0.16),
+                    blurRadius: 12,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.chat_bubble_rounded,
+                color: Colors.white,
+                size: 17,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Flexible(child: Text(title, overflow: TextOverflow.ellipsis)),
+          ],
+        ),
         shape: const Border(bottom: BorderSide(color: AppColors.border)),
         actions: [
           ...?actions,
           if (showLogout)
             Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: TextButton.icon(
-                onPressed: () async => _logout(context),
-                icon: const Icon(Icons.logout_rounded, size: 18),
-                label: const Text('Logout'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.danger,
-                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-              ),
+              child: compact
+                  ? IconButton(
+                      onPressed: () async => _logout(context),
+                      icon: const Icon(Icons.logout_rounded),
+                      tooltip: 'Logout',
+                      color: AppColors.danger,
+                    )
+                  : TextButton.icon(
+                      onPressed: () async => _logout(context),
+                      icon: const Icon(Icons.logout_rounded, size: 18),
+                      label: const Text('Logout'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.danger,
+                        textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
             ),
         ],
       ),

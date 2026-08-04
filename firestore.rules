@@ -479,11 +479,11 @@ service cloud.firestore {
           allow read: if canReadCourseAsAdmin(courseId) || canAccessThread(courseId, threadId);
           allow create: if isCourseAdmin(courseId)
               ? hasValidSender()
-                && request.resource.data.type in ['text', 'image', 'video', 'voice', 'document']
+                && request.resource.data.type in ['text', 'image', 'video', 'voice', 'document', 'media_group']
                 && request.resource.data.created_at == request.time
               : canWriteThread(courseId, threadId)
                 && hasValidSender()
-                && request.resource.data.type in ['text', 'image', 'video', 'voice', 'document']
+                && request.resource.data.type in ['text', 'image', 'video', 'voice', 'document', 'media_group']
                 && request.resource.data.created_at == request.time;
           allow update: if isCourseAdmin(courseId)
               ? (

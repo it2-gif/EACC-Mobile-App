@@ -7,6 +7,7 @@ import '../services/push_notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/course_card.dart';
+import '../widgets/home_summary_strip.dart';
 import '../widgets/polished_state_card.dart';
 import '../widgets/screen_header.dart';
 import '../widgets/support_entry_card.dart';
@@ -30,7 +31,31 @@ class TeacherCoursesScreen extends StatelessWidget {
             subtitle: session.courses.isEmpty
                 ? 'No open LMS courses are assigned right now.'
                 : 'Choose a course to view student chats.',
-            icon: Icons.menu_book,
+            icon: Icons.menu_book_rounded,
+            badge: 'Teacher workspace',
+          ),
+          const SizedBox(height: 12),
+          HomeSummaryStrip(
+            items: [
+              HomeSummaryItem(
+                icon: Icons.menu_book_rounded,
+                value: '',
+                label: 'Open courses',
+                color: AppColors.teacher,
+              ),
+              HomeSummaryItem(
+                icon: Icons.groups_rounded,
+                value: _studentSeatCount(session).toString(),
+                label: 'Students',
+                color: AppColors.student,
+              ),
+              HomeSummaryItem(
+                icon: Icons.forum_rounded,
+                value: _chatCount(session).toString(),
+                label: 'Student chats',
+                color: AppColors.primary,
+              ),
+            ],
           ),
           const SizedBox(height: 18),
           if (session.courses.isEmpty)
@@ -43,6 +68,20 @@ class TeacherCoursesScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+int _studentSeatCount(AuthSession session) {
+  return session.courses.fold<int>(
+    0,
+    (total, course) => total + course.students.length,
+  );
+}
+
+int _chatCount(AuthSession session) {
+  return session.courses.fold<int>(
+    0,
+    (total, course) => total + course.students.length + 2,
+  );
 }
 
 class _TeacherCourseCard extends StatefulWidget {

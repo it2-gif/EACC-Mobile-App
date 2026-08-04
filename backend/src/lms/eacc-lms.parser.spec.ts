@@ -237,6 +237,34 @@ describe('parseLmsResponse', () => {
     expect(contactPerson?.isManagerOperation).toBe(false);
   });
 
+  it('parses the LMS teacher-manager admin response from login-test', () => {
+    const admin = parseLmsPhpArrayResponse(
+      `Array
+(
+    [admin_name] => Array
+        (
+            [0] => Array
+                (
+                    [shortname] => Niven
+                    [id] => 78
+                    [fullaccese] => 0
+                    [m_operation] => 1
+                    [tec] => 0
+                    [manage-techers] => 1
+                )
+
+        )
+)`,
+      'admin',
+    );
+
+    expect(admin?.lmsUserId).toBe('78');
+    expect(admin?.name).toBe('Niven');
+    expect(admin?.isSuperAdmin).toBe(false);
+    expect(admin?.isManagerOperation).toBe(true);
+    expect(admin?.isTechnicalSupport).toBe(false);
+    expect(admin?.isAcademic).toBe(true);
+  });
   it('reads full access from the response root when admin identity is nested', () => {
     const admin = parseLmsResponse(
       {

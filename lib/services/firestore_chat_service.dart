@@ -128,6 +128,20 @@ class AdminInboxThread {
       !isAnnouncement && !isTeacherChat && !isContactPersonChat;
 }
 
+class ChatMediaUploadItem {
+  final Uint8List bytes;
+  final String fileName;
+  final String type;
+  final int? durationMs;
+
+  const ChatMediaUploadItem({
+    required this.bytes,
+    required this.fileName,
+    required this.type,
+    this.durationMs,
+  });
+}
+
 class FirestoreChatService {
   static const int maxImageSizeBytes = 5 * 1024 * 1024;
   static const int maxVoiceSizeBytes = 10 * 1024 * 1024;
@@ -1095,6 +1109,93 @@ class FirestoreChatService {
     );
   }
 
+  static Future<String> sendMediaGroupMessage({
+    required String courseId,
+    required String threadId,
+    required String senderName,
+    required String senderRole,
+    required List<ChatMediaUploadItem> items,
+    void Function(double progress)? onProgress,
+    String? studentName,
+    MessageReply? reply,
+  }) async {
+    if (items.length < 2) {
+      throw const ChatUploadException('Select at least two media files.');
+    }
+
+    for (final item in items) {
+      if (item.type == 'image') {
+        validateImageUpload(
+          fileName: item.fileName,
+          fileSize: item.bytes.length,
+        );
+      } else if (item.type == 'video') {
+        validateVideoUpload(
+          fileName: item.fileName,
+          fileSize: item.bytes.length,
+        );
+      } else {
+        throw const ChatUploadException(
+          'Only photos and videos can be grouped.',
+        );
+      }
+    }
+
+    final attachments = <Map<String, dynamic>>[];
+    for (var index = 0; index < items.length; index += 1) {
+      final item = items[index];
+      final uploaded = await _uploadMediaFile(
+        courseId: courseId,
+        threadId: threadId,
+        bytes: item.bytes,
+        fileName: item.fileName,
+        contentType: item.type == 'image'
+            ? _guessImageContentType(item.fileName)
+            : _guessVideoContentType(item.fileName),
+        onProgress: onProgress == null
+            ? null
+            : (progress) {
+                onProgress(((index + progress) / items.length).clamp(0.0, 1.0));
+              },
+      );
+      attachments.add({
+        'type': item.type,
+        'media_url': uploaded.mediaUrl,
+        'file_name': item.fileName,
+        'file_size_bytes': item.bytes.length,
+        'file_type': _fileExtension(item.fileName).toUpperCase(),
+        'storage_path': uploaded.storagePath,
+        if (item.durationMs != null) 'duration_ms': item.durationMs,
+      });
+    }
+
+    final threadData = _messageThreadUpdateData(
+      threadId: threadId,
+      senderName: senderName,
+      senderRole: senderRole,
+      lastMessage: _mediaGroupPreview(items),
+      studentName: studentName,
+    );
+
+    final messageData = <String, dynamic>{
+      'type': 'media_group',
+      'text': '',
+      'attachments': attachments,
+      'media_count': attachments.length,
+      'sender_name': senderName,
+      'sender_role': senderRole,
+      'created_at': FieldValue.serverTimestamp(),
+    };
+    if (reply != null) messageData.addAll(reply.toFirestore());
+
+    return _commitMessage(
+      courseId: courseId,
+      threadId: threadId,
+      threadData: threadData,
+      messageData: messageData,
+    );
+  }
+
   static Future<String> sendVoiceMessage({
     required String courseId,
     required String threadId,
@@ -1215,10 +1316,58 @@ class FirestoreChatService {
     String? studentName,
     MessageReply? reply,
   }) async {
+    final uploaded = await _uploadMediaFile(
+      courseId: courseId,
+      threadId: threadId,
+      bytes: bytes,
+      fileName: fileName,
+      contentType: contentType,
+      onProgress: onProgress,
+    );
+
+    final threadData = _messageThreadUpdateData(
+      threadId: threadId,
+      senderName: senderName,
+      senderRole: senderRole,
+      lastMessage: lastMessage,
+      studentName: studentName,
+    );
+
+    final messageData = <String, dynamic>{
+      'type': type,
+      'text': '',
+      'media_url': uploaded.mediaUrl,
+      'file_name': fileName,
+      'file_size_bytes': bytes.length,
+      'file_type': _fileExtension(fileName).toUpperCase(),
+      'storage_path': uploaded.storagePath,
+      'sender_name': senderName,
+      'sender_role': senderRole,
+      'created_at': FieldValue.serverTimestamp(),
+    };
+    if (durationMs != null) messageData['duration_ms'] = durationMs;
+    if (reply != null) messageData.addAll(reply.toFirestore());
+
+    return _commitMessage(
+      courseId: courseId,
+      threadId: threadId,
+      threadData: threadData,
+      messageData: messageData,
+    );
+  }
+
+  static Future<_UploadedMedia> _uploadMediaFile({
+    required String courseId,
+    required String threadId,
+    required Uint8List bytes,
+    required String fileName,
+    required String contentType,
+    void Function(double progress)? onProgress,
+  }) async {
     final safeFileName = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
     final storagePath =
         'chat_uploads/courses/$courseId/threads/$threadId/'
-        '${DateTime.now().millisecondsSinceEpoch}_$safeFileName';
+        '${DateTime.now().microsecondsSinceEpoch}_$safeFileName';
 
     final uploadTask = _storage
         .ref()
@@ -1239,36 +1388,10 @@ class FirestoreChatService {
     } finally {
       await progressSubscription?.cancel();
     }
-    final mediaUrl = await uploadResult.ref.getDownloadURL();
 
-    final threadData = _messageThreadUpdateData(
-      threadId: threadId,
-      senderName: senderName,
-      senderRole: senderRole,
-      lastMessage: lastMessage,
-      studentName: studentName,
-    );
-
-    final messageData = <String, dynamic>{
-      'type': type,
-      'text': '',
-      'media_url': mediaUrl,
-      'file_name': fileName,
-      'file_size_bytes': bytes.length,
-      'file_type': _fileExtension(fileName).toUpperCase(),
-      'storage_path': storagePath,
-      'sender_name': senderName,
-      'sender_role': senderRole,
-      'created_at': FieldValue.serverTimestamp(),
-    };
-    if (durationMs != null) messageData['duration_ms'] = durationMs;
-    if (reply != null) messageData.addAll(reply.toFirestore());
-
-    return _commitMessage(
-      courseId: courseId,
-      threadId: threadId,
-      threadData: threadData,
-      messageData: messageData,
+    return _UploadedMedia(
+      mediaUrl: await uploadResult.ref.getDownloadURL(),
+      storagePath: storagePath,
     );
   }
 
@@ -1646,6 +1769,9 @@ class FirestoreChatService {
         return 'Forwarded photo';
       case 'video':
         return 'Forwarded video';
+      case 'media_group':
+        final count = data['media_count'] as int? ?? 0;
+        return count > 0 ? 'Forwarded  media files' : 'Forwarded media';
       case 'voice':
         return 'Forwarded voice message';
       case 'document':
@@ -1656,6 +1782,17 @@ class FirestoreChatService {
       default:
         return 'Forwarded message';
     }
+  }
+
+  static String _mediaGroupPreview(List<ChatMediaUploadItem> items) {
+    final imageCount = items.where((item) => item.type == 'image').length;
+    final videoCount = items.where((item) => item.type == 'video').length;
+
+    if (imageCount > 0 && videoCount > 0) {
+      return '${items.length} media files';
+    }
+    if (imageCount > 0) return '$imageCount photos';
+    return '$videoCount videos';
   }
 
   static String _fileExtension(String fileName) {
@@ -1680,6 +1817,13 @@ class FirestoreChatService {
         return null;
     }
   }
+}
+
+class _UploadedMedia {
+  final String mediaUrl;
+  final String storagePath;
+
+  const _UploadedMedia({required this.mediaUrl, required this.storagePath});
 }
 
 class AdminUnreadCounts {

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -18,6 +19,7 @@ class MessageBubble extends StatelessWidget {
   final int? fileSizeBytes;
   final String? fileType;
   final int? durationMs;
+  final List<Map<String, dynamic>>? attachments;
   final String senderName;
   final String senderRole;
   final String currentUserRole;
@@ -49,6 +51,7 @@ class MessageBubble extends StatelessWidget {
     this.fileSizeBytes,
     this.fileType,
     this.durationMs,
+    this.attachments,
     required this.senderName,
     required this.senderRole,
     required this.currentUserRole,
@@ -268,6 +271,68 @@ class MessageBubble extends StatelessWidget {
     unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
   }
 
+  void _openAttachment(BuildContext context, Map<String, dynamic> attachment) {
+    final url = attachment['media_url']?.toString() ?? '';
+    if (url.isEmpty) return;
+
+    final attachmentType = attachment['type']?.toString() ?? '';
+    if (attachmentType == 'image') {
+      showDialog(
+        context: context,
+        builder: (context) => Dialog.fullscreen(
+          backgroundColor: Colors.black,
+          child: Stack(
+            children: [
+              Center(
+                child: InteractiveViewer(
+                  child: Image.network(
+                    url,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) => const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'Could not load image',
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 12,
+                right: 12,
+                child: IconButton.filledTonal(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Close',
+                ),
+              ),
+              Positioned(
+                left: 12,
+                right: 72,
+                bottom: 16,
+                child: FilledButton.icon(
+                  onPressed: () => _openUrl(url),
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text('Open or download'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      return;
+    }
+
+    _openUrl(url);
+  }
+
+  void _openUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
+  }
+
   void _openVideo(BuildContext context) {
     if (mediaUrl == null || mediaUrl!.isEmpty) return;
 
@@ -316,6 +381,8 @@ class MessageBubble extends StatelessWidget {
     final isVoice = type == 'voice' && mediaUrl != null && mediaUrl!.isNotEmpty;
     final isDocument =
         type == 'document' && mediaUrl != null && mediaUrl!.isNotEmpty;
+    final groupAttachments = attachments ?? const <Map<String, dynamic>>[];
+    final isMediaGroup = type == 'media_group' && groupAttachments.isNotEmpty;
     final screenWidth = MediaQuery.sizeOf(context).width;
     final maxBubbleWidth = screenWidth * (screenWidth >= 900 ? 0.58 : 0.78);
     final bubbleColor = isMe ? AppColors.bubbleMe : AppColors.bubbleOther;
@@ -600,15 +667,14 @@ class MessageBubble extends StatelessWidget {
                         metaLabel: _fileMetaLabel,
                         onOpen: _openMediaExternally,
                       )
+                    else if (isMediaGroup)
+                      _MediaGroupGrid(
+                        attachments: groupAttachments,
+                        onOpen: (attachment) =>
+                            _openAttachment(context, attachment),
+                      )
                     else
-                      SelectableText(
-                        text,
-                        style: const TextStyle(
-                          fontSize: 15.25,
-                          height: 1.45,
-                          color: AppColors.ink,
-                        ),
-                      ),
+                      _LinkedMessageText(text: text),
                     if (time.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       if (_reactionCounts.isNotEmpty) ...[
@@ -691,6 +757,517 @@ class MessageBubble extends StatelessWidget {
     }
     return '$bytes B';
   }
+}
+
+class _MediaGroupGrid extends StatelessWidget {
+  final List<Map<String, dynamic>> attachments;
+  final void Function(Map<String, dynamic> attachment) onOpen;
+
+  const _MediaGroupGrid({required this.attachments, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleAttachments = attachments.take(4).toList();
+    final extraCount = attachments.length - visibleAttachments.length;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const gap = 4.0;
+        final totalWidth = constraints.maxWidth;
+        final tileHeight = _gridHeight(visibleAttachments.length, totalWidth);
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(15),
+          child: SizedBox(
+            width: totalWidth,
+            height: tileHeight,
+            child: _buildGrid(
+              totalWidth: totalWidth,
+              height: tileHeight,
+              gap: gap,
+              visibleAttachments: visibleAttachments,
+              extraCount: extraCount,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGrid({
+    required double totalWidth,
+    required double height,
+    required double gap,
+    required List<Map<String, dynamic>> visibleAttachments,
+    required int extraCount,
+  }) {
+    if (visibleAttachments.length == 1) {
+      return _tile(visibleAttachments[0], totalWidth, height, extraCount);
+    }
+
+    if (visibleAttachments.length == 2) {
+      final tileWidth = (totalWidth - gap) / 2;
+      return Row(
+        children: [
+          _tile(visibleAttachments[0], tileWidth, height, 0),
+          SizedBox(width: gap),
+          _tile(visibleAttachments[1], tileWidth, height, extraCount),
+        ],
+      );
+    }
+
+    if (visibleAttachments.length == 3) {
+      final largeWidth = (totalWidth - gap) * 0.58;
+      final sideWidth = totalWidth - largeWidth - gap;
+      final sideHeight = (height - gap) / 2;
+      return Row(
+        children: [
+          _tile(visibleAttachments[0], largeWidth, height, 0),
+          SizedBox(width: gap),
+          Column(
+            children: [
+              _tile(visibleAttachments[1], sideWidth, sideHeight, 0),
+              SizedBox(height: gap),
+              _tile(visibleAttachments[2], sideWidth, sideHeight, extraCount),
+            ],
+          ),
+        ],
+      );
+    }
+
+    final tileWidth = (totalWidth - gap) / 2;
+    final tileHeight = (height - gap) / 2;
+    return Column(
+      children: [
+        Row(
+          children: [
+            _tile(visibleAttachments[0], tileWidth, tileHeight, 0),
+            SizedBox(width: gap),
+            _tile(visibleAttachments[1], tileWidth, tileHeight, 0),
+          ],
+        ),
+        SizedBox(height: gap),
+        Row(
+          children: [
+            _tile(visibleAttachments[2], tileWidth, tileHeight, 0),
+            SizedBox(width: gap),
+            _tile(visibleAttachments[3], tileWidth, tileHeight, extraCount),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _tile(
+    Map<String, dynamic> attachment,
+    double width,
+    double height,
+    int extraCount,
+  ) {
+    return _MediaGroupTile(
+      attachment: attachment,
+      width: width,
+      height: height,
+      extraCount: extraCount,
+      onOpen: () => onOpen(attachment),
+    );
+  }
+
+  double _gridHeight(int count, double width) {
+    if (count <= 1) return (width * 0.58).clamp(180.0, 260.0);
+    if (count == 2) return (width * 0.48).clamp(160.0, 230.0);
+    return (width * 0.62).clamp(210.0, 310.0);
+  }
+}
+
+class _MediaGroupTile extends StatelessWidget {
+  final Map<String, dynamic> attachment;
+  final double width;
+  final double height;
+  final int extraCount;
+  final VoidCallback onOpen;
+
+  const _MediaGroupTile({
+    required this.attachment,
+    required this.width,
+    required this.height,
+    required this.extraCount,
+    required this.onOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final type = attachment['type']?.toString() ?? '';
+    final url = attachment['media_url']?.toString() ?? '';
+    final fileName = attachment['file_name']?.toString() ?? 'Media';
+    final isVideo = type == 'video';
+
+    return Material(
+      color: const Color(0xFF0F172A),
+      child: InkWell(
+        onTap: onOpen,
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (!isVideo && url.isNotEmpty)
+                Image.network(
+                  url,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => _MediaFallbackTile(
+                    icon: Icons.broken_image_outlined,
+                    label: fileName,
+                  ),
+                )
+              else
+                _MediaFallbackTile(
+                  icon: isVideo
+                      ? Icons.play_circle_fill_rounded
+                      : Icons.photo_rounded,
+                  label: fileName,
+                ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.04),
+                      Colors.black.withValues(alpha: 0.55),
+                    ],
+                  ),
+                ),
+              ),
+              if (isVideo)
+                Center(
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.38),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.42),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 34,
+                    ),
+                  ),
+                ),
+              Positioned(
+                left: 9,
+                right: 9,
+                bottom: 8,
+                child: Row(
+                  children: [
+                    Icon(
+                      isVideo ? Icons.videocam_rounded : Icons.image_rounded,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        isVideo ? 'Video' : 'Photo',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (extraCount > 0)
+                Container(
+                  color: Colors.black.withValues(alpha: 0.62),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '+$extraCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MediaFallbackTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _MediaFallbackTile({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF111827), Color(0xFF020617)],
+        ),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: Colors.white70, size: 34),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LinkedMessageText extends StatefulWidget {
+  final String text;
+
+  const _LinkedMessageText({required this.text});
+
+  @override
+  State<_LinkedMessageText> createState() => _LinkedMessageTextState();
+}
+
+class _LinkedMessageTextState extends State<_LinkedMessageText> {
+  final List<TapGestureRecognizer> _recognizers = [];
+
+  @override
+  void dispose() {
+    for (final recognizer in _recognizers) {
+      recognizer.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _disposeRecognizers();
+    final links = _extractLinks(widget.text);
+    final firstLink = links.firstOrNull;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (firstLink != null) ...[
+          _LinkPreviewCard(link: firstLink),
+          const SizedBox(height: 9),
+        ],
+        SelectableText.rich(
+          TextSpan(
+            style: const TextStyle(
+              fontSize: 15.25,
+              height: 1.45,
+              color: AppColors.ink,
+            ),
+            children: _buildTextSpans(widget.text),
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<InlineSpan> _buildTextSpans(String value) {
+    final spans = <InlineSpan>[];
+    var cursor = 0;
+
+    for (final match in _linkPattern.allMatches(value)) {
+      if (match.start > cursor) {
+        spans.add(TextSpan(text: value.substring(cursor, match.start)));
+      }
+
+      final rawUrl = match.group(0)!;
+      final uri = _normalizeLink(rawUrl);
+      final recognizer = TapGestureRecognizer()
+        ..onTap = () {
+          if (uri != null) {
+            unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
+          }
+        };
+      _recognizers.add(recognizer);
+
+      spans.add(
+        TextSpan(
+          text: rawUrl,
+          recognizer: recognizer,
+          style: const TextStyle(
+            color: AppColors.primary,
+            fontWeight: FontWeight.w800,
+            decoration: TextDecoration.underline,
+          ),
+        ),
+      );
+      cursor = match.end;
+    }
+
+    if (cursor < value.length) {
+      spans.add(TextSpan(text: value.substring(cursor)));
+    }
+
+    return spans.isEmpty ? [TextSpan(text: value)] : spans;
+  }
+
+  void _disposeRecognizers() {
+    for (final recognizer in _recognizers) {
+      recognizer.dispose();
+    }
+    _recognizers.clear();
+  }
+}
+
+class _LinkPreviewCard extends StatelessWidget {
+  final _MessageLink link;
+
+  const _LinkPreviewCard({required this.link});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.primary.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => unawaited(
+          launchUrl(link.uri, mode: LaunchMode.externalApplication),
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.14),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.link_rounded, color: AppColors.primary),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      link.host,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      link.displayUrl,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.open_in_new_rounded,
+                size: 18,
+                color: AppColors.primary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MessageLink {
+  final Uri uri;
+  final String raw;
+
+  const _MessageLink({required this.uri, required this.raw});
+
+  String get host => uri.host.replaceFirst(RegExp(r'^www\.'), '');
+
+  String get displayUrl {
+    final value = raw.trim();
+    if (value.length <= 72) return value;
+    return '${value.substring(0, 69)}...';
+  }
+}
+
+final _linkPattern = RegExp(
+  r'((?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+(?:[^\s<>()]*)?)',
+  caseSensitive: false,
+);
+
+List<_MessageLink> _extractLinks(String value) {
+  return _linkPattern
+      .allMatches(value)
+      .map((match) {
+        final raw = match.group(0) ?? '';
+        final uri = _normalizeLink(raw);
+        return uri == null ? null : _MessageLink(uri: uri, raw: raw);
+      })
+      .whereType<_MessageLink>()
+      .toList();
+}
+
+Uri? _normalizeLink(String value) {
+  final cleaned = value.trim().replaceAll(RegExp(r'[.,;:!?]+$'), '');
+  if (cleaned.isEmpty) return null;
+
+  final candidate =
+      cleaned.startsWith(RegExp(r'https?:\/\/', caseSensitive: false))
+      ? cleaned
+      : 'https://$cleaned';
+  final uri = Uri.tryParse(candidate);
+  if (uri == null || uri.host.trim().isEmpty || !uri.host.contains('.')) {
+    return null;
+  }
+  if (uri.scheme != 'http' && uri.scheme != 'https') return null;
+
+  return uri;
 }
 
 class _MessageActionsMenu extends StatelessWidget {

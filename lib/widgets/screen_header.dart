@@ -6,12 +6,14 @@ class ScreenHeader extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
+  final String? badge;
 
   const ScreenHeader({
     super.key,
     required this.title,
     required this.subtitle,
     this.icon = Icons.chat_bubble_outline,
+    this.badge,
   });
 
   @override
@@ -32,11 +34,11 @@ class ScreenHeader extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF286FBE), AppColors.primaryDark],
+          colors: [Color(0xFF2369B8), Color(0xFF103874)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
             color: AppColors.primaryDark.withValues(alpha: 0.18),
@@ -48,14 +50,26 @@ class ScreenHeader extends StatelessWidget {
       child: Stack(
         children: [
           Positioned(
-            right: -36,
-            top: -42,
+            right: -22,
+            top: -36,
             child: Container(
-              width: 132,
-              height: 132,
+              width: 128,
+              height: 128,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.08),
+                color: Colors.white.withValues(alpha: 0.07),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 22,
+            bottom: -44,
+            child: Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
               ),
             ),
           ),
@@ -64,20 +78,20 @@ class ScreenHeader extends StatelessWidget {
             children: [
               Container(
                 width: compact
-                    ? 44
+                    ? 46
                     : wide
-                    ? 58
-                    : 48,
+                    ? 62
+                    : 52,
                 height: compact
-                    ? 44
+                    ? 46
                     : wide
-                    ? 58
-                    : 48,
+                    ? 62
+                    : 52,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(16),
+                  color: Colors.white.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(18),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.16),
+                    color: Colors.white.withValues(alpha: 0.18),
                   ),
                 ),
                 child: Icon(icon, color: Colors.white, size: wide ? 30 : 24),
@@ -88,6 +102,32 @@ class ScreenHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (badge != null && badge!.trim().isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Text(
+                          badge!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     Text(
                       title,
                       maxLines: 2,
@@ -95,7 +135,7 @@ class ScreenHeader extends StatelessWidget {
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: wide ? 24 : 20,
-                        height: 1.05,
+                        height: 1.06,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -108,7 +148,7 @@ class ScreenHeader extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.78),
                         fontSize: wide ? 14 : 13,
                         height: 1.28,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],

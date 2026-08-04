@@ -372,8 +372,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       color: AppColors.primary,
                     ),
                   ),
-                  title: const Text('Choose existing image'),
-                  subtitle: const Text('Select a photo from your device'),
+                  title: const Text('Choose images'),
+                  subtitle: const Text('Select one or more photos'),
                   onTap: () {
                     Navigator.pop(context);
                     pickAndSendImage(ImageSource.gallery);
@@ -387,8 +387,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       color: AppColors.primary,
                     ),
                   ),
-                  title: const Text('Choose existing video'),
-                  subtitle: const Text('Select a video from your device'),
+                  title: const Text('Choose videos'),
+                  subtitle: const Text('Select one or more videos'),
                   onTap: () {
                     Navigator.pop(context);
                     pickAndSendVideo(ImageSource.gallery);
@@ -402,9 +402,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       color: AppColors.primary,
                     ),
                   ),
-                  title: const Text('Upload document'),
+                  title: const Text('Upload documents'),
                   subtitle: const Text(
-                    'PDF, Word, PowerPoint, Excel, TXT, CSV',
+                    'Select one or more PDF, Word, Excel, TXT, or CSV files',
                   ),
                   onTap: () {
                     Navigator.pop(context);
@@ -1040,17 +1040,37 @@ class _ChatScreenState extends State<ChatScreen> {
     if (isUploadingMedia || isSending || isRecordingVoice) return;
 
     final picker = ImagePicker();
-    final image = await picker.pickImage(
-      source: source,
-      imageQuality: 78,
-      maxWidth: 1920,
-      maxHeight: 1920,
-    );
+    final images = <XFile>[];
+    if (source == ImageSource.gallery) {
+      images.addAll(
+        await picker.pickMultiImage(
+          imageQuality: 78,
+          maxWidth: 1920,
+          maxHeight: 1920,
+        ),
+      );
+    } else {
+      final image = await picker.pickImage(
+        source: source,
+        imageQuality: 78,
+        maxWidth: 1920,
+        maxHeight: 1920,
+      );
+      if (image != null) images.add(image);
+    }
 
-    if (image == null) return;
+    if (images.isEmpty) return;
 
-    setState(() => isUploadingMedia = true);
+    final reply = selectedReply;
+    if (images.length > 1) {
+      await _sendMediaGroupAttachment(
+        items: await _readMediaGroupItems(images, type: 'image'),
+        reply: reply,
+      );
+      return;
+    }
 
+    final image = images.single;
     try {
       final imageSize = await image.length();
       FirestoreChatService.validateImageUpload(
@@ -1061,7 +1081,11 @@ class _ChatScreenState extends State<ChatScreen> {
       final imageBytes = await image.readAsBytes();
       shouldScrollAfterSending = true;
 
-      await _sendImageAttachment(imageBytes: imageBytes, fileName: image.name);
+      await _sendImageAttachment(
+        imageBytes: imageBytes,
+        fileName: image.name,
+        reply: reply,
+      );
     } on ChatUploadException catch (error) {
       shouldScrollAfterSending = false;
       if (mounted) {
@@ -1071,41 +1095,61 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (error) {
       shouldScrollAfterSending = false;
-      if (mounted) {
-        final message = error.toString().toLowerCase();
-        final isCors =
-            message.contains('cors') || message.contains('xmlhttprequest');
-        final isStorage =
-            message.contains('storage') || message.contains('unauthorized');
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isCors
-                  ? 'Storage upload is not ready. Enable Firebase Storage, then apply CORS from scripts/SETUP.md.'
-                  : isStorage
-                  ? 'Firebase Storage not ready. Enable Storage in Firebase Console first.'
-                  : 'Failed to upload image: $error',
-            ),
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
+      _showImageUploadError(error);
     }
-
-    if (mounted) setState(() => isUploadingMedia = false);
   }
 
   Future<void> pickAndSendVideo(ImageSource source) async {
     if (isUploadingMedia || isSending || isRecordingVoice) return;
+
+    final reply = selectedReply;
+    if (source == ImageSource.gallery) {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions:
+            FirestoreChatService.supportedVideoExtensions.toList()..sort(),
+        allowMultiple: true,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final items = <ChatMediaUploadItem>[];
+      for (final file in result.files) {
+        final bytes = file.bytes;
+        if (bytes == null || bytes.isEmpty) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not read ${file.name}.')),
+          );
+          return;
+        }
+        FirestoreChatService.validateVideoUpload(
+          fileName: file.name,
+          fileSize: bytes.length,
+        );
+        items.add(
+          ChatMediaUploadItem(bytes: bytes, fileName: file.name, type: 'video'),
+        );
+      }
+
+      if (items.length > 1) {
+        await _sendMediaGroupAttachment(items: items, reply: reply);
+      } else {
+        final item = items.single;
+        await _sendVideoAttachment(
+          videoBytes: item.bytes,
+          fileName: item.fileName,
+          reply: reply,
+        );
+      }
+      return;
+    }
 
     final video = await ImagePicker().pickVideo(
       source: source,
       maxDuration: const Duration(minutes: 2),
     );
     if (video == null) return;
-
-    setState(() => isUploadingMedia = true);
 
     try {
       final videoSize = await video.length();
@@ -1116,7 +1160,11 @@ class _ChatScreenState extends State<ChatScreen> {
       final videoBytes = await video.readAsBytes();
       shouldScrollAfterSending = true;
 
-      await _sendVideoAttachment(videoBytes: videoBytes, fileName: video.name);
+      await _sendVideoAttachment(
+        videoBytes: videoBytes,
+        fileName: video.name,
+        reply: reply,
+      );
     } on ChatUploadException catch (error) {
       shouldScrollAfterSending = false;
       if (mounted) {
@@ -1132,8 +1180,6 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     }
-
-    if (mounted) setState(() => isUploadingMedia = false);
   }
 
   Future<void> pickAndSendDocument() async {
@@ -1143,46 +1189,108 @@ class _ChatScreenState extends State<ChatScreen> {
       type: FileType.custom,
       allowedExtensions:
           FirestoreChatService.supportedDocumentExtensions.toList()..sort(),
+      allowMultiple: true,
       withData: true,
     );
 
     if (result == null || result.files.isEmpty) return;
 
-    final file = result.files.single;
-    final documentBytes = file.bytes;
-    if (documentBytes == null || documentBytes.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not read this document.')),
-      );
-      return;
-    }
-
-    try {
-      FirestoreChatService.validateDocumentUpload(
-        fileName: file.name,
-        fileSize: documentBytes.length,
-      );
-      shouldScrollAfterSending = true;
-      await _sendDocumentAttachment(
-        documentBytes: documentBytes,
-        fileName: file.name,
-      );
-    } on ChatUploadException catch (error) {
-      shouldScrollAfterSending = false;
-      if (mounted) {
+    final reply = selectedReply;
+    for (var index = 0; index < result.files.length; index += 1) {
+      final file = result.files[index];
+      final documentBytes = file.bytes;
+      if (documentBytes == null || documentBytes.isEmpty) {
+        if (!mounted) return;
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(error.message)));
+        ).showSnackBar(SnackBar(content: Text('Could not read ${file.name}.')));
+        break;
       }
-    } catch (error) {
-      shouldScrollAfterSending = false;
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to upload document: $error')),
+
+      try {
+        FirestoreChatService.validateDocumentUpload(
+          fileName: file.name,
+          fileSize: documentBytes.length,
         );
+        shouldScrollAfterSending = true;
+        await _sendDocumentAttachment(
+          documentBytes: documentBytes,
+          fileName: file.name,
+          reply: reply,
+          uploadLabel: result.files.length == 1
+              ? null
+              : 'Uploading document ${index + 1} of ${result.files.length}...',
+        );
+        if (failedAttachment != null) break;
+      } on ChatUploadException catch (error) {
+        shouldScrollAfterSending = false;
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(error.message)));
+        }
+        break;
+      } catch (error) {
+        shouldScrollAfterSending = false;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to upload document: $error')),
+          );
+        }
+        break;
       }
     }
+  }
+
+  Future<List<ChatMediaUploadItem>> _readMediaGroupItems(
+    List<XFile> files, {
+    required String type,
+  }) async {
+    final items = <ChatMediaUploadItem>[];
+    for (final file in files) {
+      final size = await file.length();
+      if (type == 'image') {
+        FirestoreChatService.validateImageUpload(
+          fileName: file.name,
+          fileSize: size,
+        );
+      } else {
+        FirestoreChatService.validateVideoUpload(
+          fileName: file.name,
+          fileSize: size,
+        );
+      }
+      items.add(
+        ChatMediaUploadItem(
+          bytes: await file.readAsBytes(),
+          fileName: file.name,
+          type: type,
+        ),
+      );
+    }
+    return items;
+  }
+
+  void _showImageUploadError(Object error) {
+    if (!mounted) return;
+    final message = error.toString().toLowerCase();
+    final isCors =
+        message.contains('cors') || message.contains('xmlhttprequest');
+    final isStorage =
+        message.contains('storage') || message.contains('unauthorized');
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          isCors
+              ? 'Storage upload is not ready. Enable Firebase Storage, then apply CORS from scripts/SETUP.md.'
+              : isStorage
+              ? 'Firebase Storage not ready. Enable Storage in Firebase Console first.'
+              : 'Failed to upload image: $error',
+        ),
+        duration: const Duration(seconds: 5),
+      ),
+    );
   }
 
   Future<void> retryLastAttachment() async {
@@ -1230,14 +1338,62 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _sendMediaGroupAttachment({
+    required List<ChatMediaUploadItem> items,
+    MessageReply? reply,
+    bool retrying = false,
+  }) async {
+    final effectiveReply = reply ?? selectedReply;
+    final imageCount = items.where((item) => item.type == 'image').length;
+    final videoCount = items.where((item) => item.type == 'video').length;
+    final label = imageCount > 0 && videoCount > 0
+        ? '${items.length} media files'
+        : imageCount > 0
+        ? '$imageCount photos'
+        : '$videoCount videos';
+
+    _beginMediaUpload(retrying ? 'Retrying $label...' : 'Uploading $label...');
+    try {
+      final messageId = await FirestoreChatService.sendMediaGroupMessage(
+        courseId: widget.courseId,
+        threadId: widget.threadId,
+        senderName: widget.senderName,
+        senderRole: widget.currentUserRole,
+        items: items,
+        studentName: _resolvedStudentName,
+        reply: effectiveReply,
+        onProgress: _updateMediaUploadProgress,
+      );
+      if (mounted) setState(() => selectedReply = null);
+      shouldScrollAfterSending = true;
+      unawaited(
+        _sendPushNotification(
+          messageId: messageId,
+          messageType: 'media_group',
+          previewText: label,
+        ),
+      );
+      _clearMediaUploadState();
+    } catch (error) {
+      _clearMediaUploadState();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to upload $label: $error')),
+      );
+    }
+  }
+
   Future<void> _sendImageAttachment({
     required Uint8List imageBytes,
     required String fileName,
     MessageReply? reply,
     bool retrying = false,
+    String? uploadLabel,
   }) async {
     final effectiveReply = reply ?? selectedReply;
-    _beginMediaUpload(retrying ? 'Retrying photo...' : 'Uploading photo...');
+    _beginMediaUpload(
+      uploadLabel ?? (retrying ? 'Retrying photo...' : 'Uploading photo...'),
+    );
     try {
       final messageId = await FirestoreChatService.sendImageMessage(
         courseId: widget.courseId,
@@ -1369,10 +1525,12 @@ class _ChatScreenState extends State<ChatScreen> {
     required String fileName,
     MessageReply? reply,
     bool retrying = false,
+    String? uploadLabel,
   }) async {
     final effectiveReply = reply ?? selectedReply;
     _beginMediaUpload(
-      retrying ? 'Retrying document...' : 'Uploading document...',
+      uploadLabel ??
+          (retrying ? 'Retrying document...' : 'Uploading document...'),
     );
     try {
       final messageId = await FirestoreChatService.sendDocumentMessage(
@@ -1844,6 +2002,31 @@ class _ChatScreenState extends State<ChatScreen> {
                                                               ?.toString(),
                                                       durationMs:
                                                           data['duration_ms'],
+                                                      attachments:
+                                                          data['attachments']
+                                                              is List
+                                                          ? List<
+                                                              Map<
+                                                                String,
+                                                                dynamic
+                                                              >
+                                                            >.from(
+                                                              (data['attachments']
+                                                                      as List)
+                                                                  .whereType<
+                                                                    Map
+                                                                  >()
+                                                                  .map(
+                                                                    (item) =>
+                                                                        Map<
+                                                                          String,
+                                                                          dynamic
+                                                                        >.from(
+                                                                          item,
+                                                                        ),
+                                                                  ),
+                                                            )
+                                                          : null,
                                                       senderName:
                                                           data['sender_name'] ??
                                                           '',
@@ -2423,6 +2606,9 @@ class _ChatScreenState extends State<ChatScreen> {
         return 'Photo';
       case 'video':
         return 'Video';
+      case 'media_group':
+        final count = data['media_count'] as int? ?? 0;
+        return count > 0 ? ' media files' : 'Media';
       case 'voice':
         return 'Voice message';
       case 'document':
@@ -3474,4 +3660,3 @@ class _PendingAttachment {
     this.reply,
   });
 }
-

@@ -145,28 +145,20 @@ export class EaccLmsClient implements LmsClient {
 
     const responseText = await response.text();
 
-    if (
-      isLoginFailedResponse(response, responseText, endpoint) ||
-      response.status === 401 ||
-      response.status === 403 ||
-      responseText.includes('Username Not Found')
-    ) {
-      console.warn(
-        `[LMS] invalid login response role=${credentials.role} user=${credentials.username} status=${response.status} url=${response.url} refresh=${readMetaRefreshUrl(responseText, endpoint)?.href ?? 'none'} preview="${previewLmsResponse(responseText)}"`,
-      );
-      throw new InvalidLmsCredentialsError();
-    }
-
-    if (!response.ok) {
-      console.warn(
-        `[LMS] login ${credentials.role} returned ${response.status} ${response.statusText}`,
-      );
-      throw new LmsUnavailableError();
-    }
+    this.assertValidLoginResponse(
+      response,
+      responseText,
+      endpoint,
+      credentials.role,
+      credentials.username,
+    );
 
     const dashboardUrl = new URL(dashboardPaths[credentials.role], baseUrl);
     let parsedUser = parseStructuredLmsResponse(responseText, credentials.role);
-    let parsedResponseHeaders = response.headers;
+    let authenticatedSessionCookie = mergeSessionCookie(
+      sessionCookie,
+      response.headers,
+    );
 
     if (parsedUser === undefined && credentials.role === 'admin') {
       const apiRedirectUrl = readMetaRefreshUrl(responseText, endpoint);
@@ -176,7 +168,7 @@ export class EaccLmsClient implements LmsClient {
           {
             headers: {
               accept: 'text/html,application/json',
-              cookie: mergeSessionCookie(sessionCookie, response.headers),
+              cookie: authenticatedSessionCookie,
             },
             redirect: 'follow',
           },
@@ -185,17 +177,14 @@ export class EaccLmsClient implements LmsClient {
         );
         const apiResponseText = await apiResponse.text();
 
-        if (
-          isLoginFailedResponse(apiResponse, apiResponseText, apiRedirectUrl) ||
-          apiResponse.status === 401 ||
-          apiResponse.status === 403 ||
-          apiResponseText.includes('Username Not Found')
-        ) {
-          console.warn(
-            `[LMS] invalid admin data api response user=${credentials.username} status=${apiResponse.status} url=${apiResponse.url} refresh=${readMetaRefreshUrl(apiResponseText, apiRedirectUrl)?.href ?? 'none'} preview="${previewLmsResponse(apiResponseText)}"`,
-          );
-          throw new InvalidLmsCredentialsError();
-        }
+        this.assertValidLoginResponse(
+          apiResponse,
+          apiResponseText,
+          apiRedirectUrl,
+          credentials.role,
+          credentials.username,
+          'admin data api response',
+        );
 
         const apiParsedUser = parseStructuredLmsResponse(
           apiResponseText,
@@ -203,7 +192,10 @@ export class EaccLmsClient implements LmsClient {
         );
         if (apiParsedUser !== undefined) {
           parsedUser = apiParsedUser;
-          parsedResponseHeaders = apiResponse.headers;
+          authenticatedSessionCookie = mergeSessionCookie(
+            authenticatedSessionCookie,
+            apiResponse.headers,
+          );
         }
       }
 
@@ -232,7 +224,7 @@ export class EaccLmsClient implements LmsClient {
           ...user,
           courses: await this.loadTeacherCoursesWithStudents(
             baseUrl,
-            mergeSessionCookie(sessionCookie, parsedResponseHeaders),
+            authenticatedSessionCookie,
             timeout,
             user.courses.map((course) => ({
               ...course,
@@ -250,15 +242,18 @@ export class EaccLmsClient implements LmsClient {
       try {
         return await this.loadAdminCoursesForUser(
           dashboardUrl,
-          mergeSessionCookie(sessionCookie, parsedResponseHeaders),
+          authenticatedSessionCookie,
           timeout,
           user,
           credentials,
         );
       } catch (error) {
-        if (error instanceof InvalidLmsCredentialsError) {
+        if (
+          error instanceof InvalidLmsCredentialsError &&
+          this.canReturnWithoutPreloadedAdminCourses(user)
+        ) {
           console.warn(
-            `[AdminCourses] post-login course load failed for user="${credentials.username}" after the LMS app login was accepted; returning authenticated admin session without preloaded courses`,
+            `[AdminCourses] post-login full-catalog load failed for user="${credentials.username}" after the LMS app login was accepted; returning authenticated admin session without preloaded courses`,
           );
 
           return {
@@ -274,7 +269,7 @@ export class EaccLmsClient implements LmsClient {
 
     const user = await this.loadDashboard(
       dashboardUrl,
-      mergeSessionCookie(sessionCookie, parsedResponseHeaders),
+      authenticatedSessionCookie,
       timeout,
       credentials.role,
       credentials,
@@ -287,7 +282,7 @@ export class EaccLmsClient implements LmsClient {
           credentials.role === 'student' ? '/members/lms' : '/teacher/lms',
           baseUrl,
         ),
-        mergeSessionCookie(sessionCookie, parsedResponseHeaders),
+        authenticatedSessionCookie,
         timeout,
       );
 
@@ -300,7 +295,7 @@ export class EaccLmsClient implements LmsClient {
       if (credentials.role === 'teacher') {
         const coursesWithStudents = await this.loadTeacherCoursesWithStudents(
           baseUrl,
-          mergeSessionCookie(sessionCookie, parsedResponseHeaders),
+          authenticatedSessionCookie,
           timeout,
           courses.map((course) => ({
             ...course,
@@ -357,24 +352,14 @@ export class EaccLmsClient implements LmsClient {
 
     const responseText = await response.text();
 
-    if (
-      isLoginFailedResponse(response, responseText, endpoint) ||
-      response.status === 401 ||
-      response.status === 403 ||
-      responseText.includes('Username Not Found')
-    ) {
-      console.warn(
-        `[LMS] invalid login response role=admin user=${credentials.username} status=${response.status} url=${response.url} refresh=${readMetaRefreshUrl(responseText, endpoint)?.href ?? 'none'} preview="${previewLmsResponse(responseText)}"`,
-      );
-      throw new InvalidLmsCredentialsError();
-    }
-
-    if (!response.ok) {
-      console.warn(
-        `[LMS] admin session login returned ${response.status} ${response.statusText}`,
-      );
-      throw new LmsUnavailableError();
-    }
+    this.assertValidLoginResponse(
+      response,
+      responseText,
+      endpoint,
+      'admin',
+      credentials.username,
+      'admin session login',
+    );
 
     return mergeSessionCookie(sessionCookie, response.headers);
   }
@@ -511,6 +496,43 @@ export class EaccLmsClient implements LmsClient {
     }
 
     throw new LmsUnavailableError();
+  }
+
+  private assertValidLoginResponse(
+    response: Response,
+    responseText: string,
+    endpoint: URL,
+    role: LmsUserRole,
+    username: string,
+    action = `login ${role}`,
+  ): void {
+    if (
+      isLoginFailedResponse(response, responseText, endpoint) ||
+      response.status === 401 ||
+      response.status === 403
+    ) {
+      console.warn(
+        `[LMS] invalid ${action} role=${role} user=${username} status=${response.status} url=${response.url} refresh=${readMetaRefreshUrl(responseText, endpoint)?.href ?? 'none'} preview="${previewLmsResponse(responseText)}"`,
+      );
+      throw new InvalidLmsCredentialsError();
+    }
+
+    if (!response.ok) {
+      console.warn(
+        `[LMS] ${action} returned ${response.status} ${response.statusText}`,
+      );
+      throw new LmsUnavailableError();
+    }
+  }
+
+  private canReturnWithoutPreloadedAdminCourses(
+    user: NormalizedLmsUser,
+  ): boolean {
+    return (
+      user.isSuperAdmin === true ||
+      user.isManagerOperation === true ||
+      user.isAcademic === true
+    );
   }
 
   private async loadDashboard(
