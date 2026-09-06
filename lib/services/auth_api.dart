@@ -113,6 +113,9 @@ class AuthApi {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $idToken',
       });
+    if (method.toUpperCase() == 'POST') {
+      request.body = jsonEncode({});
+    }
     final streamed = await _client.send(request);
     return http.Response.fromStream(streamed);
   }
