@@ -1,6 +1,6 @@
 // Compatibility bridge for previously installed EACC Connect web apps.
 // No messages are sent and no browser data is deleted.
-const destination = 'https://eacc-mobile-app.web.app/';
+const destination = 'https://eacc-mobile-app.web.app/?from=old-shortcut';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', event => {
